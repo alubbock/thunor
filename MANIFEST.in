@@ -1,0 +1,2 @@
+include versioneer.py
+include pydrc/_version.py
