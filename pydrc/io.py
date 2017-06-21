@@ -147,9 +147,19 @@ def write_hdf(df_data, filename):
                 raise ValueError('Type not supported: {}'.format(type(val)))
 
 
-def read_hdf(filename):
+def read_hdf(filename_or_buffer):
     df_data = {}
-    with pd.HDFStore(filename, 'r') as hdf:
+    hdf_kwargs = {'mode': 'r'}
+    if isinstance(filename_or_buffer, str):
+        hdf_kwargs['path'] = filename_or_buffer
+    else:
+        hdf_kwargs.update({
+            'path': 'data.h5',
+            'driver': 'H5FD_CORE',
+            'driver_core_backing_store': 0,
+            'driver_core_image': filename_or_buffer
+        })
+    with pd.HDFStore(**hdf_kwargs) as hdf:
         df_data['assays'] = hdf['assays']
         try:
             df_data['controls'] = hdf['controls']
