@@ -13,10 +13,14 @@ def tyson1(adj_r_sq, rmse, n):
 
 
 def dip_rates(df_data, selector_fn=tyson1):
-    df_controls = df_data['controls'].loc[df_data['dip_assay_name']]
+    if df_data['controls'] is None:
+        ctrl_dips = None
+    else:
+        df_controls = df_data['controls'].loc[df_data['dip_assay_name']]
+        ctrl_dips = ctrl_dip_rates(df_controls)
     df_assays = df_data['assays'].loc[df_data['dip_assay_name']]
 
-    return ctrl_dip_rates(df_controls), \
+    return ctrl_dips, \
            expt_dip_rates(df_data['doses'], df_assays, selector_fn=selector_fn)
 
 
@@ -157,7 +161,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
-        except KeyError:
+        except (KeyError, AttributeError):
             dip_ctrl = []
             dip_ctrl_std_err = []
 
