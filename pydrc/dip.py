@@ -27,7 +27,8 @@ def dip_rates(df_data, selector_fn=tyson1):
 def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
     res = df_vals.groupby(level='well_id')['value'].\
         apply(_expt_dip, selector_fn=selector_fn).apply(pd.Series).\
-        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err'})
+        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
+                        2: 'dip_first_timepoint', 3: 'dip_y_intercept'})
 
     dip_df = pd.merge(df_doses, res, left_on='well_id',
                       right_index=True)
@@ -44,6 +45,8 @@ def _expt_dip(df_timecourses, selector_fn):
 
     dip = None
     final_std_err = None
+    first_timepoint = None
+    final_intercept = None
     dip_selector = -np.inf
     if n_total < 3:
         return None
@@ -62,15 +65,18 @@ def _expt_dip(df_timecourses, selector_fn):
             dip_selector = new_dip_selector
             dip = slope
             final_std_err = std_err
+            first_timepoint = x[0]
+            final_intercept = intercept
 
-    return dip, final_std_err
+    return dip, final_std_err, first_timepoint, final_intercept
 
 
 def ctrl_dip_rates(df_controls):
     res = df_controls.groupby(level=('cell_line', 'well_id'))[
         'value'].apply(
         _ctrl_dip).apply(pd.Series).\
-        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err'})
+        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
+                        2: 'dip_y_intercept'})
 
     return res
 
@@ -83,7 +89,7 @@ def _ctrl_dip(df_timecourse):
         scipy.stats.linregress(
             t_hours, np.log2(np.array(df_timecourse)))
 
-    return ctrl_slope, ctrl_std_err
+    return ctrl_slope, ctrl_std_err, ctrl_intercept
 
 
 def adjusted_r_squared(r, n, p):
