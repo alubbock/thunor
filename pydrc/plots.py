@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 from .helpers import format_dose
 from .curve_fit import ll4
+from .dip import ctrl_dip_rates, expt_dip_rates
 
 
 SECONDS_IN_HOUR = 3600.0
@@ -164,33 +165,65 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
 
 
 def plot_time_course(df_doses, df_vals, df_controls,
-                     log_yaxis=False, assay_name='Assay', title=None):
+                     log_yaxis=False, assay_name='Assay', title=None,
+                     show_dip_fit=False):
+    if show_dip_fit and not log_yaxis:
+        raise ValueError('log_yaxis must be True when show_dip_fit is True')
     traces = []
 
     colours = sns.color_palette("husl", len(df_doses.index.get_level_values(
         level='dose').unique()))
+
+    if show_dip_fit:
+        dip_rate_ctrl = ctrl_dip_rates(df_controls)
+        dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
+        dip_rates = expt_dip_rates(df_doses, df_vals)
+        dip_rates.set_index('well_id', inplace=True)
 
     # Controls
     if df_controls is not None:
         is_first_control = True
         for well_id, timecourse in df_controls.groupby(level='well_id'):
             timecourse = timecourse['value']
+            t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)
-                timecourse -= timecourse[0]
+                t0_offset = timecourse[0]
+                timecourse -= t0_offset
+            x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
+                       timecourse.index.get_level_values('timepoint')]
             traces.append(go.Scatter(
-                x=[t.total_seconds() / SECONDS_IN_HOUR for t in
-                   timecourse.index.get_level_values('timepoint')],
+                x=x_range,
                 y=timecourse,
                 mode='lines+markers',
                 line={'color': 'black',
-                      'shape': 'spline'},
+                      'shape': 'spline',
+                      'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
                 name='Control',
                 legendgroup='__Control',
                 showlegend=is_first_control
             ))
             is_first_control = False
+
+            if show_dip_fit:
+                dip_well = dip_rate_ctrl.loc[well_id]
+                minmax = [np.min(x_range), np.max(x_range)]
+
+                dip_points = [x * dip_well['dip_rate'] +
+                              dip_well['dip_y_intercept'] - t0_offset
+                              for x in minmax]
+
+                traces.append(go.Scatter(
+                    x=minmax,
+                    y=dip_points,
+                    mode='lines',
+                    line={'color': 'black'},
+                    marker={'size': 5},
+                    name='Control',
+                    legendgroup='__Control',
+                    showlegend=False
+                ))
 
     # Experiment (non-control)
     for dose, wells in df_doses.groupby(level='dose'):
@@ -199,21 +232,43 @@ def plot_time_course(df_doses, df_vals, df_controls,
 
         for well_idx, well_id in enumerate(wells['well_id']):
             timecourse = df_vals.loc[well_id, 'value']
+            t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)
-                timecourse -= timecourse[0]
+                t0_offset = timecourse[0]
+                timecourse -= t0_offset
+            x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
+                       timecourse.index.get_level_values('timepoint')]
             traces.append(go.Scatter(
-                x=[t.total_seconds() / SECONDS_IN_HOUR for t in
-                   timecourse.index.get_level_values('timepoint')],
+                x=x_range,
                 y=timecourse,
                 mode='lines+markers',
                 line={'color': this_colour,
-                      'shape': 'spline'},
+                      'shape': 'spline',
+                      'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
                 name=format_dose(dose),
                 legendgroup=str(dose),
                 showlegend=well_idx == 0
             ))
+
+            if show_dip_fit:
+                dip_well = dip_rates.loc[well_id]
+                minmax = [dip_well['dip_first_timepoint'], np.max(x_range)]
+                dip_points = [x*dip_well['dip_rate'] +
+                              dip_well['dip_y_intercept'] - t0_offset
+                              for x in minmax]
+
+                traces.append(go.Scatter(
+                    x=minmax,
+                    y=dip_points,
+                    mode='lines',
+                    line={'color': this_colour},
+                    marker={'size': 5},
+                    name=format_dose(dose),
+                    legendgroup=str(dose),
+                    showlegend=False
+                ))
 
     data = go.Data(traces)
     if log_yaxis:
