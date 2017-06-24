@@ -8,6 +8,7 @@ from .dip import ctrl_dip_rates, expt_dip_rates
 
 SECONDS_IN_HOUR = 3600.0
 PLOT_AXIS_LABELS = {'auc': 'Area under curve (AUC)',
+                    'aa': 'Activity Area',
                     'ic50': 'IC50',
                     'ec50': 'EC50',
                     'emax': 'Emax',

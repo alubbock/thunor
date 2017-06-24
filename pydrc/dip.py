@@ -134,6 +134,14 @@ def find_auc(fit_params, min_conc):
             hill_slope) * ((e0 - emax) / e0)
 
 
+def find_aa(fit_params, max_conc):
+    hill_slope, e0, emax, ec50 = fit_params
+
+    if emax > e0:
+        emax, e0 = e0, emax
+    return np.log10(max_conc / ec50) * ((e0 - emax) / e0)
+
+
 def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                    include_dip_rates=True, include_stats=True):
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
@@ -213,9 +221,11 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 fit_data['ic50'] = find_ic50(
                     doses_for_ic50, hill_fn(doses_for_ic50, *popt_rel))
 
-            if popt is None:
+            if popt is None or fit_data['ec50'] is None:
+                fit_data['aa'] = None
                 fit_data['auc'] = None
             else:
+                fit_data['aa'] = find_aa(fit_params=popt, max_conc=1e-3)
                 fit_data['auc'] = find_auc(fit_params=popt, min_conc=1e-12)
 
         fit_params.append(fit_data)
