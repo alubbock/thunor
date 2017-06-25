@@ -3,6 +3,7 @@ import scipy.stats
 import scipy.interpolate
 import pandas as pd
 from .curve_fit import fit_drc, ll4
+from .helpers import format_dose
 
 SECONDS_IN_HOUR = 3600.0
 
@@ -143,6 +144,7 @@ def find_aa(fit_params, max_conc):
 
 
 def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
+                   aa_max_conc=1e-3, auc_min_conc=1e-12,
                    include_dip_rates=True, include_stats=True):
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
@@ -213,6 +215,17 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         # Only calculate AUC and IC50 if needed
         if include_stats:
+            if auc_min_conc < 1e-24 or auc_min_conc > np.min(doses):
+                raise ValueError('AUC minimum concentration must be '
+                                 'greater than 1e-24 M and less than minimum '
+                                 'dose in dataset/control: '
+                                 '{}'.format(format_dose(np.min(doses))))
+            if aa_max_conc < np.max(doses) or aa_max_conc > 1e6:
+                raise ValueError('AA maximum concentration must be '
+                                 'less than 1e6 M and greater than minimum '
+                                 'dose in dataset/control: '
+                                 '{}'.format(format_dose(np.max(doses))))
+
             if popt_rel is None:
                 fit_data['ic50'] = None
             else:
@@ -225,8 +238,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 fit_data['aa'] = None
                 fit_data['auc'] = None
             else:
-                fit_data['aa'] = find_aa(fit_params=popt, max_conc=1e-3)
-                fit_data['auc'] = find_auc(fit_params=popt, min_conc=1e-12)
+                fit_data['aa'] = find_aa(fit_params=popt, max_conc=aa_max_conc)
+                fit_data['auc'] = find_auc(fit_params=popt,
+                                           min_conc=auc_min_conc)
 
         fit_params.append(fit_data)
 
