@@ -6,9 +6,22 @@ from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates
 
 
+def _activity_area_title(**kwargs):
+    title = 'Activity area'
+    if 'aa_max_conc' in kwargs:
+        title += ' [max. dose={}]'.format(format_dose(kwargs['aa_max_conc']))
+    return title
+
+
+def _auc_title(**kwargs):
+    title = 'Area under curve (AUC)'
+    if 'auc_min_conc' in kwargs:
+        title += ' [min. dose={}]'.format(format_dose(kwargs['auc_min_conc']))
+    return title
+
 SECONDS_IN_HOUR = 3600.0
-PLOT_AXIS_LABELS = {'auc': 'Area under curve (AUC)',
-                    'aa': 'Activity Area',
+PLOT_AXIS_LABELS = {'auc': _activity_area_title,
+                    'aa': _activity_area_title,
                     'ic50': 'IC50',
                     'ec50': 'EC50',
                     'emax': 'Emax',
@@ -115,8 +128,9 @@ def plot_dip(fit_params, is_absolute=False,
             if annotation_label:
                 annotations.append({
                     'x': 0.5,
-                    'y': 1.1,
+                    'y': 1.0,
                     'xref': 'paper',
+                    'yanchor': 'bottom',
                     'yref': 'paper',
                     'showarrow': False,
                     'text': annotation_label
@@ -146,6 +160,10 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
     groups = [fp['label'] for fp in fit_params]
 
     yaxis_title = PLOT_AXIS_LABELS.get(fit_params_sort, fit_params_sort)
+    try:
+        yaxis_title = yaxis_title(**kwargs)
+    except TypeError:
+        pass
     yvals = [fp[fit_params_sort] for fp in fit_params]
     data = [go.Bar(x=groups, y=yvals)]
     annotations = [{'x': x, 'y': 0, 'text': '<em>N/A</em>',
