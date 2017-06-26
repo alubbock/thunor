@@ -1,4 +1,5 @@
 import collections
+import pandas as pd
 
 
 def format_dose(num, sig_digits=12):
@@ -24,3 +25,37 @@ def format_dose(num, sig_digits=12):
             multiplier = i
     return ('{0:.' + str(sig_digits) + 'g} {1}M').format(
         num/multiplier, _prefix[multiplier])
+
+
+def plotly_to_dataframe(plot_fig):
+    series = []
+    for trace in plot_fig['data']:
+        try:
+            trace_name = trace['customdata']['csvname']
+        except (TypeError, KeyError):
+            try:
+                trace_name = trace['name'].replace('\\n', '')
+            except KeyError:
+                trace_name = None
+        yvals = trace['y']
+        xvals = trace['x']
+        if isinstance(yvals, (pd.DataFrame, pd.Series)):
+            if not isinstance(xvals, pd.Index) or xvals.is_unique:
+                yvals = yvals.values
+                series.append(pd.Series(yvals, index=xvals, name=trace_name))
+            else:
+                index_name = yvals.index.names[0]
+                series_name = yvals.name
+                yvals = pd.DataFrame(yvals)
+                yvals['__replicate__'] = yvals.groupby(level=0).cumcount()
+                yvals.reset_index(inplace=True)
+                ptable = yvals.pivot(columns='__replicate__',
+                                     index=index_name,
+                                     values=series_name)
+                ptable.rename(columns=lambda i: '{} {}'.format(trace_name, i),
+                              inplace=True)
+                series.extend(col for _, col in ptable.iteritems())
+        else:
+            series.append(pd.Series(yvals, index=xvals, name=trace_name))
+
+    return pd.concat(series, axis=1)

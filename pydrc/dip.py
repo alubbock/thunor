@@ -182,6 +182,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
         except (KeyError, AttributeError):
+            ctrl_dip_data_cl = None
             dip_ctrl = []
             dip_ctrl_std_err = []
 
@@ -214,10 +215,13 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         )
 
         if include_dip_rates:
-            fit_data['doses_ctrl'] = doses_ctrl
-            fit_data['doses_expt'] = doses_expt
-            fit_data['dip_ctrl'] = dip_ctrl
-            fit_data['dip_expt'] = dip_expt
+            if ctrl_dip_data_cl is not None:
+                ctrl_dip_data_cl['dose'] = doses_ctrl
+                ctrl_dip_data_cl.reset_index('well_id', inplace=True)
+                ctrl_dip_data_cl.set_index(['dose', 'well_id'], inplace=True)
+                fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
+            fit_data['dip_expt'] = dip_grp['dip_rate'].reset_index(
+                level=['drug', 'cell_line'], drop=True)
 
         # Only calculate AUC and IC50 if needed
         if include_stats:

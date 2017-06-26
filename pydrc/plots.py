@@ -53,7 +53,14 @@ def plot_dip(fit_params, is_absolute=False,
 
         popt_plot = fp.popt if is_absolute else fp.popt_rel
 
-        doses = np.concatenate((fp.doses_ctrl, fp.doses_expt))
+        try:
+            ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
+        except AttributeError:
+            ctrl_doses = []
+
+        expt_doses = fp.dip_expt.index.get_level_values('dose')
+
+        doses = np.concatenate((ctrl_doses, expt_doses))
 
         # Calculate the dip rate fit
         log_dose_min = int(np.floor(np.log10(min(doses))))
@@ -89,12 +96,15 @@ def plot_dip(fit_params, is_absolute=False,
 
         if show_replicates:
             y_trace = fp.dip_expt
-            dip_ctrl = fp.dip_ctrl
+            try:
+                dip_ctrl = fp.dip_ctrl
+            except AttributeError:
+                dip_ctrl = None
             if not is_absolute:
                 y_trace /= fp.divisor
                 dip_ctrl /= fp.divisor
 
-            traces.append(go.Scatter(x=fp.doses_expt,
+            traces.append(go.Scatter(x=expt_doses,
                                      y=y_trace,
                                      mode='markers',
                                      line={'shape': 'spline',
@@ -105,18 +115,19 @@ def plot_dip(fit_params, is_absolute=False,
                                      name='Replicate',
                                      marker={'size': 5})
                           )
-            traces.append(go.Scatter(x=fp.doses_ctrl,
-                                     y=dip_ctrl,
-                                     mode='markers',
-                                     line={'shape': 'spline',
-                                           'color': 'black',
-                                           'width': 3},
-                                     hoverinfo='y+text',
-                                     text='Control',
-                                     legendgroup=group_name_disp,
-                                     showlegend=False,
-                                     marker={'size': 5})
-                          )
+            if dip_ctrl is not None:
+                traces.append(go.Scatter(x=ctrl_doses,
+                                         y=dip_ctrl,
+                                         mode='markers',
+                                         line={'shape': 'spline',
+                                               'color': 'black',
+                                               'width': 3},
+                                         hoverinfo='y+name',
+                                         name='Control',
+                                         legendgroup=group_name_disp,
+                                         showlegend=False,
+                                         marker={'size': 5})
+                              )
 
             annotation_label = ''
             if fp.ec50 is not None:
@@ -184,6 +195,7 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
         text = None
         marker_cols = colours[1]
     data = [go.Bar(x=groups, y=yvals,
+                   name=fit_params_sort,
                    text=text,
                    marker={'color': marker_cols}
                    )]
@@ -210,6 +222,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
     if show_dip_fit and not log_yaxis:
         raise ValueError('log_yaxis must be True when show_dip_fit is True')
     traces = []
+    traces_fits = []
 
     colours = _sns_to_rgb(sns.color_palette(
         "husl", len(df_doses.index.get_level_values(level='dose').unique())))
@@ -254,13 +267,13 @@ def plot_time_course(df_doses, df_vals, df_controls,
                               dip_well['dip_y_intercept'] - t0_offset
                               for x in minmax]
 
-                traces.append(go.Scatter(
+                traces_fits.append(go.Scatter(
                     x=minmax,
                     y=dip_points,
                     mode='lines',
                     line={'color': 'black'},
                     marker={'size': 5},
-                    name='Control',
+                    name='DIP fit Control',
                     legendgroup='__Control',
                     showlegend=False
                 ))
@@ -287,6 +300,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
                       'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
                 name=format_dose(dose),
+                customdata={'csvname': dose},
                 legendgroup=str(dose),
                 showlegend=well_idx == 0
             ))
@@ -298,18 +312,19 @@ def plot_time_course(df_doses, df_vals, df_controls,
                               dip_well['dip_y_intercept'] - t0_offset
                               for x in minmax]
 
-                traces.append(go.Scatter(
+                traces_fits.append(go.Scatter(
                     x=minmax,
                     y=dip_points,
                     mode='lines',
                     line={'color': this_colour},
                     marker={'size': 5},
                     name=format_dose(dose),
+                    customdata={'csvname': 'DIP fit ' + str(dose)},
                     legendgroup=str(dose),
                     showlegend=False
                 ))
 
-    data = go.Data(traces)
+    data = go.Data(traces + traces_fits)
     if log_yaxis:
         assay_name = "Change in log2 {}".format(assay_name)
     max_time = df_vals.index.get_level_values('timepoint').max()
