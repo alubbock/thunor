@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.stats
-import scipy.interpolate
 import pandas as pd
 from .curve_fit import fit_drc, ll4
 from .helpers import format_dose
@@ -116,13 +115,18 @@ def adjusted_r_squared(r, n, p):
     return 1 - (1 - r ** 2) * ((n - 1) / (n - p - 1))
 
 
-def find_ic50(x_interp, y_interp):
-    st, sc, sk = scipy.interpolate.splrep(x_interp, y_interp)
-    hill_interpolate = scipy.interpolate.sproot((st, sc - .5, sk))
-    if len(hill_interpolate) > 0:
-        return hill_interpolate[0]
-    else:
-        return None
+def find_ic50(fit_params):
+    hill_slope, e0, emax, ec50 = fit_params
+
+    if emax > e0:
+        emax, e0 = e0, emax
+
+    ic50 = ec50 / (1 - 2 * (emax/e0)) ** (1 / hill_slope)
+
+    if np.isnan(ic50):
+        ic50 = None
+
+    return ic50
 
 
 def find_auc(fit_params, min_conc):
@@ -203,7 +207,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             popt=popt,
             popt_rel=popt_rel,
             emax=None if popt is None else popt[1],
-            ec50=None if popt is None or popt[3] > np.max(doses) else popt[3],
+            ec50=None if popt is None else popt[3],
+            ec50_out_of_range=None if popt is None else
+            popt[3] > np.max(doses),
             hill=None if popt is None else popt[0]
         )
 
@@ -229,10 +235,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             if popt_rel is None:
                 fit_data['ic50'] = None
             else:
-                doses_for_ic50 = np.linspace(
-                    np.min(doses), np.max(doses), 2000)
-                fit_data['ic50'] = find_ic50(
-                    doses_for_ic50, hill_fn(doses_for_ic50, *popt_rel))
+                fit_data['ic50'] = find_ic50(popt)
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None
