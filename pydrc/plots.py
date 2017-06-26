@@ -41,15 +41,15 @@ def plot_dip(fit_params, is_absolute=False,
 
     annotations = []
     traces = []
-    for trace_idx, fp in enumerate(fit_params):
+    for fp in fit_params.itertuples():
         c = colours.pop()
         this_colour = 'rgb(%d, %d, %d)' % \
                       (c[0] * 255, c[1] * 255, c[2] * 255)
-        group_name_disp = fp['label']
+        group_name_disp = fp.label
 
-        popt_plot = fp['popt'] if is_absolute else fp['popt_rel']
+        popt_plot = fp.popt if is_absolute else fp.popt_rel
 
-        doses = np.concatenate((fp['doses_ctrl'], fp['doses_expt']))
+        doses = np.concatenate((fp.doses_ctrl, fp.doses_expt))
 
         # Calculate the dip rate fit
         log_dose_min = int(np.floor(np.log10(min(doses))))
@@ -65,7 +65,7 @@ def plot_dip(fit_params, is_absolute=False,
                                  axis=0)
 
         if popt_plot is None:
-            dip_rate_fit = [1 if not is_absolute else fp['divisor']] * \
+            dip_rate_fit = [1 if not is_absolute else fp.divisor] * \
                            len(dose_x_range)
         else:
             dip_rate_fit = hill_fn(dose_x_range, *popt_plot)
@@ -84,13 +84,13 @@ def plot_dip(fit_params, is_absolute=False,
                       )
 
         if show_replicates:
-            y_trace = fp['dip_expt']
-            dip_ctrl = fp['dip_ctrl']
+            y_trace = fp.dip_expt
+            dip_ctrl = fp.dip_ctrl
             if not is_absolute:
-                y_trace /= fp['divisor']
-                dip_ctrl /= fp['divisor']
+                y_trace /= fp.divisor
+                dip_ctrl /= fp.divisor
 
-            traces.append(go.Scatter(x=fp['doses_expt'],
+            traces.append(go.Scatter(x=fp.doses_expt,
                                      y=y_trace,
                                      mode='markers',
                                      line={'shape': 'spline',
@@ -101,7 +101,7 @@ def plot_dip(fit_params, is_absolute=False,
                                      name='Replicate',
                                      marker={'size': 5})
                           )
-            traces.append(go.Scatter(x=fp['doses_ctrl'],
+            traces.append(go.Scatter(x=fp.doses_ctrl,
                                      y=dip_ctrl,
                                      mode='markers',
                                      line={'shape': 'spline',
@@ -115,16 +115,16 @@ def plot_dip(fit_params, is_absolute=False,
                           )
 
             annotation_label = ''
-            if fp['ec50'] is not None:
+            if fp.ec50 is not None:
                 annotation_label += 'EC50: {} '.format(format_dose(
-                    fp['ec50'], sig_digits=5
+                    fp.ec50, sig_digits=5
                 ))
-            if fp['ic50'] is not None:
+            if fp.ic50 is not None:
                 annotation_label += 'IC50: {} '.format(format_dose(
-                    fp['ic50'], sig_digits=5
+                    fp.ic50, sig_digits=5
                 ))
-            if fp['emax'] is not None:
-                annotation_label += 'Emax: {0:.5g}'.format(fp['emax'])
+            if fp.emax is not None:
+                annotation_label += 'Emax: {0:.5g}'.format(fp.emax)
             if annotation_label:
                 annotations.append({
                     'x': 0.5,
@@ -152,26 +152,24 @@ def plot_dip(fit_params, is_absolute=False,
 
 
 def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
-    # Sort lists by chosen index. The sort order key ensures that Nones
-    # appear at the start of the sort.
-    fit_params = sorted(fit_params, key=lambda x:
-        (x[fit_params_sort] is not None, x[fit_params_sort])
-    )
-    groups = [fp['label'] for fp in fit_params]
+    fit_params = fit_params.sort_values(by=fit_params_sort,
+                                        na_position='first')
 
     yaxis_title = PLOT_AXIS_LABELS.get(fit_params_sort, fit_params_sort)
     try:
         yaxis_title = yaxis_title(**kwargs)
     except TypeError:
         pass
-    yvals = [fp[fit_params_sort] for fp in fit_params]
+
+    groups = fit_params['label']
+    yvals = fit_params[fit_params_sort]
     data = [go.Bar(x=groups, y=yvals)]
     annotations = [{'x': x, 'y': 0, 'text': '<em>N/A</em>',
                     'textangle': 90,
                     'xanchor': 'center', 'yanchor': 'bottom',
                     'showarrow': False,
                     'font': {'color': 'rgba(150, 150, 150, 1)'}}
-                   for x, y in zip(groups, yvals) if y is None]
+                   for x in groups[yvals.isnull()]]
 
     layout = go.Layout(title=title,
                        barmode='group',

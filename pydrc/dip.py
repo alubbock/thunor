@@ -222,7 +222,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                                  '{}'.format(format_dose(np.min(doses))))
             if aa_max_conc < np.max(doses) or aa_max_conc > 1e6:
                 raise ValueError('AA maximum concentration must be '
-                                 'less than 1e6 M and greater than minimum '
+                                 'less than 1e6 M and greater than maximum '
                                  'dose in dataset/control: '
                                  '{}'.format(format_dose(np.max(doses))))
 
@@ -244,4 +244,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         fit_params.append(fit_data)
 
-    return fit_params
+    df_params = pd.DataFrame(fit_params)
+    df_params.set_index(['cell_line', 'drug'], inplace=True)
+
+    return df_params
