@@ -202,6 +202,7 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
     annotations = [{'x': x, 'y': 0, 'text': '<em>N/A</em>',
                     'textangle': 90,
                     'xanchor': 'center', 'yanchor': 'bottom',
+                    'yref': 'paper',
                     'showarrow': False,
                     'font': {'color': 'rgba(150, 150, 150, 1)'}}
                    for x in groups[yvals.isnull()]]
@@ -210,8 +211,9 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
                        barmode='group',
                        annotations=annotations,
                        yaxis={'title': yaxis_title,
-                              'type': 'log' if kwargs.get('log_yaxis',
-                                                          False) else None})
+                              'type':
+                                  'log' if fit_params_sort in
+                                  ('ec50', 'ic50') else None})
 
     return go.Figure(data=data, layout=layout)
 
