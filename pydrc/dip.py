@@ -12,6 +12,14 @@ class ValueWarning(UserWarning):
     pass
 
 
+class AUCFitWarning(ValueWarning):
+    pass
+
+
+class AAFitWarning(ValueWarning):
+    pass
+
+
 def tyson1(adj_r_sq, rmse, n):
     """ Tyson1 DIP rate selection heuristic """
     return adj_r_sq * ((1 - rmse) ** 2) * ((n - 3) ** 0.25)
@@ -235,13 +243,13 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                               'greater than 1e-24 M and less than minimum '
                               'dose in dataset/control: '
                               '{}'.format(format_dose(np.min(doses))),
-                              ValueWarning)
+                              AUCFitWarning)
             if aa_max_conc < np.max(doses) or aa_max_conc > 1e6:
                 warnings.warn('AA maximum dose should be '
                               'less than 1e6 M and greater than maximum '
                               'dose in dataset/control: '
                               '{}'.format(format_dose(np.max(doses))),
-                              ValueWarning)
+                              AAFitWarning)
 
             if popt_rel is None:
                 fit_data['ic50'] = None
@@ -268,6 +276,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                           'the highest EC50 in this selection: {}. This '
                           'is to avoid negative AA values.'.format(
                                 format_dose(max_ec50, sig_digits=5)),
-                          ValueWarning)
+                          AAFitWarning)
 
     return df_params

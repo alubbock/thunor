@@ -326,7 +326,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
 
     data = go.Data(traces + traces_fits)
     if log_yaxis:
-        assay_name = "Change in log2 {}".format(assay_name)
+        assay_name = "Change in log<sub>2</sub> {}".format(assay_name)
     max_time = df_vals.index.get_level_values('timepoint').max()
     layout = go.Layout(title=title,
                        xaxis={'title': 'Time (hours)',
