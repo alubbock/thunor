@@ -3,8 +3,13 @@ import scipy.stats
 import pandas as pd
 from .curve_fit import fit_drc, ll4
 from .helpers import format_dose
+import warnings
 
 SECONDS_IN_HOUR = 3600.0
+
+
+class ValueWarning(UserWarning):
+    pass
 
 
 def tyson1(adj_r_sq, rmse, n):
@@ -226,15 +231,17 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         # Only calculate AUC and IC50 if needed
         if include_stats:
             if auc_min_conc < 1e-24 or auc_min_conc > np.min(doses):
-                raise ValueError('AUC minimum concentration must be '
-                                 'greater than 1e-24 M and less than minimum '
-                                 'dose in dataset/control: '
-                                 '{}'.format(format_dose(np.min(doses))))
+                warnings.warn('AUC minimum dose should be '
+                              'greater than 1e-24 M and less than minimum '
+                              'dose in dataset/control: '
+                              '{}'.format(format_dose(np.min(doses))),
+                              ValueWarning)
             if aa_max_conc < np.max(doses) or aa_max_conc > 1e6:
-                raise ValueError('AA maximum concentration must be '
-                                 'less than 1e6 M and greater than maximum '
-                                 'dose in dataset/control: '
-                                 '{}'.format(format_dose(np.max(doses))))
+                warnings.warn('AA maximum dose should be '
+                              'less than 1e6 M and greater than maximum '
+                              'dose in dataset/control: '
+                              '{}'.format(format_dose(np.max(doses))),
+                              ValueWarning)
 
             if popt_rel is None:
                 fit_data['ic50'] = None
@@ -253,5 +260,14 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
     df_params = pd.DataFrame(fit_params)
     df_params.set_index(['cell_line', 'drug'], inplace=True)
+
+    if include_stats:
+        max_ec50 = df_params['ec50'].max()
+        if aa_max_conc < max_ec50 < 1e6:
+            warnings.warn('AA maximum dose should be larger than '
+                          'the highest EC50 in this selection: {}. This '
+                          'is to avoid negative AA values.'.format(
+                                format_dose(max_ec50, sig_digits=5)),
+                          ValueWarning)
 
     return df_params
