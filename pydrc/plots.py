@@ -22,11 +22,11 @@ def _auc_title(**kwargs):
 SECONDS_IN_HOUR = 3600.0
 PLOT_AXIS_LABELS = {'auc': _activity_area_title,
                     'aa': _activity_area_title,
-                    'ic50': 'IC50',
-                    'ec50': 'EC50',
-                    'emax': 'Emax',
+                    'ic50': 'IC<sub>50</sub> (M)',
+                    'ec50': 'EC<sub>50</sub> (M)',
+                    'emax': 'E<sub>max</sub> (h<sup>-1</sup>)',
                     'hill': 'Hill coefficient'}
-EC50_OUT_OF_RANGE_MSG = 'EC50 &gt; measured concentrations'
+EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations'
 
 
 def _sns_to_rgb(palette):
@@ -39,7 +39,7 @@ def plot_dip(fit_params, is_absolute=False,
 
     colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
 
-    yaxis_title = 'DIP rate'
+    yaxis_title = 'DIP rate (h<sup>-1</sup>)'
     if not is_absolute:
         yaxis_title = 'Relative ' + yaxis_title
 
@@ -131,16 +131,16 @@ def plot_dip(fit_params, is_absolute=False,
 
             annotation_label = ''
             if fp.ec50 is not None:
-                annotation_label += 'EC50{}: {} '.format(
+                annotation_label += 'EC<sub>50</sub>{}: {} '.format(
                     '*' if fp.ec50_out_of_range else '',
                     format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
-                annotation_label += 'IC50: {} '.format(format_dose(
+                annotation_label += 'IC<sub>50</sub>: {} '.format(format_dose(
                     fp.ic50, sig_digits=5
                 ))
             if fp.emax is not None:
-                annotation_label += 'Emax: {0:.5g}'.format(fp.emax)
+                annotation_label += 'E<sub>max</sub>: {0:.5g}'.format(fp.emax)
             if annotation_label:
                 annotations.append({
                     'x': 0.5,
