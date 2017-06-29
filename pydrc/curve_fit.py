@@ -17,6 +17,12 @@ def ll4(x, b, c, d, e):
 
 # Fitting function
 def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4):
+    dip_rate_nans = np.isnan(dip_rates)
+    if np.any(dip_rate_nans):
+        doses = doses[~dip_rate_nans]
+        dip_rates = dip_rates[~dip_rate_nans]
+        if dip_std_errs is not None:
+            dip_std_errs = dip_std_errs[~dip_rate_nans]
     popt = None
     curve_initial_guess = ll4_initials(doses, dip_rates)
     try:
