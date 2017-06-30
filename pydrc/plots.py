@@ -34,8 +34,28 @@ def _sns_to_rgb(palette):
             in palette]
 
 
+def _make_title(title, df):
+    drug_list = df.index.get_level_values('drug').unique()
+    if len(drug_list) == 1:
+        title += ' for {}'.format(drug_list[0])
+
+    cell_line_list = df.index.get_level_values('cell_line').unique()
+    if len(cell_line_list) == 1:
+        title += ' on {}'.format(cell_line_list[0])
+
+    return title
+
+
+def _combine_title_subtitle(title, subtitle):
+    if subtitle:
+        title += '<br> <span style="color:#999;font-size:0.9em">' \
+                 '{}</span>'.format(subtitle)
+
+    return title
+
+
 def plot_dip(fit_params, is_absolute=False,
-             title=None, hill_fn=ll4):
+             title=None, subtitle=None, hill_fn=ll4):
 
     colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
 
@@ -44,6 +64,10 @@ def plot_dip(fit_params, is_absolute=False,
         yaxis_title = 'Relative ' + yaxis_title
 
     show_replicates = len(fit_params) == 1
+
+    if title is None:
+        title = _make_title('Dose response', fit_params)
+    title = _combine_title_subtitle(title, subtitle)
 
     annotations = []
     traces = []
@@ -102,7 +126,8 @@ def plot_dip(fit_params, is_absolute=False,
                 dip_ctrl = None
             if not is_absolute:
                 y_trace /= fp.divisor
-                dip_ctrl /= fp.divisor
+                if dip_ctrl is not None:
+                    dip_ctrl /= fp.divisor
 
             traces.append(go.Scatter(x=expt_doses,
                                      y=y_trace,
@@ -169,11 +194,16 @@ def plot_dip(fit_params, is_absolute=False,
     return go.Figure(data=data, layout=layout)
 
 
-def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
+def plot_dip_params(fit_params, fit_params_sort, title=None,
+                    subtitle=None, **kwargs):
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     fit_params = fit_params.sort_values(by=fit_params_sort,
                                         na_position='first')
+
+    if title is None:
+        title = _make_title('Dose response parameters', fit_params)
+    title = _combine_title_subtitle(title, subtitle)
 
     yaxis_title = PLOT_AXIS_LABELS.get(fit_params_sort, fit_params_sort)
     try:
@@ -220,11 +250,15 @@ def plot_dip_params(fit_params, fit_params_sort, title=None, **kwargs):
 
 def plot_time_course(df_doses, df_vals, df_controls,
                      log_yaxis=False, assay_name='Assay', title=None,
-                     show_dip_fit=False):
+                     subtitle=None, show_dip_fit=False):
     if show_dip_fit and not log_yaxis:
         raise ValueError('log_yaxis must be True when show_dip_fit is True')
     traces = []
     traces_fits = []
+
+    if title is None:
+        title = _make_title('Dose response parameters', df_doses)
+    title = _combine_title_subtitle(title, subtitle)
 
     colours = _sns_to_rgb(sns.color_palette(
         "husl", len(df_doses.index.get_level_values(level='dose').unique())))
