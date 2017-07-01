@@ -195,11 +195,9 @@ def plot_dip(fit_params, is_absolute=False,
 
 
 def plot_dip_params(fit_params, fit_params_sort, title=None,
-                    subtitle=None, **kwargs):
+                    subtitle=None, aggregate_cell_lines=False,
+                    aggregate_drugs=False, **kwargs):
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
-
-    fit_params = fit_params.sort_values(by=fit_params_sort,
-                                        na_position='first')
 
     if title is None:
         title = _make_title('Dose response parameters', fit_params)
@@ -211,8 +209,6 @@ def plot_dip_params(fit_params, fit_params_sort, title=None,
     except TypeError:
         pass
 
-    groups = fit_params['label']
-    yvals = fit_params[fit_params_sort]
     if fit_params_sort in ('ec50', 'auc', 'aa'):
         msg = EC50_OUT_OF_RANGE_MSG
         if fit_params_sort != 'ec50':
@@ -224,28 +220,89 @@ def plot_dip_params(fit_params, fit_params_sort, title=None,
     else:
         text = None
         marker_cols = colours[1]
-    data = [go.Bar(x=groups, y=yvals,
-                   name=fit_params_sort,
-                   text=text,
-                   marker={'color': marker_cols}
-                   )]
-    annotations = [{'x': x, 'y': 0, 'text': '<em>N/A</em>',
-                    'textangle': 90,
-                    'xanchor': 'center', 'yanchor': 'bottom',
-                    'yref': 'paper',
-                    'showarrow': False,
-                    'font': {'color': 'rgba(150, 150, 150, 1)'}}
-                   for x in groups[yvals.isnull()]]
 
-    layout = go.Layout(title=title,
-                       barmode='group',
-                       annotations=annotations,
-                       yaxis={'title': yaxis_title,
-                              'type':
-                                  'log' if fit_params_sort in
-                                  ('ec50', 'ic50') else None})
+    layout = dict(title=title,
+                  yaxis={'title': yaxis_title,
+                         'type': 'log' if fit_params_sort in
+                                 ('ec50', 'ic50') else None})
+
+    if not aggregate_cell_lines and not aggregate_drugs:
+        fit_params = fit_params.sort_values(by=fit_params_sort,
+                                            na_position='first')
+        groups = fit_params['label']
+        yvals = fit_params[fit_params_sort]
+
+        data = [go.Bar(x=groups, y=yvals,
+                       name=fit_params_sort,
+                       text=text,
+                       marker={'color': marker_cols}
+                       )]
+        layout['annotations'] = [
+            {'x': x, 'y': 0, 'text': '<em>N/A</em>',
+             'textangle': 90,
+             'xanchor': 'center', 'yanchor': 'bottom',
+             'yref': 'paper',
+             'showarrow': False,
+             'font': {'color': 'rgba(150, 150, 150, 1)'}}
+            for x in groups[yvals.isnull()]]
+        layout['barmode'] = 'group'
+    else:
+        layout['boxmode'] = 'group'
+        yvals = fit_params[fit_params_sort]
+
+        data = []
+
+        if aggregate_cell_lines:
+            if aggregate_cell_lines is True:
+                cell_lines = yvals.index.get_level_values(
+                    level='cell_line').unique().tolist()
+                aggregate_cell_lines = {", ".join(cell_lines): cell_lines}
+
+            for cl_tag_name, cl_names in aggregate_cell_lines.items():
+                yvals_tmp = yvals.iloc[yvals.index.isin(cl_names,
+                                                        level='cell_line')]
+                x = np.repeat(cl_tag_name, len(yvals_tmp))
+                if aggregate_drugs:
+                    data.extend(_agg_drugs(yvals_tmp, aggregate_drugs, x=x))
+                else:
+                    for dr_name, grp in yvals_tmp.groupby(level='drug'):
+                        data.append(go.Box(x=np.repeat(cl_tag_name, len(grp)),
+                                           y=grp,
+                                           name=dr_name))
+
+        else:
+            data.extend(_agg_drugs(yvals, aggregate_drugs))
+
+        if aggregate_drugs and (aggregate_drugs is True or len(
+                aggregate_drugs) == 1):
+            drugs = yvals.index.get_level_values('drug').unique().tolist()
+            layout['annotations'] = [{'x': 0.5, 'y': 1.0, 'xref': 'paper',
+                                      'yanchor': 'bottom', 'yref': 'paper',
+                                      'showarrow': False,
+                                      'text': ", ".join(drugs)
+                                      }]
+
+    layout = go.Layout(layout)
 
     return go.Figure(data=data, layout=layout)
+
+
+def _agg_drugs(series, aggregate_drugs, x=None):
+    data = []
+
+    if aggregate_drugs is True:
+        drugs = series.index.get_level_values(
+            'drug').unique().tolist()
+        aggregate_drugs = {", ".join(drugs): drugs}
+
+    for tag_name, drug_names in aggregate_drugs.items():
+        y = series.iloc[series.index.isin(
+            drug_names, level='drug')]
+        if x is None:
+            x = y.index.get_level_values('cell_line')
+        data.append(go.Box(x=x, y=y, name=tag_name))
+
+    return data
 
 
 def plot_time_course(df_doses, df_vals, df_controls,
