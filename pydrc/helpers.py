@@ -2,12 +2,15 @@ import collections
 import pandas as pd
 
 
-def format_dose(num, sig_digits=12):
+def format_dose(num, sig_digits=12, array_as_string=None):
     """
     Formats a numeric dose like 1.2e-9 into 1.2 nM
     """
     if not isinstance(num, str) and isinstance(num, collections.Iterable):
-        return [format_dose(each_num) for each_num in num]
+        retval = [format_dose(each_num) for each_num in num]
+        if array_as_string is not None:
+            return array_as_string.join(retval)
+        return retval
 
     if num is None:
         return 'N/A'

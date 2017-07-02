@@ -408,6 +408,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
                 timecourse -= t0_offset
             x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
                        timecourse.index.get_level_values('timepoint')]
+            dose_str = format_dose(dose, array_as_string=" &amp; ")
             traces.append(go.Scatter(
                 x=x_range,
                 y=timecourse,
@@ -416,9 +417,9 @@ def plot_time_course(df_doses, df_vals, df_controls,
                       'shape': 'spline',
                       'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
-                name=format_dose(dose),
+                name=dose_str,
                 customdata={'csvname': dose},
-                legendgroup=str(dose),
+                legendgroup=dose_str,
                 showlegend=well_idx == 0
             ))
 
@@ -435,9 +436,9 @@ def plot_time_course(df_doses, df_vals, df_controls,
                     mode='lines',
                     line={'color': this_colour},
                     marker={'size': 5},
-                    name=format_dose(dose),
-                    customdata={'csvname': 'DIP fit ' + str(dose)},
-                    legendgroup=str(dose),
+                    name=dose_str,
+                    customdata={'csvname': 'DIP fit ' + dose_str},
+                    legendgroup=dose_str,
                     showlegend=False
                 ))
 
