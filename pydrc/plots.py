@@ -256,30 +256,42 @@ def plot_dip_params(fit_params, fit_params_sort, title=None,
             if aggregate_cell_lines is True:
                 cell_lines = yvals.index.get_level_values(
                     level='cell_line').unique().tolist()
-                aggregate_cell_lines = {", ".join(cell_lines): cell_lines}
+                aggregate_cell_lines = {
+                    _create_label_max_items(cell_lines, 5): cell_lines
+                }
 
             for cl_tag_name, cl_names in aggregate_cell_lines.items():
                 yvals_tmp = yvals.iloc[yvals.index.isin(cl_names,
                                                         level='cell_line')]
-                x = np.repeat(cl_tag_name, len(yvals_tmp))
+                num_cell_lines = len(yvals_tmp.index.get_level_values(
+                    'cell_line').unique())
+                cl_tag_label = '{} [{}]'.format(cl_tag_name, num_cell_lines)
                 if aggregate_drugs:
-                    data.extend(_agg_drugs(yvals_tmp, aggregate_drugs, x=x))
+                    data.extend(_agg_drugs(
+                        yvals_tmp,
+                        aggregate_drugs,
+                        x=np.repeat(cl_tag_label, len(yvals_tmp))
+                    ))
                 else:
                     for dr_name, grp in yvals_tmp.groupby(level='drug'):
-                        data.append(go.Box(x=np.repeat(cl_tag_name, len(grp)),
+                        data.append(go.Box(x=np.repeat(cl_tag_label, len(grp)),
                                            y=grp,
                                            name=dr_name))
 
         else:
             data.extend(_agg_drugs(yvals, aggregate_drugs))
 
-        if aggregate_drugs and (aggregate_drugs is True or len(
-                aggregate_drugs) == 1):
+        if aggregate_drugs and \
+                (aggregate_drugs is True or len(aggregate_drugs) == 1):
             drugs = yvals.index.get_level_values('drug').unique().tolist()
+            annotation_label = '{} [{}]'.format(
+                _create_label_max_items(drugs, 3),
+                len(drugs)
+            )
             layout['annotations'] = [{'x': 0.5, 'y': 1.0, 'xref': 'paper',
                                       'yanchor': 'bottom', 'yref': 'paper',
                                       'showarrow': False,
-                                      'text': ", ".join(drugs)
+                                      'text': annotation_label
                                       }]
 
     layout = go.Layout(layout)
@@ -293,16 +305,28 @@ def _agg_drugs(series, aggregate_drugs, x=None):
     if aggregate_drugs is True:
         drugs = series.index.get_level_values(
             'drug').unique().tolist()
-        aggregate_drugs = {", ".join(drugs): drugs}
+        aggregate_drugs = {_create_label_max_items(drugs, 1): drugs}
 
     for tag_name, drug_names in aggregate_drugs.items():
         y = series.iloc[series.index.isin(
             drug_names, level='drug')]
+        num_drugs = len(y.index.get_level_values('drug').unique())
+        tag_label = '{} [{}]'.format(tag_name, num_drugs)
         if x is None:
             x = y.index.get_level_values('cell_line')
-        data.append(go.Box(x=x, y=y, name=tag_name))
+        data.append(go.Box(x=x, y=y, name=tag_label))
 
     return data
+
+
+def _create_label_max_items(items, max_items=5):
+    n = len(items)
+    if n > max_items:
+        items = items[0:max_items]
+    annotation_label = ", ".join(items)
+    if n > max_items:
+        annotation_label += " and {} more".format(n - len(items))
+    return annotation_label
 
 
 def plot_time_course(df_doses, df_vals, df_controls,
