@@ -338,7 +338,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
     traces_fits = []
 
     if title is None:
-        title = _make_title('Dose response parameters', df_doses)
+        title = _make_title('Time course', df_doses)
     title = _combine_title_subtitle(title, subtitle)
 
     colours = _sns_to_rgb(sns.color_palette(
