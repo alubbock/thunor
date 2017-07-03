@@ -4,6 +4,7 @@ import seaborn as sns
 from .helpers import format_dose
 from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates
+import scipy.stats
 
 
 def _activity_area_title(**kwargs):
@@ -194,9 +195,15 @@ def plot_dip(fit_params, is_absolute=False,
     return go.Figure(data=data, layout=layout)
 
 
-def plot_dip_params(fit_params, fit_params_sort, title=None,
+def plot_dip_params(fit_params, fit_params_sort,
+                    fit_params_compare=None,
+                    title=None,
                     subtitle=None, aggregate_cell_lines=False,
                     aggregate_drugs=False, **kwargs):
+    if fit_params_compare and (aggregate_cell_lines or aggregate_drugs):
+        raise ValueError('Aggregation is not available when comparing two '
+                         'dose response parameters')
+
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     if title is None:
@@ -226,7 +233,56 @@ def plot_dip_params(fit_params, fit_params_sort, title=None,
                          'type': 'log' if fit_params_sort in
                                  ('ec50', 'ic50') else None})
 
-    if not aggregate_cell_lines and not aggregate_drugs:
+    if fit_params_compare:
+        if fit_params_sort == fit_params_compare:
+            xdat = fit_params.loc[:, fit_params_sort].dropna()
+            ydat = xdat
+        else:
+            dat = fit_params.loc[:, [fit_params_compare, fit_params_sort]].dropna()
+            xdat = dat[fit_params_compare]
+            ydat = dat[fit_params_sort]
+
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            xdat, ydat)
+
+        data = [go.Scatter(
+            x=xdat,
+            y=ydat,
+            hovertext=fit_params['label'],
+            hoverinfo="text+x+y",
+            mode='markers'
+        )]
+        if not np.isnan(slope):
+            linefn = lambda x: np.add(np.multiply(x, slope), intercept)
+            xfit = (min(xdat), max(xdat))
+            yfit = linefn(xfit)
+            data.append(go.Scatter(
+                x=xfit,
+                y=yfit,
+                mode='lines',
+                hoverinfo="none"
+            ))
+            layout['annotations'] = [{
+                    'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
+                    'yref': 'paper', 'showarrow': False,
+                    'text': 'Slope: {:0.4g} '
+                            'Intercept: {:0.4g} '
+                            'R<sup>2</sup>: {:0.4g} '
+                            'p-value: {:0.4g}'.format(slope, intercept,
+                                                 r_value**2, p_value)
+                }]
+        xaxis_title = PLOT_AXIS_LABELS.get(fit_params_compare,
+                                           fit_params_compare)
+        try:
+            xaxis_title = xaxis_title(**kwargs)
+        except TypeError:
+            pass
+        layout['xaxis'] = {'title': xaxis_title,
+                           'type': 'log' if fit_params_compare in
+                                   ('ec50', 'ic50') else None}
+        layout['hovermode'] = 'closest'
+        layout['showlegend'] = False
+    elif not aggregate_cell_lines and not aggregate_drugs:
         fit_params = fit_params.sort_values(by=fit_params_sort,
                                             na_position='first')
         groups = fit_params['label']
