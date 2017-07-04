@@ -216,17 +216,8 @@ def plot_dip_params(fit_params, fit_params_sort,
     except TypeError:
         pass
 
-    if fit_params_sort in ('ec50', 'auc', 'aa'):
-        msg = EC50_OUT_OF_RANGE_MSG
-        if fit_params_sort != 'ec50':
-            msg = 'Based on ' + EC50_OUT_OF_RANGE_MSG
-        text = [msg if x else None for x in fit_params[
-                         'ec50_out_of_range']]
-        marker_cols = [colours[0] if est else colours[1] for
-                                     est in fit_params['ec50_out_of_range']]
-    else:
-        text = None
-        marker_cols = colours[1]
+    text = None
+    marker_cols = colours[1]
 
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
@@ -287,6 +278,15 @@ def plot_dip_params(fit_params, fit_params_sort,
                                             na_position='first')
         groups = fit_params['label']
         yvals = fit_params[fit_params_sort]
+
+        if fit_params_sort in ('ec50', 'auc', 'aa'):
+            msg = EC50_OUT_OF_RANGE_MSG
+            if fit_params_sort != 'ec50':
+                msg = 'Based on ' + EC50_OUT_OF_RANGE_MSG
+            text = [msg if x else None for x in fit_params[
+                'ec50_out_of_range']]
+            marker_cols = [colours[0] if est else colours[1] for
+                           est in fit_params['ec50_out_of_range']]
 
         data = [go.Bar(x=groups, y=yvals,
                        name=fit_params_sort,
