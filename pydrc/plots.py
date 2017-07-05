@@ -5,6 +5,7 @@ from .helpers import format_dose
 from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates
 import scipy.stats
+import pandas as pd
 
 
 def _activity_area_title(**kwargs):
@@ -28,6 +29,7 @@ PLOT_AXIS_LABELS = {'auc': _activity_area_title,
                     'emax': 'E<sub>max</sub> (h<sup>-1</sup>)',
                     'hill': 'Hill coefficient'}
 EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations'
+IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations'
 
 
 def _sns_to_rgb(palette):
@@ -162,12 +164,20 @@ def plot_dip(fit_params, is_absolute=False,
                     format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
-                annotation_label += 'IC<sub>50</sub>: {} '.format(format_dose(
-                    fp.ic50, sig_digits=5
-                ))
+                annotation_label += 'IC<sub>50</sub>{}: {} '.format(
+                    '*' if fp.ic50_out_of_range else '',
+                    format_dose(fp.ic50, sig_digits=5)
+                )
             if fp.emax is not None:
                 annotation_label += 'E<sub>max</sub>: {0:.5g}'.format(fp.emax)
             if annotation_label:
+                hovertext = None
+                if fp.ec50_out_of_range or fp.ic50_out_of_range:
+                    hovertext = '*'
+                    if fp.ec50_out_of_range:
+                        hovertext += EC50_OUT_OF_RANGE_MSG
+                    if fp.ic50_out_of_range:
+                        hovertext += IC50_OUT_OF_RANGE_MSG
                 annotations.append({
                     'x': 0.5,
                     'y': 1.0,
@@ -175,8 +185,7 @@ def plot_dip(fit_params, is_absolute=False,
                     'yanchor': 'bottom',
                     'yref': 'paper',
                     'showarrow': False,
-                    'hovertext': '*' + EC50_OUT_OF_RANGE_MSG if
-                                 fp.ec50_out_of_range else None,
+                    'hovertext': hovertext,
                     'text': annotation_label
                 })
     data = go.Data(traces)
@@ -216,37 +225,53 @@ def plot_dip_params(fit_params, fit_params_sort,
     except TypeError:
         pass
 
-    text = None
-    marker_cols = colours[1]
-
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
                          'type': 'log' if fit_params_sort in
                                  ('ec50', 'ic50') else None})
 
     if fit_params_compare:
+        fit_params.dropna(subset=[fit_params_sort, fit_params_compare],
+                          inplace=True)
         if fit_params_sort == fit_params_compare:
-            xdat = fit_params.loc[:, fit_params_sort].dropna()
+            xdat = fit_params.loc[:, fit_params_sort]
             ydat = xdat
         else:
-            dat = fit_params.loc[:, [fit_params_compare, fit_params_sort]].dropna()
+            dat = fit_params.loc[:, [fit_params_compare, fit_params_sort]]
             xdat = dat[fit_params_compare]
             ydat = dat[fit_params_sort]
 
         slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
             xdat, ydat)
 
+        hovertext = fit_params['label']
+        symbols = ['circle'] * len(fit_params)
+        if fit_params_compare == 'ic50' or fit_params_sort == 'ic50':
+            addtxt = ['<br> ' + IC50_OUT_OF_RANGE_MSG if x else '' for x in
+                      fit_params['ic50_out_of_range']]
+            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+            symbols = ['cross' if x else 'circle' for x in
+                       fit_params['ic50_out_of_range']]
+
+        if fit_params_compare in ('ec50', 'auc', 'aa') or \
+                        fit_params_sort in ('ec50', 'auc', 'aa'):
+            addtxt = ['<br> ' + EC50_OUT_OF_RANGE_MSG if x else '' for x in
+                        fit_params['ec50_out_of_range']]
+            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+            symbols = ['cross' if x else old for x, old in
+                       zip(fit_params['ec50_out_of_range'], symbols)]
+
         data = [go.Scatter(
             x=xdat,
             y=ydat,
-            hovertext=fit_params['label'],
+            hovertext=hovertext,
             hoverinfo="text+x+y",
-            mode='markers'
+            mode='markers',
+            marker={'symbol': symbols}
         )]
         if not np.isnan(slope):
-            linefn = lambda x: np.add(np.multiply(x, slope), intercept)
             xfit = (min(xdat), max(xdat))
-            yfit = linefn(xfit)
+            yfit = [x * slope + intercept for x in xfit]
             data.append(go.Scatter(
                 x=xfit,
                 y=yfit,
@@ -279,6 +304,9 @@ def plot_dip_params(fit_params, fit_params_sort,
         groups = fit_params['label']
         yvals = fit_params[fit_params_sort]
 
+        text = None
+        marker_cols = colours[1]
+
         if fit_params_sort in ('ec50', 'auc', 'aa'):
             msg = EC50_OUT_OF_RANGE_MSG
             if fit_params_sort != 'ec50':
@@ -287,6 +315,11 @@ def plot_dip_params(fit_params, fit_params_sort,
                 'ec50_out_of_range']]
             marker_cols = [colours[0] if est else colours[1] for
                            est in fit_params['ec50_out_of_range']]
+        elif fit_params_sort == 'ic50':
+            text = [IC50_OUT_OF_RANGE_MSG if x else None for x in fit_params[
+                'ic50_out_of_range']]
+            marker_cols = [colours[0] if est else colours[1] for
+                           est in fit_params['ic50_out_of_range']]
 
         data = [go.Bar(x=groups, y=yvals,
                        name=fit_params_sort,
