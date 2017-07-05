@@ -157,11 +157,14 @@ def find_aa(fit_params, max_conc):
 
     if emax > e0:
         emax, e0 = e0, emax
-    return np.log10(max_conc / ec50) * ((e0 - emax) / e0)
+
+    ec50_hill = ec50 ** hill_slope
+
+    return np.log10((ec50_hill + max_conc ** hill_slope) / ec50_hill) \
+        * ((e0 - emax) / e0) / hill_slope
 
 
 def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
-                   aa_max_conc=1e-3, auc_min_conc=1e-12,
                    include_dip_rates=True, include_stats=True):
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
@@ -213,6 +216,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         popt, popt_rel, divisor = fit_drc(doses, dip_all,
                                           dip_std_errs, hill_fn=hill_fn)
 
+        max_dose_measured = np.max(doses)
+        min_dose_measured = np.min(doses)
+
         fit_data = dict(
             label=group_name_disp,
             cell_line=cl_name,
@@ -221,9 +227,11 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             popt=popt,
             popt_rel=popt_rel,
             emax=None if popt is None else popt[1],
-            ec50=None if popt is None else popt[3],
+            ec50_unclipped=None if popt is None else popt[3],
+            ec50=None if popt is None else np.min((popt[3],
+                                                   max_dose_measured)),
             ec50_out_of_range=None if popt is None else
-            popt[3] > np.max(doses),
+            popt[3] > max_dose_measured,
             hill=None if popt is None else popt[0]
         )
 
@@ -238,44 +246,32 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         # Only calculate AUC and IC50 if needed
         if include_stats:
-            if auc_min_conc < 1e-24 or auc_min_conc > np.min(doses):
-                warnings.warn('AUC minimum dose should be '
-                              'greater than 1e-24 M and less than minimum '
-                              'dose in dataset/control: '
-                              '{}'.format(format_dose(np.min(doses))),
-                              AUCFitWarning)
-            if aa_max_conc < np.max(doses) or aa_max_conc > 1e6:
-                warnings.warn('AA maximum dose should be '
-                              'less than 1e6 M and greater than maximum '
-                              'dose in dataset/control: '
-                              '{}'.format(format_dose(np.max(doses))),
-                              AAFitWarning)
+            fit_data['ic50_out_of_range'] = False
 
             if popt_rel is None:
+                fit_data['ic50_unclipped'] = None
                 fit_data['ic50'] = None
             else:
-                fit_data['ic50'] = find_ic50(popt)
+                ic50 = find_ic50(popt)
+                fit_data['ic50_unclipped'] = ic50
+                if ic50 is not None:
+                    fit_data['ic50'] = np.min((ic50, max_dose_measured))
+                    fit_data['ic50_out_of_range'] = ic50 > fit_data['ic50']
+                else:
+                    fit_data['ic50'] = None
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None
                 fit_data['auc'] = None
             else:
-                fit_data['aa'] = find_aa(fit_params=popt, max_conc=aa_max_conc)
+                fit_data['aa'] = find_aa(fit_params=popt,
+                                         max_conc=max_dose_measured)
                 fit_data['auc'] = find_auc(fit_params=popt,
-                                           min_conc=auc_min_conc)
+                                           min_conc=min_dose_measured)
 
         fit_params.append(fit_data)
 
     df_params = pd.DataFrame(fit_params)
     df_params.set_index(['cell_line', 'drug'], inplace=True)
-
-    if include_stats:
-        max_ec50 = df_params['ec50'].max()
-        if aa_max_conc < max_ec50 < 1e6:
-            warnings.warn('AA maximum dose should be larger than '
-                          'the highest EC50 in this selection: {}. This '
-                          'is to avoid negative AA values.'.format(
-                                format_dose(max_ec50, sig_digits=5)),
-                          AAFitWarning)
 
     return df_params
