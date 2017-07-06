@@ -30,6 +30,7 @@ PLOT_AXIS_LABELS = {'auc': _activity_area_title,
                     'hill': 'Hill coefficient'}
 EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations'
 IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations'
+PARAMETERS_LOG_SCALE = ('ec50', 'ic50')
 
 
 def _sns_to_rgb(palette):
@@ -228,7 +229,7 @@ def plot_dip_params(fit_params, fit_params_sort,
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
                          'type': 'log' if fit_params_sort in
-                                 ('ec50', 'ic50') else None})
+                                 PARAMETERS_LOG_SCALE else None})
 
     if fit_params_compare:
         fit_params.dropna(subset=[fit_params_sort, fit_params_compare],
@@ -241,8 +242,13 @@ def plot_dip_params(fit_params, fit_params_sort,
             xdat = dat[fit_params_compare]
             ydat = dat[fit_params_sort]
 
+        xdat_fit = np.log10(xdat) if fit_params_compare in \
+            PARAMETERS_LOG_SCALE else xdat
+        ydat_fit = np.log10(ydat) if fit_params_sort in PARAMETERS_LOG_SCALE \
+            else ydat
+
         slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-            xdat, ydat)
+            xdat_fit, ydat_fit)
 
         hovertext = fit_params['label']
         symbols = ['circle'] * len(fit_params)
@@ -254,7 +260,7 @@ def plot_dip_params(fit_params, fit_params_sort,
                        fit_params['ic50_out_of_range']]
 
         if fit_params_compare in ('ec50', 'auc', 'aa') or \
-                        fit_params_sort in ('ec50', 'auc', 'aa'):
+                fit_params_sort in ('ec50', 'auc', 'aa'):
             addtxt = ['<br> ' + EC50_OUT_OF_RANGE_MSG if x else '' for x in
                         fit_params['ec50_out_of_range']]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
@@ -270,8 +276,12 @@ def plot_dip_params(fit_params, fit_params_sort,
             marker={'symbol': symbols}
         )]
         if not np.isnan(slope):
-            xfit = (min(xdat), max(xdat))
+            xfit = (min(xdat_fit), max(xdat_fit))
             yfit = [x * slope + intercept for x in xfit]
+            if fit_params_compare in PARAMETERS_LOG_SCALE:
+                xfit = np.power(10, xfit)
+            if fit_params_sort in PARAMETERS_LOG_SCALE:
+                yfit = np.power(10, yfit)
             data.append(go.Scatter(
                 x=xfit,
                 y=yfit,
@@ -281,11 +291,8 @@ def plot_dip_params(fit_params, fit_params_sort,
             layout['annotations'] = [{
                     'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
                     'yref': 'paper', 'showarrow': False,
-                    'text': 'Slope: {:0.4g} '
-                            'Intercept: {:0.4g} '
-                            'R<sup>2</sup>: {:0.4g} '
-                            'p-value: {:0.4g}'.format(slope, intercept,
-                                                 r_value**2, p_value)
+                    'text': 'R<sup>2</sup>: {:0.4g} '
+                            'p-value: {:0.4g} '.format(r_value**2, p_value)
                 }]
         xaxis_title = PLOT_AXIS_LABELS.get(fit_params_compare,
                                            fit_params_compare)
