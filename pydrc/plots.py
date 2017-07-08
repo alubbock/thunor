@@ -28,8 +28,9 @@ PLOT_AXIS_LABELS = {'auc': _activity_area_title,
                     'ec50': 'EC<sub>50</sub> (M)',
                     'emax': 'E<sub>max</sub> (h<sup>-1</sup>)',
                     'hill': 'Hill coefficient'}
-EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations'
-IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations'
+EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations<br> '
+IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations<br> '
+EMAX_TRUNCATED_MSG = 'E<sub>max</sub> truncated at effect of maximum dose<br> '
 PARAMETERS_LOG_SCALE = ('ec50', 'ic50')
 
 
@@ -63,8 +64,10 @@ def plot_dip(fit_params, is_absolute=False,
 
     colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
 
-    yaxis_title = 'DIP rate (h<sup>-1</sup>)'
-    if not is_absolute:
+    yaxis_title = 'DIP rate'
+    if is_absolute:
+        yaxis_title += ' (h<sup>-1</sup>)'
+    else:
         yaxis_title = 'Relative ' + yaxis_title
 
     show_replicates = len(fit_params) == 1
@@ -170,15 +173,20 @@ def plot_dip(fit_params, is_absolute=False,
                     format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
-                annotation_label += 'E<sub>max</sub>: {0:.5g}'.format(fp.emax)
+                annotation_label += 'E<sub>max</sub>{}: {:.5g}'.format(
+                    '*' if fp.einf < fp.emax else '',
+                    fp.emax)
             if annotation_label:
                 hovertext = None
-                if fp.ec50_out_of_range or fp.ic50_out_of_range:
+                if fp.ec50_out_of_range or fp.ic50_out_of_range \
+                        or fp.einf < fp.emax:
                     hovertext = '*'
                     if fp.ec50_out_of_range:
                         hovertext += EC50_OUT_OF_RANGE_MSG
                     if fp.ic50_out_of_range:
                         hovertext += IC50_OUT_OF_RANGE_MSG
+                    if fp.einf < fp.emax:
+                        hovertext += EMAX_TRUNCATED_MSG
                 annotations.append({
                     'x': 0.5,
                     'y': 1.0,
@@ -262,10 +270,18 @@ def plot_dip_params(fit_params, fit_params_sort,
         if fit_params_compare in ('ec50', 'auc', 'aa') or \
                 fit_params_sort in ('ec50', 'auc', 'aa'):
             addtxt = ['<br> ' + EC50_OUT_OF_RANGE_MSG if x else '' for x in
-                        fit_params['ec50_out_of_range']]
+                      fit_params['ec50_out_of_range']]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
                        zip(fit_params['ec50_out_of_range'], symbols)]
+
+        if fit_params_compare == 'emax' or fit_params_sort == 'emax':
+            emax_truncated = fit_params['einf'] < fit_params['emax']
+            addtxt = ['<br> ' + EMAX_TRUNCATED_MSG if x else '' for x in
+                      emax_truncated]
+            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+            symbols = ['cross' if x else old for x, old in
+                       zip(emax_truncated, symbols)]
 
         data = [go.Scatter(
             x=xdat,
@@ -327,6 +343,11 @@ def plot_dip_params(fit_params, fit_params_sort,
                 'ic50_out_of_range']]
             marker_cols = [colours[0] if est else colours[1] for
                            est in fit_params['ic50_out_of_range']]
+        elif fit_params_sort == 'emax':
+            emax_truncated = fit_params['einf'] < fit_params['emax']
+            text = [EMAX_TRUNCATED_MSG if x else None for x in emax_truncated]
+            marker_cols = [colours[0] if x else colours[1] for x in
+                           emax_truncated]
 
         data = [go.Bar(x=groups, y=yvals,
                        name=fit_params_sort,

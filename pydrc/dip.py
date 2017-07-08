@@ -152,11 +152,14 @@ def find_auc(fit_params, min_conc):
             hill_slope) * ((e0 - emax) / e0)
 
 
-def find_aa(fit_params, max_conc):
+def find_aa(fit_params, max_conc, emax_obs=None):
     hill_slope, e0, emax, ec50 = fit_params
 
     if emax > e0:
         emax, e0 = e0, emax
+
+    if emax_obs is not None:
+        emax = emax_obs
 
     ec50_hill = ec50 ** hill_slope
 
@@ -218,6 +221,15 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
+        if popt_rel is not None:
+            emax_obs = hill_fn(max_dose_measured, *popt)
+        else:
+            emax_obs = None
+
+        if popt is not None:
+            emax = popt[1]
+            if abs(emax / emax_obs) > 1.1:
+                emax = emax_obs
 
         fit_data = dict(
             label=group_name_disp,
@@ -226,7 +238,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             divisor=divisor,
             popt=popt,
             popt_rel=popt_rel,
-            emax=None if popt is None else popt[1],
+            einf=None if popt is None else popt[1],
+            emax=None if popt is None else emax,
             ec50_unclipped=None if popt is None else popt[3],
             ec50=None if popt is None else np.min((popt[3],
                                                    max_dose_measured)),
