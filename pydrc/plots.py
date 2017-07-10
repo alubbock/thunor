@@ -255,8 +255,11 @@ def plot_dip_params(fit_params, fit_params_sort,
         ydat_fit = np.log10(ydat) if fit_params_sort in PARAMETERS_LOG_SCALE \
             else ydat
 
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-            xdat_fit, ydat_fit)
+        if len(xdat_fit) > 0 and len(ydat_fit) > 0:
+            slope, intercept, r_value, p_value, std_err = \
+                scipy.stats.linregress(xdat_fit, ydat_fit)
+        else:
+            slope = np.nan
 
         hovertext = fit_params['label']
         symbols = ['circle'] * len(fit_params)
