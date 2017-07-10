@@ -228,7 +228,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         if popt is not None:
             emax = popt[1]
-            if abs(emax / emax_obs) > 1.1:
+            if emax_obs is not None and abs(emax / emax_obs) > 1.1:
                 emax = emax_obs
 
         fit_data = dict(
