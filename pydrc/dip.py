@@ -128,18 +128,20 @@ def adjusted_r_squared(r, n, p):
     return 1 - (1 - r ** 2) * ((n - 1) / (n - p - 1))
 
 
-def find_ic50(fit_params):
+def find_icN(fit_params, ic_num=50):
     hill_slope, e0, emax, ec50 = fit_params
 
     if emax > e0:
         emax, e0 = e0, emax
 
-    ic50 = ec50 / (1 - 2 * (emax/e0)) ** (1 / hill_slope)
+    ic_frac = ic_num / 100.0
 
-    if np.isnan(ic50):
-        ic50 = None
+    icN = ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (1 / hill_slope)
 
-    return ic50
+    if np.isnan(icN):
+        icN = None
+
+    return icN
 
 
 def find_auc(fit_params, min_conc):
@@ -222,14 +224,28 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
         if popt_rel is not None:
-            emax_obs = hill_fn(max_dose_measured, *popt)
+            emax_obs_fit = hill_fn(max_dose_measured, *popt)
         else:
-            emax_obs = None
+            emax_obs_fit = None
 
         if popt is not None:
             emax = popt[1]
-            if emax_obs is not None and abs(emax / emax_obs) > 1.1:
-                emax = emax_obs
+            if emax_obs_fit is not None and abs(emax / emax_obs_fit) > 1.1:
+                emax = emax_obs_fit
+
+        emax_obs = np.min(dip_expt)
+        emax_obs_rel = None
+        if emax_obs and divisor is not None:
+            emax_obs_rel = emax_obs / divisor
+
+        emax_rel = None
+        if emax and divisor is not None:
+            emax_rel = emax / divisor
+
+        ec50 = None if popt is None else np.min((popt[3], max_dose_measured))
+        e50 = None
+        if ec50 is not None:
+            e50 = hill_fn(ec50, *popt)
 
         fit_data = dict(
             label=group_name_disp,
@@ -240,11 +256,15 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             popt_rel=popt_rel,
             einf=None if popt is None else popt[1],
             emax=None if popt is None else emax,
+            emax_rel=emax_rel,
+            emax_obs=emax_obs,
+            emax_obs_rel=emax_obs_rel,
             ec50_unclipped=None if popt is None else popt[3],
-            ec50=None if popt is None else np.min((popt[3],
-                                                   max_dose_measured)),
-            ec50_out_of_range=None if popt is None else
-            popt[3] > max_dose_measured,
+            ec50=ec50,
+            ec50_out_of_range=None if popt is None else popt[3] >
+                                                        max_dose_measured,
+            e50=e50,
+            max_dose_measured=max_dose_measured,
             hill=None if popt is None else popt[0]
         )
 
@@ -261,17 +281,20 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         if include_stats:
             fit_data['ic50_out_of_range'] = False
 
-            if popt_rel is None:
-                fit_data['ic50_unclipped'] = None
-                fit_data['ic50'] = None
-            else:
-                ic50 = find_ic50(popt)
+            fit_data['ic50_unclipped'] = None
+            fit_data['ic50'] = None
+            fit_data['ic10'] = None
+            fit_data['ic100'] = None
+            if popt is not None:
+                ic50 = find_icN(popt, ic_num=50)
                 fit_data['ic50_unclipped'] = ic50
                 if ic50 is not None:
                     fit_data['ic50'] = np.min((ic50, max_dose_measured))
                     fit_data['ic50_out_of_range'] = ic50 > fit_data['ic50']
                 else:
                     fit_data['ic50'] = None
+                fit_data['ic10'] = find_icN(popt, ic_num=10)
+                fit_data['ic100'] = find_icN(popt, ic_num=100)
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None

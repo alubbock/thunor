@@ -24,14 +24,20 @@ def _auc_title(**kwargs):
 SECONDS_IN_HOUR = 3600.0
 PLOT_AXIS_LABELS = {'auc': _activity_area_title,
                     'aa': _activity_area_title,
+                    'ic10': 'IC<sub>10</sub> (M)',
                     'ic50': 'IC<sub>50</sub> (M)',
+                    'ic100': 'IC<sub>100</sub> (M)',
                     'ec50': 'EC<sub>50</sub> (M)',
                     'emax': 'E<sub>max</sub> (h<sup>-1</sup>)',
+                    'emax_rel': 'E<sub>max</sub> (relative)',
+                    'emax_obs': 'E<sub>max</sub> observed (h<sup>-1</sup>)',
+                    'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
+                    'e50': 'E<sub>50</sub> (h<sup>-1</sup>)',
                     'hill': 'Hill coefficient'}
 EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations<br> '
 IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations<br> '
 EMAX_TRUNCATED_MSG = 'E<sub>max</sub> truncated at effect of maximum dose<br> '
-PARAMETERS_LOG_SCALE = ('ec50', 'ic50')
+PARAMETERS_LOG_SCALE = ('ec50', 'ic50', 'ic10', 'ic100')
 
 
 def _sns_to_rgb(palette):
@@ -270,15 +276,16 @@ def plot_dip_params(fit_params, fit_params_sort,
             symbols = ['cross' if x else 'circle' for x in
                        fit_params['ic50_out_of_range']]
 
-        if fit_params_compare in ('ec50', 'auc', 'aa') or \
-                fit_params_sort in ('ec50', 'auc', 'aa'):
+        if fit_params_compare in ('ec50', 'auc', 'aa', 'e50') or \
+                fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
             addtxt = ['<br> ' + EC50_OUT_OF_RANGE_MSG if x else '' for x in
                       fit_params['ec50_out_of_range']]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
                        zip(fit_params['ec50_out_of_range'], symbols)]
 
-        if fit_params_compare == 'emax' or fit_params_sort == 'emax':
+        if fit_params_compare in ('emax', 'emax_rel') or \
+                        fit_params_sort in ('emax', 'emax_rel'):
             emax_truncated = fit_params['einf'] < fit_params['emax']
             addtxt = ['<br> ' + EMAX_TRUNCATED_MSG if x else '' for x in
                       emax_truncated]
@@ -333,7 +340,7 @@ def plot_dip_params(fit_params, fit_params_sort,
         text = None
         marker_cols = colours[1]
 
-        if fit_params_sort in ('ec50', 'auc', 'aa'):
+        if fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
             msg = EC50_OUT_OF_RANGE_MSG
             if fit_params_sort != 'ec50':
                 msg = 'Based on ' + EC50_OUT_OF_RANGE_MSG
