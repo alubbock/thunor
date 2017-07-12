@@ -219,7 +219,8 @@ def plot_dip(fit_params, is_absolute=False,
                 })
     data = go.Data(traces)
     layout = go.Layout(title=title,
-                       hovermode='closest' if show_replicates else 'x',
+                       hovermode='closest' if show_replicates
+                                 or len(traces) > 50 else 'x',
                        xaxis={'title': 'Dose (M)',
                               'range': np.log10((1e-12, 1e-5)),
                               'type': 'log'},
