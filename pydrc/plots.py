@@ -198,6 +198,7 @@ def plot_dip(fit_params, is_absolute=False,
                     fp.emax)
             if annotation_label:
                 hovermsgs = []
+                hovertext = None
                 if fp.ec50_unclipped > fp.ec50:
                     hovermsgs.append(_out_of_range_msg('ec50'))
                 if fp.ic50_unclipped > fp.ic50:
