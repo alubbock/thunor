@@ -329,7 +329,9 @@ def plot_dip_params(fit_params, fit_params_sort,
             hovertext=hovertext,
             hoverinfo="text+x+y",
             mode='markers',
-            marker={'symbol': symbols}
+            marker={'symbol': symbols,
+                    'color': [colours[1] if s == 'circle' else
+                              'crimson' for s in symbols]}
         )]
         if not np.isnan(slope):
             xfit = (min(xdat_fit), max(xdat_fit))
@@ -363,7 +365,7 @@ def plot_dip_params(fit_params, fit_params_sort,
             xaxis_title = xaxis_param_name
         layout['xaxis'] = {'title': xaxis_title,
                            'type': 'log' if fit_params_compare in
-                                   ('ec50', 'ic50') else None}
+                                   PARAMETERS_LOG_SCALE else None}
         layout['hovermode'] = 'closest'
         layout['showlegend'] = False
     elif not aggregate_cell_lines and not aggregate_drugs:
