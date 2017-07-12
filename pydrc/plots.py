@@ -5,39 +5,53 @@ from .helpers import format_dose
 from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates
 import scipy.stats
-import pandas as pd
+import re
 
 
-def _activity_area_title(**kwargs):
-    title = 'Activity area'
+def _activity_area_units(**kwargs):
     if 'aa_max_conc' in kwargs:
-        title += ' [max. dose={}]'.format(format_dose(kwargs['aa_max_conc']))
-    return title
+        return '[max. dose={}]'.format(format_dose(kwargs['aa_max_conc']))
+    else:
+        return ''
 
 
-def _auc_title(**kwargs):
-    title = 'Area under curve (AUC)'
+def _auc_units(**kwargs):
     if 'auc_min_conc' in kwargs:
-        title += ' [min. dose={}]'.format(format_dose(kwargs['auc_min_conc']))
-    return title
+        return '[min. dose={}]'.format(format_dose(kwargs['auc_min_conc']))
+    else:
+        return ''
 
 SECONDS_IN_HOUR = 3600.0
-PLOT_AXIS_LABELS = {'auc': _activity_area_title,
-                    'aa': _activity_area_title,
-                    'ic10': 'IC<sub>10</sub> (M)',
-                    'ic50': 'IC<sub>50</sub> (M)',
-                    'ic100': 'IC<sub>100</sub> (M)',
-                    'ec50': 'EC<sub>50</sub> (M)',
-                    'emax': 'E<sub>max</sub> (h<sup>-1</sup>)',
-                    'emax_rel': 'E<sub>max</sub> (relative)',
-                    'emax_obs': 'E<sub>max</sub> observed (h<sup>-1</sup>)',
-                    'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
-                    'e50': 'E<sub>50</sub> (h<sup>-1</sup>)',
-                    'hill': 'Hill coefficient'}
-EC50_OUT_OF_RANGE_MSG = 'EC<sub>50</sub> &gt; measured concentrations<br> '
-IC50_OUT_OF_RANGE_MSG = 'IC<sub>50</sub> &gt; measured concentrations<br> '
-EMAX_TRUNCATED_MSG = 'E<sub>max</sub> truncated at effect of maximum dose<br> '
+PARAM_UNITS = {'auc': _activity_area_units,
+               'aa': _activity_area_units,
+               'ic10': 'M',
+               'ic50': 'M',
+               'ic100': 'M',
+               'ec50': 'M',
+               'emax': 'h<sup>-1</sup>',
+               'emax_obs': 'h<sup>-1</sup>',
+               'e50': 'h<sup>-1</sup>'}
+PARAM_NAMES = {'aa': 'Activity area',
+               'auc': 'Area under curve',
+               'ic10': 'IC<sub>10</sub>',
+               'ic50': 'IC<sub>50</sub>',
+               'ic100': 'IC<sub>100</sub>',
+               'ec50': 'EC<sub>50</sub>',
+               'emax': 'E<sub>max</sub>',
+               'emax_rel': 'E<sub>max</sub> (relative)',
+               'emax_obs': 'E<sub>max</sub> observed',
+               'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
+               'e50': 'E<sub>50</sub>',
+               'hill': 'Hill coefficient'}
+EMAX_TRUNCATED_MSG = 'E<sub>max</sub> truncated at effect of maximum dose'
 PARAMETERS_LOG_SCALE = ('ec50', 'ic50', 'ic10', 'ic100')
+IC_REGEX = re.compile('ic[0-9]+$')
+
+
+def _out_of_range_msg(param_name):
+    return '{} &gt; measured concentrations'.format(
+        PARAM_NAMES.get(param_name, param_name)
+    )
 
 
 def _sns_to_rgb(palette):
@@ -170,12 +184,12 @@ def plot_dip(fit_params, is_absolute=False,
             annotation_label = ''
             if fp.ec50 is not None:
                 annotation_label += 'EC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ec50_out_of_range else '',
+                    '*' if fp.ec50_unclipped > fp.ec50 else '',
                     format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
                 annotation_label += 'IC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ic50_out_of_range else '',
+                    '*' if fp.ic50_unclipped > fp.ic50 else '',
                     format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
@@ -183,16 +197,15 @@ def plot_dip(fit_params, is_absolute=False,
                     '*' if fp.einf < fp.emax else '',
                     fp.emax)
             if annotation_label:
-                hovertext = None
-                if fp.ec50_out_of_range or fp.ic50_out_of_range \
-                        or fp.einf < fp.emax:
-                    hovertext = '*'
-                    if fp.ec50_out_of_range:
-                        hovertext += EC50_OUT_OF_RANGE_MSG
-                    if fp.ic50_out_of_range:
-                        hovertext += IC50_OUT_OF_RANGE_MSG
-                    if fp.einf < fp.emax:
-                        hovertext += EMAX_TRUNCATED_MSG
+                hovermsgs = []
+                if fp.ec50_unclipped > fp.ec50:
+                    hovermsgs.append(_out_of_range_msg('ec50'))
+                if fp.ic50_unclipped > fp.ic50:
+                    hovermsgs.append(_out_of_range_msg('ic50'))
+                if fp.einf < fp.emax:
+                    hovermsgs.append(EMAX_TRUNCATED_MSG)
+                if hovermsgs:
+                    hovertext = '*' + '<br>'.join(hovermsgs)
                 annotations.append({
                     'x': 0.5,
                     'y': 1.0,
@@ -234,11 +247,16 @@ def plot_dip_params(fit_params, fit_params_sort,
         title = _make_title('Dose response parameters', fit_params)
     title = _combine_title_subtitle(title, subtitle)
 
-    yaxis_title = PLOT_AXIS_LABELS.get(fit_params_sort, fit_params_sort)
+    yaxis_param_name = PARAM_NAMES.get(fit_params_sort, fit_params_sort)
+    yaxis_units = PARAM_UNITS.get(fit_params_sort, '')
     try:
-        yaxis_title = yaxis_title(**kwargs)
+        yaxis_units = yaxis_units(**kwargs)
     except TypeError:
         pass
+    if yaxis_units:
+        yaxis_title = '{} ({})'.format(yaxis_param_name, yaxis_units)
+    else:
+        yaxis_title = yaxis_param_name
 
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
@@ -269,20 +287,32 @@ def plot_dip_params(fit_params, fit_params_sort,
 
         hovertext = fit_params['label']
         symbols = ['circle'] * len(fit_params)
-        if fit_params_compare == 'ic50' or fit_params_sort == 'ic50':
-            addtxt = ['<br> ' + IC50_OUT_OF_RANGE_MSG if x else '' for x in
-                      fit_params['ic50_out_of_range']]
+        ic_params = set()
+
+        for param in (fit_params_sort, fit_params_compare):
+            match = IC_REGEX.match(param)
+            if match:
+                ic_params.add(match.group())
+
+        for ic_param in ic_params:
+            msg = _out_of_range_msg(ic_param)
+            ic_truncated = fit_params['{}_unclipped'.format(ic_param)] > \
+                           fit_params[ic_param]
+            addtxt = ['<br> ' + msg if x else '' for x in
+                      ic_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else 'circle' for x in
-                       fit_params['ic50_out_of_range']]
+            symbols = ['cross' if x else old for x, old in
+                       zip(ic_truncated, symbols)]
 
         if fit_params_compare in ('ec50', 'auc', 'aa', 'e50') or \
                 fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
-            addtxt = ['<br> ' + EC50_OUT_OF_RANGE_MSG if x else '' for x in
-                      fit_params['ec50_out_of_range']]
+            msg = _out_of_range_msg('ec50')
+            ec50_truncated = fit_params['ec50_unclipped'] > fit_params['ec50']
+            addtxt = ['<br> ' + msg if x else '' for x in
+                      ec50_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
-                       zip(fit_params['ec50_out_of_range'], symbols)]
+                       zip(ec50_truncated, symbols)]
 
         if fit_params_compare in ('emax', 'emax_rel') or \
                         fit_params_sort in ('emax', 'emax_rel'):
@@ -320,12 +350,17 @@ def plot_dip_params(fit_params, fit_params_sort,
                     'text': 'R<sup>2</sup>: {:0.4g} '
                             'p-value: {:0.4g} '.format(r_value**2, p_value)
                 }]
-        xaxis_title = PLOT_AXIS_LABELS.get(fit_params_compare,
+        xaxis_param_name = PARAM_NAMES.get(fit_params_compare,
                                            fit_params_compare)
+        xaxis_units = PARAM_UNITS.get(fit_params_compare, '')
         try:
-            xaxis_title = xaxis_title(**kwargs)
+            xaxis_units = xaxis_units(**kwargs)
         except TypeError:
             pass
+        if xaxis_units:
+            xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
+        else:
+            xaxis_title = xaxis_param_name
         layout['xaxis'] = {'title': xaxis_title,
                            'type': 'log' if fit_params_compare in
                                    ('ec50', 'ic50') else None}
@@ -341,19 +376,21 @@ def plot_dip_params(fit_params, fit_params_sort,
         marker_cols = colours[1]
 
         if fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
-            msg = EC50_OUT_OF_RANGE_MSG
+            msg = _out_of_range_msg('ec50')
             if fit_params_sort != 'ec50':
-                msg = 'Based on ' + EC50_OUT_OF_RANGE_MSG
-            text = [msg if x else None for x in fit_params[
-                'ec50_out_of_range']]
+                msg = 'Based on ' + msg
+            ec50_truncated = fit_params['ec50_unclipped'] > fit_params['ec50']
+            text = [msg if x else None for x in ec50_truncated]
             marker_cols = [colours[0] if est else colours[1] for
-                           est in fit_params['ec50_out_of_range']]
-        elif fit_params_sort == 'ic50':
-            text = [IC50_OUT_OF_RANGE_MSG if x else None for x in fit_params[
-                'ic50_out_of_range']]
+                           est in ec50_truncated]
+        elif IC_REGEX.match(fit_params_sort):
+            msg = _out_of_range_msg(fit_params_sort)
+            ic_truncated = fit_params['{}_unclipped'.format(fit_params_sort)]\
+                            > fit_params[fit_params_sort]
+            text = [msg if x else None for x in ic_truncated]
             marker_cols = [colours[0] if est else colours[1] for
-                           est in fit_params['ic50_out_of_range']]
-        elif fit_params_sort == 'emax':
+                           est in ic_truncated]
+        elif fit_params_sort in ('emax', 'emax_rel'):
             emax_truncated = fit_params['einf'] < fit_params['emax']
             text = [EMAX_TRUNCATED_MSG if x else None for x in emax_truncated]
             marker_cols = [colours[0] if x else colours[1] for x in

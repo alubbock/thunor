@@ -261,8 +261,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             emax_obs_rel=emax_obs_rel,
             ec50_unclipped=None if popt is None else popt[3],
             ec50=ec50,
-            ec50_out_of_range=None if popt is None else popt[3] >
-                                                        max_dose_measured,
             e50=e50,
             max_dose_measured=max_dose_measured,
             hill=None if popt is None else popt[0]
@@ -279,22 +277,17 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         # Only calculate AUC and IC50 if needed
         if include_stats:
-            fit_data['ic50_out_of_range'] = False
-
-            fit_data['ic50_unclipped'] = None
-            fit_data['ic50'] = None
-            fit_data['ic10'] = None
-            fit_data['ic100'] = None
-            if popt is not None:
-                ic50 = find_icN(popt, ic_num=50)
-                fit_data['ic50_unclipped'] = ic50
-                if ic50 is not None:
-                    fit_data['ic50'] = np.min((ic50, max_dose_measured))
-                    fit_data['ic50_out_of_range'] = ic50 > fit_data['ic50']
+            for ic_num in (10, 50, 100):
+                if popt is None:
+                    ic_n = None
                 else:
-                    fit_data['ic50'] = None
-                fit_data['ic10'] = find_icN(popt, ic_num=10)
-                fit_data['ic100'] = find_icN(popt, ic_num=100)
+                    ic_n = find_icN(popt, ic_num=ic_num)
+                fit_data['ic{:d}_unclipped'.format(ic_num)] = ic_n
+                if ic_n is not None:
+                    fit_data['ic{:d}'.format(ic_num)] = \
+                        np.min((ic_n, max_dose_measured))
+                else:
+                    fit_data['ic{:d}'.format(ic_num)] = None
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None
