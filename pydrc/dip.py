@@ -228,6 +228,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         else:
             emax_obs_fit = None
 
+        emax = None
         if popt is not None:
             emax = popt[1]
             if emax_obs_fit is not None and abs(emax / emax_obs_fit) > 1.1:
@@ -239,7 +240,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             emax_obs_rel = emax_obs / divisor
 
         emax_rel = None
-        if emax and divisor is not None:
+        if emax is not None and divisor is not None:
             emax_rel = emax / divisor
 
         ec50 = None if popt is None else np.min((popt[3], max_dose_measured))
