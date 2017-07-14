@@ -295,7 +295,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 fit_data['auc'] = None
             else:
                 fit_data['aa'] = find_aa(fit_params=popt,
-                                         max_conc=max_dose_measured)
+                                         max_conc=max_dose_measured,
+                                         emax_obs=emax)
                 fit_data['auc'] = find_auc(fit_params=popt,
                                            min_conc=min_dose_measured)
 
