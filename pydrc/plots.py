@@ -3,7 +3,8 @@ import numpy as np
 import seaborn as sns
 from .helpers import format_dose
 from .curve_fit import ll4
-from .dip import ctrl_dip_rates, expt_dip_rates
+from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated, \
+    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL
 import scipy.stats
 import re
 import pandas as pd
@@ -183,14 +184,22 @@ def plot_dip(fit_params, is_absolute=False,
                               )
 
             annotation_label = ''
+            ec50_truncated = False
+            ic50_truncated = False
             if fp.ec50 is not None:
+                ec50_truncated = np.allclose(fp.ec50, fp.max_dose_measured,
+                                             atol=PARAM_EQUAL_ATOL,
+                                             rtol=PARAM_EQUAL_RTOL)
                 annotation_label += 'EC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ec50_unclipped > fp.ec50 else '',
+                    '*' if ec50_truncated else '',
                     format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
+                ic50_truncated = np.allclose(fp.ic50, fp.max_dose_measured,
+                                             atol=PARAM_EQUAL_ATOL,
+                                             rtol=PARAM_EQUAL_RTOL)
                 annotation_label += 'IC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ic50_unclipped > fp.ic50 else '',
+                    '*' if ic50_truncated else '',
                     format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
@@ -200,9 +209,9 @@ def plot_dip(fit_params, is_absolute=False,
             if annotation_label:
                 hovermsgs = []
                 hovertext = None
-                if fp.ec50_unclipped > fp.ec50:
+                if ec50_truncated:
                     hovermsgs.append(_out_of_range_msg('ec50'))
-                if fp.ic50_unclipped > fp.ic50:
+                if ic50_truncated:
                     hovermsgs.append(_out_of_range_msg('ic50'))
                 if fp.einf < fp.emax:
                     hovermsgs.append(EMAX_TRUNCATED_MSG)
@@ -304,8 +313,7 @@ def plot_dip_params(df_params, fit_param,
 
         for ic_param in ic_params:
             msg = _out_of_range_msg(ic_param)
-            ic_truncated = df_params['{}_unclipped'.format(ic_param)] > \
-                           df_params[ic_param]
+            ic_truncated = is_param_truncated(df_params, ic_param)
             addtxt = ['<br> ' + msg if x else '' for x in
                       ic_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
@@ -315,7 +323,7 @@ def plot_dip_params(df_params, fit_param,
         if fit_param_compare in ('ec50', 'e50') or \
                 fit_param in ('ec50', 'e50'):
             msg = _out_of_range_msg('ec50')
-            ec50_truncated = df_params['ec50_unclipped'] > df_params['ec50']
+            ec50_truncated = is_param_truncated(df_params, 'ec50')
             addtxt = ['<br> ' + msg if x else '' for x in
                       ec50_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
@@ -393,14 +401,13 @@ def plot_dip_params(df_params, fit_param,
             msg = _out_of_range_msg('ec50')
             if fit_param != 'ec50':
                 msg = 'Based on ' + msg
-            ec50_truncated = df_params['ec50_unclipped'] > df_params['ec50']
+            ec50_truncated = is_param_truncated(df_params, 'ec50')
             text = [msg if x else None for x in ec50_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ec50_truncated]
         elif IC_REGEX.match(fit_param):
             msg = _out_of_range_msg(fit_param)
-            ic_truncated = df_params['{}_unclipped'.format(fit_param)] \
-                           > df_params[fit_param]
+            ic_truncated = is_param_truncated(df_params, fit_param)
             text = [msg if x else None for x in ic_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ic_truncated]

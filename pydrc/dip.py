@@ -6,6 +6,8 @@ from .helpers import format_dose
 import warnings
 
 SECONDS_IN_HOUR = 3600.0
+PARAM_EQUAL_ATOL = 1e-16
+PARAM_EQUAL_RTOL = 1e-12
 
 
 class ValueWarning(UserWarning):
@@ -260,7 +262,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             emax_rel=emax_rel,
             emax_obs=emax_obs,
             emax_obs_rel=emax_obs_rel,
-            ec50_unclipped=None if popt is None else popt[3],
             ec50=ec50,
             e50=e50,
             max_dose_measured=max_dose_measured,
@@ -283,7 +284,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                     ic_n = None
                 else:
                     ic_n = find_icN(popt, ic_num=ic_num)
-                fit_data['ic{:d}_unclipped'.format(ic_num)] = ic_n
+
                 if ic_n is not None:
                     fit_data['ic{:d}'.format(ic_num)] = \
                         np.min((ic_n, max_dose_measured))
@@ -306,3 +307,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
     df_params.set_index(['cell_line', 'drug'], inplace=True)
 
     return df_params
+
+
+def is_param_truncated(df_params, param_name):
+    return np.isclose(df_params[param_name],
+                      df_params['max_dose_measured'],
+                      atol=PARAM_EQUAL_ATOL,
+                      rtol=PARAM_EQUAL_RTOL)
