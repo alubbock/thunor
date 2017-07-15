@@ -50,9 +50,29 @@ PARAMETERS_LOG_SCALE = ('ec50', 'ic50', 'ic10', 'ic100')
 IC_REGEX = re.compile('ic[0-9]+$')
 
 
+def _get_param_name(param_id):
+    try:
+        return PARAM_NAMES[param_id]
+    except KeyError:
+        if IC_REGEX.match(param_id):
+            return 'IC<sub>{:d}</sub>'.format(int(param_id[2:]))
+        else:
+            return param_id
+
+
+def _get_param_units(param_id):
+    try:
+        return PARAM_UNITS[param_id]
+    except KeyError:
+        if IC_REGEX.match(param_id):
+            return 'M'
+        else:
+            return ''
+
+
 def _out_of_range_msg(param_name):
     return '{} truncated to maximum measured concentration'.format(
-        PARAM_NAMES.get(param_name, param_name)
+        _get_param_name(param_name)
     )
 
 
@@ -264,8 +284,8 @@ def plot_dip_params(df_params, fit_param,
         title = _make_title('Dose response parameters', df_params)
     title = _combine_title_subtitle(title, subtitle)
 
-    yaxis_param_name = PARAM_NAMES.get(fit_param, fit_param)
-    yaxis_units = PARAM_UNITS.get(fit_param, '')
+    yaxis_param_name = _get_param_name(fit_param)
+    yaxis_units = _get_param_units(fit_param)
     try:
         yaxis_units = yaxis_units(**kwargs)
     except TypeError:
@@ -371,9 +391,8 @@ def plot_dip_params(df_params, fit_param,
                     'text': 'R<sup>2</sup>: {:0.4g} '
                             'p-value: {:0.4g} '.format(r_value**2, p_value)
                 }]
-        xaxis_param_name = PARAM_NAMES.get(fit_param_compare,
-                                           fit_param_compare)
-        xaxis_units = PARAM_UNITS.get(fit_param_compare, '')
+        xaxis_param_name = _get_param_name(fit_param_compare)
+        xaxis_units = _get_param_units(fit_param_compare)
         try:
             xaxis_units = xaxis_units(**kwargs)
         except TypeError:

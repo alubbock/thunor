@@ -172,6 +172,7 @@ def find_aa(fit_params, max_conc, emax_obs=None):
 
 
 def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
+                   custom_ic_concentrations=set(),
                    include_dip_rates=True, include_stats=True):
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
@@ -279,7 +280,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         # Only calculate AUC and IC50 if needed
         if include_stats:
-            for ic_num in (10, 50, 100):
+            custom_ic_concentrations.add(50)
+            for ic_num in custom_ic_concentrations:
                 if popt is None:
                     ic_n = None
                 else:
