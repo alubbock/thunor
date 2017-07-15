@@ -6,6 +6,7 @@ from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates
 import scipy.stats
 import re
+import pandas as pd
 
 
 def _activity_area_units(**kwargs):
@@ -49,7 +50,7 @@ IC_REGEX = re.compile('ic[0-9]+$')
 
 
 def _out_of_range_msg(param_name):
-    return '{} &gt; measured concentrations'.format(
+    return '{} truncated to maximum measured concentration'.format(
         PARAM_NAMES.get(param_name, param_name)
     )
 
@@ -234,23 +235,28 @@ def plot_dip(fit_params, is_absolute=False,
     return go.Figure(data=data, layout=layout)
 
 
-def plot_dip_params(fit_params, fit_params_sort,
-                    fit_params_compare=None,
+def plot_dip_params(df_params, fit_param,
+                    fit_param_compare=None,
+                    fit_param_sort=None,
                     title=None,
                     subtitle=None, aggregate_cell_lines=False,
                     aggregate_drugs=False, **kwargs):
-    if fit_params_compare and (aggregate_cell_lines or aggregate_drugs):
+    if fit_param_compare and (aggregate_cell_lines or aggregate_drugs):
         raise ValueError('Aggregation is not available when comparing two '
                          'dose response parameters')
+
+    if fit_param_sort and aggregate_cell_lines:
+        raise ValueError('Cannot use another parameter for sort order when '
+                         'aggregating cell lines')
 
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     if title is None:
-        title = _make_title('Dose response parameters', fit_params)
+        title = _make_title('Dose response parameters', df_params)
     title = _combine_title_subtitle(title, subtitle)
 
-    yaxis_param_name = PARAM_NAMES.get(fit_params_sort, fit_params_sort)
-    yaxis_units = PARAM_UNITS.get(fit_params_sort, '')
+    yaxis_param_name = PARAM_NAMES.get(fit_param, fit_param)
+    yaxis_units = PARAM_UNITS.get(fit_param, '')
     try:
         yaxis_units = yaxis_units(**kwargs)
     except TypeError:
@@ -262,23 +268,23 @@ def plot_dip_params(fit_params, fit_params_sort,
 
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
-                         'type': 'log' if fit_params_sort in
-                                 PARAMETERS_LOG_SCALE else None})
+                         'type': 'log' if fit_param in
+                                          PARAMETERS_LOG_SCALE else None})
 
-    if fit_params_compare:
-        fit_params.dropna(subset=[fit_params_sort, fit_params_compare],
-                          inplace=True)
-        if fit_params_sort == fit_params_compare:
-            xdat = fit_params.loc[:, fit_params_sort]
+    if fit_param_compare:
+        df_params.dropna(subset=[fit_param, fit_param_compare],
+                         inplace=True)
+        if fit_param == fit_param_compare:
+            xdat = df_params.loc[:, fit_param]
             ydat = xdat
         else:
-            dat = fit_params.loc[:, [fit_params_compare, fit_params_sort]]
-            xdat = dat[fit_params_compare]
-            ydat = dat[fit_params_sort]
+            dat = df_params.loc[:, [fit_param_compare, fit_param]]
+            xdat = dat[fit_param_compare]
+            ydat = dat[fit_param]
 
-        xdat_fit = np.log10(xdat) if fit_params_compare in \
-            PARAMETERS_LOG_SCALE else xdat
-        ydat_fit = np.log10(ydat) if fit_params_sort in PARAMETERS_LOG_SCALE \
+        xdat_fit = np.log10(xdat) if fit_param_compare in \
+                                     PARAMETERS_LOG_SCALE else xdat
+        ydat_fit = np.log10(ydat) if fit_param in PARAMETERS_LOG_SCALE \
             else ydat
 
         if len(xdat_fit) > 0 and len(ydat_fit) > 0:
@@ -287,39 +293,42 @@ def plot_dip_params(fit_params, fit_params_sort,
         else:
             slope = np.nan
 
-        hovertext = fit_params['label']
-        symbols = ['circle'] * len(fit_params)
+        hovertext = df_params['label']
+        symbols = ['circle'] * len(df_params)
         ic_params = set()
 
-        for param in (fit_params_sort, fit_params_compare):
+        for param in (fit_param, fit_param_compare):
             match = IC_REGEX.match(param)
             if match:
                 ic_params.add(match.group())
 
         for ic_param in ic_params:
             msg = _out_of_range_msg(ic_param)
-            ic_truncated = fit_params['{}_unclipped'.format(ic_param)] > \
-                           fit_params[ic_param]
+            ic_truncated = df_params['{}_unclipped'.format(ic_param)] > \
+                           df_params[ic_param]
             addtxt = ['<br> ' + msg if x else '' for x in
                       ic_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
                        zip(ic_truncated, symbols)]
 
-        if fit_params_compare in ('ec50', 'auc', 'aa', 'e50') or \
-                fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
+        if fit_param_compare in ('ec50', 'e50') or \
+                fit_param in ('ec50', 'e50'):
             msg = _out_of_range_msg('ec50')
-            ec50_truncated = fit_params['ec50_unclipped'] > fit_params['ec50']
+            ec50_truncated = df_params['ec50_unclipped'] > df_params['ec50']
             addtxt = ['<br> ' + msg if x else '' for x in
                       ec50_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
                        zip(ec50_truncated, symbols)]
 
-        if fit_params_compare in ('emax', 'emax_rel') or \
-                        fit_params_sort in ('emax', 'emax_rel'):
-            emax_truncated = fit_params['einf'] < fit_params['emax']
-            addtxt = ['<br> ' + EMAX_TRUNCATED_MSG if x else '' for x in
+        if fit_param_compare in ('emax', 'emax_rel', 'aa') or \
+                        fit_param in ('emax', 'emax_rel', 'aa'):
+            emax_truncated = df_params['einf'] < df_params['emax']
+            msg = EMAX_TRUNCATED_MSG
+            if fit_param_compare == 'aa' or fit_param == 'aa':
+                msg = 'Based on ' + msg
+            addtxt = ['<br> ' + msg if x else '' for x in
                       emax_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
@@ -338,9 +347,9 @@ def plot_dip_params(fit_params, fit_params_sort,
         if not np.isnan(slope):
             xfit = (min(xdat_fit), max(xdat_fit))
             yfit = [x * slope + intercept for x in xfit]
-            if fit_params_compare in PARAMETERS_LOG_SCALE:
+            if fit_param_compare in PARAMETERS_LOG_SCALE:
                 xfit = np.power(10, xfit)
-            if fit_params_sort in PARAMETERS_LOG_SCALE:
+            if fit_param in PARAMETERS_LOG_SCALE:
                 yfit = np.power(10, yfit)
             data.append(go.Scatter(
                 x=xfit,
@@ -354,9 +363,9 @@ def plot_dip_params(fit_params, fit_params_sort,
                     'text': 'R<sup>2</sup>: {:0.4g} '
                             'p-value: {:0.4g} '.format(r_value**2, p_value)
                 }]
-        xaxis_param_name = PARAM_NAMES.get(fit_params_compare,
-                                           fit_params_compare)
-        xaxis_units = PARAM_UNITS.get(fit_params_compare, '')
+        xaxis_param_name = PARAM_NAMES.get(fit_param_compare,
+                                           fit_param_compare)
+        xaxis_units = PARAM_UNITS.get(fit_param_compare, '')
         try:
             xaxis_units = xaxis_units(**kwargs)
         except TypeError:
@@ -366,42 +375,46 @@ def plot_dip_params(fit_params, fit_params_sort,
         else:
             xaxis_title = xaxis_param_name
         layout['xaxis'] = {'title': xaxis_title,
-                           'type': 'log' if fit_params_compare in
-                                   PARAMETERS_LOG_SCALE else None}
+                           'type': 'log' if fit_param_compare in
+                                            PARAMETERS_LOG_SCALE else None}
         layout['hovermode'] = 'closest'
         layout['showlegend'] = False
     elif not aggregate_cell_lines and not aggregate_drugs:
-        fit_params = fit_params.sort_values(by=fit_params_sort,
-                                            na_position='first')
-        groups = fit_params['label']
-        yvals = fit_params[fit_params_sort]
+        sort_by = fit_param_sort if fit_param_sort is not None else fit_param
+        df_params = df_params.sort_values(by=sort_by,
+                                          na_position='first')
+        groups = df_params['label']
+        yvals = df_params[fit_param]
 
         text = None
         marker_cols = colours[1]
 
-        if fit_params_sort in ('ec50', 'auc', 'aa', 'e50'):
+        if fit_param in ('ec50', 'e50'):
             msg = _out_of_range_msg('ec50')
-            if fit_params_sort != 'ec50':
+            if fit_param != 'ec50':
                 msg = 'Based on ' + msg
-            ec50_truncated = fit_params['ec50_unclipped'] > fit_params['ec50']
+            ec50_truncated = df_params['ec50_unclipped'] > df_params['ec50']
             text = [msg if x else None for x in ec50_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ec50_truncated]
-        elif IC_REGEX.match(fit_params_sort):
-            msg = _out_of_range_msg(fit_params_sort)
-            ic_truncated = fit_params['{}_unclipped'.format(fit_params_sort)]\
-                            > fit_params[fit_params_sort]
+        elif IC_REGEX.match(fit_param):
+            msg = _out_of_range_msg(fit_param)
+            ic_truncated = df_params['{}_unclipped'.format(fit_param)] \
+                           > df_params[fit_param]
             text = [msg if x else None for x in ic_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ic_truncated]
-        elif fit_params_sort in ('emax', 'emax_rel'):
-            emax_truncated = fit_params['einf'] < fit_params['emax']
-            text = [EMAX_TRUNCATED_MSG if x else None for x in emax_truncated]
+        elif fit_param in ('emax', 'emax_rel', 'aa'):
+            emax_truncated = df_params['einf'] < df_params['emax']
+            msg = EMAX_TRUNCATED_MSG
+            if fit_param == 'aa':
+                msg = 'Based on ' + msg
+            text = [msg if x else None for x in emax_truncated]
             marker_cols = [colours[0] if x else colours[1] for x in
                            emax_truncated]
 
         data = [go.Bar(x=groups, y=yvals,
-                       name=fit_params_sort,
+                       name=fit_param,
                        text=text,
                        marker={'color': marker_cols}
                        )]
@@ -416,46 +429,53 @@ def plot_dip_params(fit_params, fit_params_sort,
         layout['barmode'] = 'group'
     else:
         layout['boxmode'] = 'group'
-        yvals = fit_params[fit_params_sort]
 
-        data = []
+        if fit_param_sort == fit_param:
+            fit_param_sort = None
+
+        if fit_param_sort is None:
+            yvals = df_params.loc[:, [fit_param]].dropna()
+        else:
+            yvals = df_params.loc[:, [fit_param,
+                                      fit_param_sort]]
+            yvals.dropna(subset=[fit_param], inplace=True)
 
         if aggregate_cell_lines:
-            if aggregate_cell_lines is True:
-                cell_lines = yvals.index.get_level_values(
-                    level='cell_line').unique().tolist()
-                aggregate_cell_lines = {
-                    _create_label_max_items(cell_lines, 5): cell_lines
-                }
+            yvals = _aggregate_by_cell_line(yvals, aggregate_cell_lines,
+                                            replace_index=True)
 
-            for cl_tag_name, cl_names in aggregate_cell_lines.items():
-                yvals_tmp = yvals.iloc[yvals.index.isin(cl_names,
-                                                        level='cell_line')]
-                num_cell_lines = len(yvals_tmp.index.get_level_values(
-                    'cell_line').unique())
-                cl_tag_label = '{} [{}]'.format(cl_tag_name, num_cell_lines)
-                if aggregate_drugs:
-                    data.extend(_agg_drugs(
-                        yvals_tmp,
-                        aggregate_drugs,
-                        x=np.repeat(cl_tag_label, len(yvals_tmp))
-                    ))
-                else:
-                    for dr_name, grp in yvals_tmp.groupby(level='drug'):
-                        data.append(go.Box(x=np.repeat(cl_tag_label, len(grp)),
-                                           y=grp,
-                                           name=dr_name))
+        if aggregate_drugs:
+            yvals = _aggregate_by_drug(yvals, aggregate_drugs,
+                                       replace_index=True)
 
-        else:
-            data.extend(_agg_drugs(yvals, aggregate_drugs))
+        # Sort by median effect per drug set
+        sortcol = fit_param_sort if fit_param_sort is \
+                                    not None else fit_param
+        yvals['median'] = yvals[sortcol].groupby(
+            level='cell_line').transform(np.median)
+        if fit_param_sort:
+            yvals.drop(labels=[fit_param_sort], axis=1, inplace=True)
+        yvals.set_index('median', append=True, inplace=True)
+        print(yvals)
+        yvals.sort_index(level=['median', 'cell_line'], ascending=False,
+                         inplace=True)
+        print(yvals)
+        yvals.reset_index('median', drop=True, inplace=True)
 
-        if aggregate_drugs and \
-                (aggregate_drugs is True or len(aggregate_drugs) == 1):
-            drugs = yvals.index.get_level_values('drug').unique().tolist()
-            annotation_label = '{} [{}]'.format(
-                _create_label_max_items(drugs, 3),
-                len(drugs)
-            )
+        # Convert yvals to a series
+        yvals = yvals.iloc[:, 0]
+
+        data = []
+        for drug, grp in yvals.groupby(level='drug'):
+            # print(grp)
+            data.append(go.Box(x=grp.index.get_level_values('cell_line'),
+                               y=grp,
+                               name=drug
+                               ))
+
+        drug_groups = yvals.index.get_level_values('drug').unique()
+        if len(drug_groups) == 1:
+            annotation_label = str(drug_groups[0])
             layout['annotations'] = [{'x': 0.5, 'y': 1.0, 'xref': 'paper',
                                       'yanchor': 'bottom', 'yref': 'paper',
                                       'showarrow': False,
@@ -467,24 +487,52 @@ def plot_dip_params(fit_params, fit_params_sort,
     return go.Figure(data=data, layout=layout)
 
 
-def _agg_drugs(series, aggregate_drugs, x=None):
-    data = []
+def _aggregate_by_drug(yvals, aggregate_drugs, replace_index=True):
+    return _aggregate_by_tag(yvals, aggregate_drugs, 'drug',
+                             replace_index=replace_index)
 
-    if aggregate_drugs is True:
-        drugs = series.index.get_level_values(
-            'drug').unique().tolist()
-        aggregate_drugs = {_create_label_max_items(drugs, 1): drugs}
 
-    for tag_name, drug_names in aggregate_drugs.items():
-        y = series.iloc[series.index.isin(
-            drug_names, level='drug')]
-        num_drugs = len(y.index.get_level_values('drug').unique())
-        tag_label = '{} [{}]'.format(tag_name, num_drugs)
-        if x is None:
-            x = y.index.get_level_values('cell_line')
-        data.append(go.Box(x=x, y=y, name=tag_label))
+def _aggregate_by_cell_line(yvals, aggregate_cell_lines,
+                            replace_index=True):
+    return _aggregate_by_tag(yvals, aggregate_cell_lines,
+                             'cell_line', replace_index=replace_index)
 
-    return data
+
+def _aggregate_by_tag(yvals, aggregate_items, label_type,
+                      replace_index=True):
+    if aggregate_items in (None, False):
+        return yvals
+
+    if aggregate_items is True:
+        items = yvals.index.get_level_values(
+            level=label_type).unique().tolist()
+        aggregate_items = {
+            _create_label_max_items(items, 5): items
+        }
+
+    new = pd.DataFrame()
+
+    label_type_tag = label_type + '_tag'
+
+    for tag_name, names in aggregate_items.items():
+        yvals_tmp = yvals.iloc[yvals.index.isin(names,
+                                                level=label_type), :]
+        yvals_tmp.is_copy = False  # suppress warning about assigning to copy
+
+        yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
+        new = new.append(yvals_tmp)
+
+    other_label = 'drug' if label_type == 'cell_line' else 'cell_line'
+    new.reset_index(other_label, inplace=True)
+    if label_type == 'cell_line':
+        index_labels = [label_type_tag, other_label]
+    else:
+        index_labels = [other_label, label_type_tag]
+    new.set_index(index_labels, inplace=True, drop=replace_index)
+    if replace_index:
+        new.index.rename(label_type, level=label_type_tag, inplace=True)
+
+    return new
 
 
 def _create_label_max_items(items, max_items=5):
