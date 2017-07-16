@@ -274,10 +274,6 @@ def plot_dip_params(df_params, fit_param,
         raise ValueError('Aggregation is not available when comparing two '
                          'dose response parameters')
 
-    if fit_param_sort and aggregate_cell_lines:
-        raise ValueError('Cannot use another parameter for sort order when '
-                         'aggregating cell lines')
-
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     if title is None:
@@ -474,34 +470,42 @@ def plot_dip_params(df_params, fit_param,
             yvals = _aggregate_by_drug(yvals, aggregate_drugs,
                                        replace_index=True)
 
-        # Sort by median effect per drug set
-        sortcol = fit_param_sort if fit_param_sort is \
-                                    not None else fit_param
+        drug_groups = yvals.index.get_level_values('drug').unique()
+        cell_line_groups = yvals.index.get_level_values('cell_line').unique()
+
+        # Sort by median effect per drug set, or cell line set if there's
+        # only one drug/drug group
+        sortcol = fit_param_sort if fit_param_sort is not None else fit_param
+
+        if len(cell_line_groups) > 1:
+            aggregate_by = 'cell_line'
+            groups = drug_groups
+        else:
+            groups = cell_line_groups
+            aggregate_by = 'drug'
+
         yvals['median'] = yvals[sortcol].groupby(
-            level='cell_line').transform(np.median)
+            level=aggregate_by).transform(np.nanmedian)
         if fit_param_sort:
             yvals.drop(labels=[fit_param_sort], axis=1, inplace=True)
         yvals.set_index('median', append=True, inplace=True)
-        print(yvals)
-        yvals.sort_index(level=['median', 'cell_line'], ascending=False,
+        yvals.sort_index(level=['median', aggregate_by], ascending=False,
                          inplace=True)
-        print(yvals)
         yvals.reset_index('median', drop=True, inplace=True)
 
         # Convert yvals to a series
         yvals = yvals.iloc[:, 0]
 
         data = []
-        for drug, grp in yvals.groupby(level='drug'):
-            # print(grp)
-            data.append(go.Box(x=grp.index.get_level_values('cell_line'),
+        group_by = 'drug' if aggregate_by == 'cell_line' else 'cell_line'
+        for grp_name, grp in yvals.groupby(level=group_by):
+            data.append(go.Box(x=grp.index.get_level_values(aggregate_by),
                                y=grp,
-                               name=drug
+                               name=grp_name
                                ))
 
-        drug_groups = yvals.index.get_level_values('drug').unique()
-        if len(drug_groups) == 1:
-            annotation_label = str(drug_groups[0])
+        if len(groups) == 1:
+            annotation_label = str(groups[0])
             layout['annotations'] = [{'x': 0.5, 'y': 1.0, 'xref': 'paper',
                                       'yanchor': 'bottom', 'yref': 'paper',
                                       'showarrow': False,
