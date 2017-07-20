@@ -30,6 +30,7 @@ PARAM_UNITS = {'auc': _activity_area_units,
                'ic50': 'M',
                'ic100': 'M',
                'ec50': 'M',
+               'einf': 'h<sup>-1</sup>',
                'emax': 'h<sup>-1</sup>',
                'emax_obs': 'h<sup>-1</sup>',
                'e50': 'h<sup>-1</sup>'}
@@ -39,13 +40,13 @@ PARAM_NAMES = {'aa': 'Activity area',
                'ic50': 'IC<sub>50</sub>',
                'ic100': 'IC<sub>100</sub>',
                'ec50': 'EC<sub>50</sub>',
+               'einf': 'E<sub>inf</sub>',
                'emax': 'E<sub>max</sub>',
                'emax_rel': 'E<sub>max</sub> (relative)',
                'emax_obs': 'E<sub>max</sub> observed',
                'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
                'e50': 'E<sub>50</sub>',
                'hill': 'Hill coefficient'}
-EMAX_TRUNCATED_MSG = 'E<sub>max</sub> truncated at effect of maximum dose'
 PARAMETERS_LOG_SCALE = ('ec50', 'ic50', 'ic10', 'ic100')
 IC_REGEX = re.compile('ic[0-9]+$')
 
@@ -233,8 +234,6 @@ def plot_dip(fit_params, is_absolute=False,
                     hovermsgs.append(_out_of_range_msg('ec50'))
                 if ic50_truncated:
                     hovermsgs.append(_out_of_range_msg('ic50'))
-                if fp.einf < fp.emax:
-                    hovermsgs.append(EMAX_TRUNCATED_MSG)
                 if hovermsgs:
                     hovertext = '*' + '<br>'.join(hovermsgs)
                 annotations.append({
@@ -312,11 +311,33 @@ def plot_dip_params(df_params, fit_param,
         ydat_fit = np.log10(ydat) if fit_param in PARAMETERS_LOG_SCALE \
             else ydat
 
+        data = []
+
         if len(xdat_fit) > 0 and len(ydat_fit) > 0:
             slope, intercept, r_value, p_value, std_err = \
                 scipy.stats.linregress(xdat_fit, ydat_fit)
-        else:
-            slope = np.nan
+            if not np.isnan(slope):
+                xfit = (min(xdat_fit), max(xdat_fit))
+                yfit = [x * slope + intercept for x in xfit]
+                if fit_param_compare in PARAMETERS_LOG_SCALE:
+                    xfit = np.power(10, xfit)
+                if fit_param in PARAMETERS_LOG_SCALE:
+                    yfit = np.power(10, yfit)
+                data.append(go.Scatter(
+                    x=xfit,
+                    y=yfit,
+                    mode='lines',
+                    hoverinfo="none",
+                    line=dict(
+                        color="darkorange"
+                    )
+                ))
+                layout['annotations'] = [{
+                    'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
+                    'yref': 'paper', 'showarrow': False,
+                    'text': 'R<sup>2</sup>: {:0.4g} '
+                            'p-value: {:0.4g} '.format(r_value ** 2, p_value)
+                }]
 
         hovertext = df_params['label']
         symbols = ['circle'] * len(df_params)
@@ -346,19 +367,7 @@ def plot_dip_params(df_params, fit_param,
             symbols = ['cross' if x else old for x, old in
                        zip(ec50_truncated, symbols)]
 
-        if fit_param_compare in ('emax', 'emax_rel', 'aa') or \
-                        fit_param in ('emax', 'emax_rel', 'aa'):
-            emax_truncated = df_params['einf'] < df_params['emax']
-            msg = EMAX_TRUNCATED_MSG
-            if fit_param_compare == 'aa' or fit_param == 'aa':
-                msg = 'Based on ' + msg
-            addtxt = ['<br> ' + msg if x else '' for x in
-                      emax_truncated]
-            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else old for x, old in
-                       zip(emax_truncated, symbols)]
-
-        data = [go.Scatter(
+        data.append(go.Scatter(
             x=xdat,
             y=ydat,
             hovertext=hovertext,
@@ -367,26 +376,7 @@ def plot_dip_params(df_params, fit_param,
             marker={'symbol': symbols,
                     'color': [colours[1] if s == 'circle' else
                               'crimson' for s in symbols]}
-        )]
-        if not np.isnan(slope):
-            xfit = (min(xdat_fit), max(xdat_fit))
-            yfit = [x * slope + intercept for x in xfit]
-            if fit_param_compare in PARAMETERS_LOG_SCALE:
-                xfit = np.power(10, xfit)
-            if fit_param in PARAMETERS_LOG_SCALE:
-                yfit = np.power(10, yfit)
-            data.append(go.Scatter(
-                x=xfit,
-                y=yfit,
-                mode='lines',
-                hoverinfo="none"
-            ))
-            layout['annotations'] = [{
-                    'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
-                    'yref': 'paper', 'showarrow': False,
-                    'text': 'R<sup>2</sup>: {:0.4g} '
-                            'p-value: {:0.4g} '.format(r_value**2, p_value)
-                }]
+        ))
         xaxis_param_name = _get_param_name(fit_param_compare)
         xaxis_units = _get_param_units(fit_param_compare)
         try:
@@ -426,14 +416,6 @@ def plot_dip_params(df_params, fit_param,
             text = [msg if x else None for x in ic_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ic_truncated]
-        elif fit_param in ('emax', 'emax_rel', 'aa'):
-            emax_truncated = df_params['einf'] < df_params['emax']
-            msg = EMAX_TRUNCATED_MSG
-            if fit_param == 'aa':
-                msg = 'Based on ' + msg
-            text = [msg if x else None for x in emax_truncated]
-            marker_cols = [colours[0] if x else colours[1] for x in
-                           emax_truncated]
 
         data = [go.Bar(x=groups, y=yvals,
                        name=fit_param,

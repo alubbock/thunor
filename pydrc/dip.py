@@ -2,8 +2,6 @@ import numpy as np
 import scipy.stats
 import pandas as pd
 from .curve_fit import fit_drc, ll4
-from .helpers import format_dose
-import warnings
 
 SECONDS_IN_HOUR = 3600.0
 PARAM_EQUAL_ATOL = 1e-16
@@ -226,16 +224,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
-        if popt_rel is not None:
-            emax_obs_fit = hill_fn(max_dose_measured, *popt)
-        else:
-            emax_obs_fit = None
-
         emax = None
         if popt is not None:
-            emax = popt[1]
-            if emax_obs_fit is not None and abs(emax / emax_obs_fit) > 1.1:
-                emax = emax_obs_fit
+            emax = hill_fn(max_dose_measured, *popt)
 
         emax_obs = np.min(dip_expt)
         emax_obs_rel = None
@@ -259,7 +250,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             popt=popt,
             popt_rel=popt_rel,
             einf=None if popt is None else popt[1],
-            emax=None if popt is None else emax,
+            emax=emax,
             emax_rel=emax_rel,
             emax_obs=emax_obs,
             emax_obs_rel=emax_obs_rel,
