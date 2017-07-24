@@ -144,6 +144,17 @@ def find_icN(fit_params, ic_num=50):
     return icN
 
 
+def find_ecN(fit_params, ec_num=50):
+    hill_slope, e0, emax, ec50 = fit_params
+
+    if ec_num >= 100:
+        return None
+
+    ec_frac = ec_num / 100.0
+
+    return ec50 * (ec_frac / (1 - ec_frac)) ** (1 / hill_slope)
+
+
 def find_auc(fit_params, min_conc):
     hill_slope, e0, emax, ec50 = fit_params
 
@@ -171,6 +182,9 @@ def find_aa(fit_params, max_conc, emax_obs=None):
 
 def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                    custom_ic_concentrations=set(),
+                   custom_ec_concentrations=set(),
+                   custom_e_values=set(),
+                   custom_e_rel_values=set(),
                    include_dip_rates=True, include_stats=True):
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
@@ -238,9 +252,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             emax_rel = emax / divisor
 
         ec50 = None if popt is None else np.min((popt[3], max_dose_measured))
-        e50 = None
-        if ec50 is not None:
-            e50 = hill_fn(ec50, *popt)
 
         fit_data = dict(
             label=group_name_disp,
@@ -255,7 +266,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             emax_obs=emax_obs,
             emax_obs_rel=emax_obs_rel,
             ec50=ec50,
-            e50=e50,
             max_dose_measured=max_dose_measured,
             hill=None if popt is None else popt[0]
         )
@@ -283,6 +293,38 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                         np.min((ic_n, max_dose_measured))
                 else:
                     fit_data['ic{:d}'.format(ic_num)] = None
+
+            custom_ec_concentrations.discard(50)
+            custom_ec_concentrations = custom_ec_concentrations.union(
+                custom_e_values)
+            custom_ec_concentrations = custom_ec_concentrations.union(
+                custom_e_rel_values)
+
+            for ec_num in custom_ec_concentrations:
+                if popt is None:
+                    ec_n = None
+                else:
+                    ec_n = find_ecN(popt, ec_num=ec_num)
+
+                if ec_n is not None:
+                    fit_data['ec{:d}'.format(ec_num)] = \
+                        np.min((ec_n, max_dose_measured))
+                else:
+                    fit_data['ec{:d}'.format(ec_num)] = None
+
+            for e_num in custom_e_values:
+                if popt is None:
+                    fit_data['e{:d}'.format(e_num)] = None
+                else:
+                    fit_data['e{:d}'.format(e_num)] = \
+                        hill_fn(fit_data['ec{:d}'.format(e_num)], *popt)
+
+            for e_num in custom_e_rel_values:
+                if popt_rel is None:
+                    fit_data['e{:d}_rel'.format(e_num)] = None
+                else:
+                    fit_data['e{:d}_rel'.format(e_num)] = \
+                        hill_fn(fit_data['ec{:d}'.format(e_num)], *popt_rel)
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None

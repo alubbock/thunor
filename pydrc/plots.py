@@ -26,29 +26,25 @@ def _auc_units(**kwargs):
 SECONDS_IN_HOUR = 3600.0
 PARAM_UNITS = {'auc': _activity_area_units,
                'aa': _activity_area_units,
-               'ic10': 'M',
-               'ic50': 'M',
-               'ic100': 'M',
-               'ec50': 'M',
                'einf': 'h<sup>-1</sup>',
                'emax': 'h<sup>-1</sup>',
-               'emax_obs': 'h<sup>-1</sup>',
-               'e50': 'h<sup>-1</sup>'}
+               'emax_obs': 'h<sup>-1</sup>'}
 PARAM_NAMES = {'aa': 'Activity area',
                'auc': 'Area under curve',
-               'ic10': 'IC<sub>10</sub>',
-               'ic50': 'IC<sub>50</sub>',
-               'ic100': 'IC<sub>100</sub>',
-               'ec50': 'EC<sub>50</sub>',
                'einf': 'E<sub>inf</sub>',
                'emax': 'E<sub>max</sub>',
                'emax_rel': 'E<sub>max</sub> (relative)',
                'emax_obs': 'E<sub>max</sub> observed',
                'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
-               'e50': 'E<sub>50</sub>',
                'hill': 'Hill coefficient'}
-PARAMETERS_LOG_SCALE = ('ec50', 'ic50', 'ic10', 'ic100')
-IC_REGEX = re.compile('ic[0-9]+$')
+IC_REGEX = re.compile('^ic([0-9]+)$')
+EC_REGEX = re.compile('^ec([0-9]+)$')
+E_REGEX = re.compile('^e([0-9]+)$')
+E_REL_REGEX = re.compile('^e([0-9]+)_rel$')
+
+
+def _param_is_log(param_id):
+    return IC_REGEX.match(param_id) or EC_REGEX.match(param_id)
 
 
 def _get_param_name(param_id):
@@ -57,6 +53,13 @@ def _get_param_name(param_id):
     except KeyError:
         if IC_REGEX.match(param_id):
             return 'IC<sub>{:d}</sub>'.format(int(param_id[2:]))
+        elif EC_REGEX.match(param_id):
+            return 'EC<sub>{:d}</sub>'.format(int(param_id[2:]))
+        elif E_REGEX.match(param_id):
+            return 'E<sub>{:d}</sub>'.format(int(param_id[1:]))
+        elif E_REL_REGEX.match(param_id):
+            return 'E<sub>{:d}</sub> (relative)'.format(
+                int(param_id[1:param_id.index('_')]))
         else:
             return param_id
 
@@ -65,15 +68,17 @@ def _get_param_units(param_id):
     try:
         return PARAM_UNITS[param_id]
     except KeyError:
-        if IC_REGEX.match(param_id):
+        if IC_REGEX.match(param_id) or EC_REGEX.match(param_id):
             return 'M'
+        elif E_REGEX.match(param_id):
+            return 'h<sup>-1</sup>'
         else:
             return ''
 
 
-def _out_of_range_msg(param_name):
+def _out_of_range_msg(param_id):
     return '{} truncated to maximum measured concentration'.format(
-        _get_param_name(param_name)
+        _get_param_name(param_id)
     )
 
 
@@ -292,8 +297,7 @@ def plot_dip_params(df_params, fit_param,
 
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
-                         'type': 'log' if fit_param in
-                                          PARAMETERS_LOG_SCALE else None})
+                         'type': 'log' if _param_is_log(fit_param) else None})
 
     if fit_param_compare:
         df_params.dropna(subset=[fit_param, fit_param_compare],
@@ -306,10 +310,8 @@ def plot_dip_params(df_params, fit_param,
             xdat = dat[fit_param_compare]
             ydat = dat[fit_param]
 
-        xdat_fit = np.log10(xdat) if fit_param_compare in \
-                                     PARAMETERS_LOG_SCALE else xdat
-        ydat_fit = np.log10(ydat) if fit_param in PARAMETERS_LOG_SCALE \
-            else ydat
+        xdat_fit = np.log10(xdat) if _param_is_log(fit_param_compare) else xdat
+        ydat_fit = np.log10(ydat) if _param_is_log(fit_param) else ydat
 
         data = []
 
@@ -319,9 +321,9 @@ def plot_dip_params(df_params, fit_param,
             if not np.isnan(slope):
                 xfit = (min(xdat_fit), max(xdat_fit))
                 yfit = [x * slope + intercept for x in xfit]
-                if fit_param_compare in PARAMETERS_LOG_SCALE:
+                if _param_is_log(fit_param_compare):
                     xfit = np.power(10, xfit)
-                if fit_param in PARAMETERS_LOG_SCALE:
+                if _param_is_log(fit_param):
                     yfit = np.power(10, yfit)
                 data.append(go.Scatter(
                     x=xfit,
@@ -341,31 +343,30 @@ def plot_dip_params(df_params, fit_param,
 
         hovertext = df_params['label']
         symbols = ['circle'] * len(df_params)
-        ic_params = set()
+        range_bounded_params = set()
 
         for param in (fit_param, fit_param_compare):
             match = IC_REGEX.match(param)
             if match:
-                ic_params.add(match.group())
+                range_bounded_params.add(match.group())
+            match = EC_REGEX.match(param)
+            if match:
+                range_bounded_params.add(match.group())
+            match = E_REGEX.match(param)
+            if match:
+                range_bounded_params.add('ec' + match.groups(0)[0])
+            match = E_REL_REGEX.match(param)
+            if match:
+                range_bounded_params.add('ec' + match.groups(0)[0])
 
-        for ic_param in ic_params:
-            msg = _out_of_range_msg(ic_param)
-            ic_truncated = is_param_truncated(df_params, ic_param)
+        for param in range_bounded_params:
+            msg = _out_of_range_msg(param)
+            param_truncated = is_param_truncated(df_params, param)
             addtxt = ['<br> ' + msg if x else '' for x in
-                      ic_truncated]
+                      param_truncated]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = ['cross' if x else old for x, old in
-                       zip(ic_truncated, symbols)]
-
-        if fit_param_compare in ('ec50', 'e50') or \
-                fit_param in ('ec50', 'e50'):
-            msg = _out_of_range_msg('ec50')
-            ec50_truncated = is_param_truncated(df_params, 'ec50')
-            addtxt = ['<br> ' + msg if x else '' for x in
-                      ec50_truncated]
-            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else old for x, old in
-                       zip(ec50_truncated, symbols)]
+                       zip(param_truncated, symbols)]
 
         data.append(go.Scatter(
             x=xdat,
@@ -388,8 +389,8 @@ def plot_dip_params(df_params, fit_param,
         else:
             xaxis_title = xaxis_param_name
         layout['xaxis'] = {'title': xaxis_title,
-                           'type': 'log' if fit_param_compare in
-                                            PARAMETERS_LOG_SCALE else None}
+                           'type': 'log' if _param_is_log(fit_param_compare)
+                           else None}
         layout['hovermode'] = 'closest'
         layout['showlegend'] = False
     elif not aggregate_cell_lines and not aggregate_drugs:
@@ -402,14 +403,21 @@ def plot_dip_params(df_params, fit_param,
         text = None
         marker_cols = colours[1]
 
-        if fit_param in ('ec50', 'e50'):
-            msg = _out_of_range_msg('ec50')
-            if fit_param != 'ec50':
+        ec_match = None
+        for regex in (EC_REGEX, E_REGEX, E_REL_REGEX):
+            match = regex.match(fit_param)
+            if match:
+                ec_match = 'ec' + match.groups(0)[0]
+                break
+
+        if ec_match:
+            msg = _out_of_range_msg(ec_match)
+            if not fit_param.startswith('ec'):
                 msg = 'Based on ' + msg
-            ec50_truncated = is_param_truncated(df_params, 'ec50')
-            text = [msg if x else None for x in ec50_truncated]
+            ec_truncated = is_param_truncated(df_params, ec_match)
+            text = [msg if x else None for x in ec_truncated]
             marker_cols = [colours[0] if est else colours[1] for
-                           est in ec50_truncated]
+                           est in ec_truncated]
         elif IC_REGEX.match(fit_param):
             msg = _out_of_range_msg(fit_param)
             ic_truncated = is_param_truncated(df_params, fit_param)
