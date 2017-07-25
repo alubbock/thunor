@@ -394,9 +394,9 @@ def plot_dip_params(df_params, fit_param,
         layout['hovermode'] = 'closest'
         layout['showlegend'] = False
     elif not aggregate_cell_lines and not aggregate_drugs:
-        sort_by = fit_param_sort if fit_param_sort is not None else fit_param
-        df_params = df_params.sort_values(by=sort_by,
-                                          na_position='first')
+        sort_by = [fit_param_sort, fit_param] if fit_param_sort is not None \
+                   else fit_param
+        df_params = df_params.sort_values(by=sort_by)
         groups = df_params['label']
         yvals = df_params[fit_param]
 
@@ -415,15 +415,28 @@ def plot_dip_params(df_params, fit_param,
             if not fit_param.startswith('ec'):
                 msg = 'Based on ' + msg
             ec_truncated = is_param_truncated(df_params, ec_match)
-            text = [msg if x else None for x in ec_truncated]
+            text = [msg if x else '' for x in ec_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ec_truncated]
         elif IC_REGEX.match(fit_param):
             msg = _out_of_range_msg(fit_param)
             ic_truncated = is_param_truncated(df_params, fit_param)
-            text = [msg if x else None for x in ic_truncated]
+            text = [msg if x else '' for x in ic_truncated]
             marker_cols = [colours[0] if est else colours[1] for
                            est in ic_truncated]
+
+        if fit_param_sort is not None:
+            na_list = df_params[fit_param_sort].isnull()
+            if text is None:
+                text = [''] * len(df_params)
+            for idx in range(len(df_params)):
+                if na_list[idx]:
+                    if text[idx]:
+                        text[idx] += '<br>'
+                    text[idx] += '{} undefined, sorted by {}'.format(
+                        _get_param_name(fit_param_sort),
+                        _get_param_name(fit_param)
+                    )
 
         data = [go.Bar(x=groups, y=yvals,
                        name=fit_param,
@@ -463,10 +476,6 @@ def plot_dip_params(df_params, fit_param,
         drug_groups = yvals.index.get_level_values('drug').unique()
         cell_line_groups = yvals.index.get_level_values('cell_line').unique()
 
-        # Sort by median effect per drug set, or cell line set if there's
-        # only one drug/drug group
-        sortcol = fit_param_sort if fit_param_sort is not None else fit_param
-
         if len(cell_line_groups) > 1:
             aggregate_by = 'cell_line'
             groups = drug_groups
@@ -474,14 +483,28 @@ def plot_dip_params(df_params, fit_param,
             groups = cell_line_groups
             aggregate_by = 'drug'
 
-        yvals['median'] = yvals[sortcol].groupby(
-            level=aggregate_by).transform(np.nanmedian)
-        if fit_param_sort:
-            yvals.drop(labels=[fit_param_sort], axis=1, inplace=True)
-        yvals.set_index('median', append=True, inplace=True)
-        yvals.sort_index(level=['median', aggregate_by], ascending=False,
-                         inplace=True)
-        yvals.reset_index('median', drop=True, inplace=True)
+        # Sort by median effect per drug set, or cell line set if there's
+        # only one drug/drug group
+        if fit_param_sort is None:
+            yvals['median'] = yvals[fit_param].groupby(
+                level=aggregate_by).transform(np.nanmedian)
+            yvals.set_index('median', append=True, inplace=True)
+            yvals.sort_index(level=['median', aggregate_by], ascending=False,
+                             inplace=True)
+            yvals.reset_index('median', drop=True, inplace=True)
+        else:
+            # Sort by fit_column_sort, with tie breakers determined by
+            # fit_param
+            median_cols = yvals.loc[:, [fit_param_sort, fit_param]].groupby(
+                level=aggregate_by).transform(np.nanmedian)
+            median_cols.rename(columns={fit_param_sort: 'median',
+                                        fit_param: 'median2'},
+                               inplace=True)
+            yvals = pd.concat([yvals, median_cols], axis=1)
+            yvals.set_index(['median', 'median2'], append=True, inplace=True)
+            yvals.sort_index(level=['median', 'median2', aggregate_by],
+                             ascending=False, inplace=True)
+            yvals.reset_index(['median', 'median2'], drop=True, inplace=True)
 
         # Convert yvals to a series
         yvals = yvals.iloc[:, 0]
