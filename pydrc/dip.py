@@ -345,7 +345,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
 
 def is_param_truncated(df_params, param_name):
-    return np.isclose(df_params[param_name],
+    return np.isclose(df_params[param_name].fillna(value=np.nan),
                       df_params['max_dose_measured'],
                       atol=PARAM_EQUAL_ATOL,
                       rtol=PARAM_EQUAL_RTOL)
