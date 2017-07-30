@@ -37,7 +37,9 @@ def plotly_to_dataframe(plot_fig):
             trace_name = trace['customdata']['csvname']
         except (TypeError, KeyError):
             try:
-                trace_name = trace['name'].replace('\\n', '')
+                trace_name = trace['name']
+                if trace_name is not None:
+                    trace_name = trace_name.replace('\\n', '')
             except KeyError:
                 trace_name = None
         yvals = trace['y']
