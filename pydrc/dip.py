@@ -186,35 +186,58 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                    custom_e_values=set(),
                    custom_e_rel_values=set(),
                    include_dip_rates=True, include_stats=True):
+
+    datasets = expt_dip_data.index.get_level_values('dataset').unique()
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
 
     if len(drugs) > 1 and len(cell_lines) == 1:
-        group_by = 'drug'
+        group_by = ['drug']
     elif len(cell_lines) > 1 and len(drugs) == 1:
-        group_by = 'cell_line'
+        group_by = ['cell_line']
     else:
-        group_by = ('cell_line', 'drug')
+        group_by = ['cell_line', 'drug']
+
+    if len(datasets) > 1:
+        if len(cell_lines) == 1 and len(drugs) == 1:
+            group_by = ['dataset']
+        else:
+            group_by = ['dataset'] + group_by
 
     fit_params = []
 
     for group_name, dip_grp in expt_dip_data.groupby(level=group_by):
-        if group_by == ('cell_line', 'drug'):
-            group_name_disp = "\n".join(group_name)
-            cl_name, dr_name = group_name
-        elif group_by == 'cell_line':
-            group_name_disp = group_name
-            cl_name = group_name
-            dr_name = drugs[0]
-        elif group_by == 'drug':
-            group_name_disp = group_name
-            cl_name = cell_lines[0]
-            dr_name = group_name
+        if 'cell_line' in group_by:
+            if len(group_by) > 1:
+                cl_name = group_name[group_by.index('cell_line')]
+            else:
+                cl_name = group_name
         else:
-            raise ValueError('Unknown group by: {}'.format(group_by))
+            cl_name = cell_lines[0]
+
+        if 'drug' in group_by:
+            if len(group_by) > 1:
+                dr_name = group_name[group_by.index('drug')]
+            else:
+                dr_name = group_name
+        else:
+            dr_name = drugs[0]
+
+        if 'dataset' in group_by:
+            if len(group_by) > 1:
+                dataset = group_name[group_by.index('dataset')]
+            else:
+                dataset = group_name
+        else:
+            dataset = datasets[0]
+
+        if len(group_by) > 1:
+            group_name_disp = "\n".join(str(x) for x in group_name)
+        else:
+            group_name_disp = str(group_name)
 
         try:
-            ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
+            ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
         except (KeyError, AttributeError):
@@ -255,6 +278,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         fit_data = dict(
             label=group_name_disp,
+            dataset_id=dataset,
             cell_line=cl_name,
             drug=dr_name,
             divisor=divisor,
@@ -339,7 +363,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         fit_params.append(fit_data)
 
     df_params = pd.DataFrame(fit_params)
-    df_params.set_index(['cell_line', 'drug'], inplace=True)
+    df_params.set_index(['dataset_id', 'cell_line', 'drug'], inplace=True)
 
     return df_params
 

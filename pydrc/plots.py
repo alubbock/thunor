@@ -111,6 +111,10 @@ def plot_dip(fit_params, is_absolute=False,
              title=None, subtitle=None, hill_fn=ll4):
 
     colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
+    # Shapes used for replicate markers
+    shapes = ['circle', 'circle-open']
+
+    datasets = fit_params.index.get_level_values('dataset_id').unique()
 
     yaxis_title = 'DIP rate'
     if is_absolute:
@@ -118,10 +122,18 @@ def plot_dip(fit_params, is_absolute=False,
     else:
         yaxis_title = 'Relative ' + yaxis_title
 
-    show_replicates = len(fit_params) == 1
+    multi_dataset = len(datasets) > 1
+    show_annotations = len(fit_params.index) == 1
+
+    show_replicates = len(fit_params.index) == 1 or \
+        (multi_dataset and
+         len(fit_params.index.get_level_values('cell_line').unique()) == 1 and
+         len(fit_params.index.get_level_values('drug').unique()) == 1)
 
     if title is None:
         title = _make_title('Dose response', fit_params)
+    if subtitle is None:
+        subtitle = " &amp; ".join(datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     annotations = []
@@ -169,7 +181,8 @@ def plot_dip(fit_params, is_absolute=False,
                                        'solid',
                                        'width': 3},
                                  legendgroup=group_name_disp,
-                                 showlegend=not show_replicates,
+                                 showlegend=not show_replicates or
+                                            multi_dataset,
                                  name=group_name_disp)
                       )
 
@@ -184,31 +197,41 @@ def plot_dip(fit_params, is_absolute=False,
                 if dip_ctrl is not None:
                     dip_ctrl /= fp.divisor
 
+            repl_name = 'Replicate'
+            ctrl_name = 'Control'
+            if multi_dataset:
+                repl_name = '{} {}'.format(fp.Index[0], repl_name)
+                ctrl_name = '{} {}'.format(fp.Index[0], ctrl_name)
+
+            shape = shapes.pop(0)
+
             traces.append(go.Scatter(x=expt_doses,
                                      y=y_trace,
                                      mode='markers',
-                                     line={'shape': 'spline',
-                                           'color': this_colour,
-                                           'width': 3},
+                                     marker={'symbol': shape,
+                                             'color': this_colour,
+                                             'size': 5},
                                      legendgroup=group_name_disp,
+                                     hoverinfo='x+y+text',
+                                     text=repl_name,
                                      showlegend=False,
-                                     name='Replicate',
-                                     marker={'size': 5})
+                                     name=repl_name)
                           )
             if dip_ctrl is not None:
                 traces.append(go.Scatter(x=ctrl_doses,
                                          y=dip_ctrl,
                                          mode='markers',
-                                         line={'shape': 'spline',
-                                               'color': 'black',
-                                               'width': 3},
-                                         hoverinfo='y+name',
-                                         name='Control',
+                                         marker={'symbol': shape,
+                                                 'color': 'black',
+                                                 'size': 5},
+                                         hoverinfo='y+text',
+                                         text=ctrl_name,
+                                         name=ctrl_name,
                                          legendgroup=group_name_disp,
-                                         showlegend=False,
-                                         marker={'size': 5})
+                                         showlegend=False)
                               )
 
+        if show_annotations:
             annotation_label = ''
             ec50_truncated = False
             ic50_truncated = False
@@ -268,20 +291,177 @@ def plot_dip(fit_params, is_absolute=False,
     return go.Figure(data=data, layout=layout)
 
 
+def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
+                                   **kwargs):
+    if title is None:
+        title = _make_title('Dose response parameters', df_params)
+    if subtitle is None:
+        datasets = df_params.index.get_level_values('dataset_id').unique()
+        subtitle = " &amp; ".join(datasets)
+    title = _combine_title_subtitle(title, subtitle)
+
+    df_params = df_params.loc[:, [fit_param, 'max_dose_measured']]
+    df_params.dropna(subset=[fit_param], inplace=True)
+    df_params.reset_index(inplace=True)
+    df_params = df_params.pivot_table(index=['cell_line', 'drug'], columns=[
+        'dataset_id'])
+    df_params.dropna(inplace=True)
+
+    if len(df_params.index) == 0:
+        raise ValueError('Dataset vs dataset scatter plot is empty. Check '
+                         'the cell lines and drugs in the two datasets '
+                         'overlap. If you want a bar plot instead, choose an '
+                         'ordering parameter.')
+
+    if len(df_params.columns) < 4:
+        raise ValueError('The cell lines and/or drugs selected only have '
+                         'data in one of the two datasets, so a scatter plot '
+                         'cannot be created. If you want a bar plot instead, '
+                         'choose an ordering parameter.')
+
+    colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
+
+    param_name = _get_param_name(fit_param)
+    param_units = _get_param_units(fit_param)
+    try:
+        param_units = param_units(**kwargs)
+    except TypeError:
+        pass
+    if param_units:
+        axis_title = '{} ({})'.format(param_name, param_units)
+    else:
+        axis_title = param_name
+
+    fit_param_data = df_params.loc[:, fit_param]
+    xdat = fit_param_data.iloc[:, 0]
+    xdat_fit = xdat
+    ydat = fit_param_data.iloc[:, 1]
+    ydat_fit = ydat
+    if _param_is_log(fit_param):
+        xdat_fit = np.log10(xdat)
+        ydat_fit = np.log10(ydat)
+
+    dataset_names = fit_param_data.columns
+
+    data = []
+    layout = go.Layout(title=title)
+
+    slope, intercept, r_value, p_value, std_err = \
+        scipy.stats.linregress(xdat_fit, ydat_fit)
+    if not np.isnan(slope):
+        xfit = (min(xdat_fit), max(xdat_fit))
+        yfit = [x * slope + intercept for x in xfit]
+        if _param_is_log(fit_param):
+            xfit = np.power(10, xfit)
+            yfit = np.power(10, yfit)
+        data.append(go.Scatter(
+            x=xfit,
+            y=yfit,
+            mode='lines',
+            hoverinfo="none",
+            line=dict(
+                color="darkorange"
+            ),
+            name='{} vs {} {} Linear Fit'.format(dataset_names[0],
+                                      dataset_names[1],
+                                      param_name)
+        ))
+        layout['annotations'] = [{
+            'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
+            'yref': 'paper', 'showarrow': False,
+            'text': 'R<sup>2</sup>: {:0.4g} '
+                    'p-value: {:0.4g} '.format(r_value ** 2, p_value)
+        }]
+
+    hovertext = [" ".join(l) for l in fit_param_data.index.values]
+    symbols = ['circle'] * len(fit_param_data.index)
+    range_bounded_params = set()
+
+    match = IC_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add(match.group())
+    match = EC_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add(match.group())
+    match = E_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add('ec' + match.groups(0)[0])
+    match = E_REL_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add('ec' + match.groups(0)[0])
+
+    for param in range_bounded_params:
+        msg = _out_of_range_msg(param)
+        for i in (0, 1):
+            tmp_df = pd.concat([
+                fit_param_data.iloc[:, i],
+                df_params.loc[:, 'max_dose_measured'].iloc[:, i]
+            ],
+            axis=1
+            )
+            tmp_df.columns = [fit_param, 'max_dose_measured']
+            param_truncated = is_param_truncated(tmp_df, fit_param)
+            addtxt = ['<br> {} {}'.format(dataset_names[i], msg) if x else
+                      '' for x in param_truncated]
+            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+            symbols = ['cross' if x else old for x, old in
+                       zip(param_truncated, symbols)]
+
+    data.append(go.Scatter(
+        x=xdat,
+        y=ydat,
+        hovertext=hovertext,
+        hoverinfo="text+x+y",
+        mode='markers',
+        marker={'symbol': symbols,
+                'color': [colours[1] if s == 'circle' else
+                          'crimson' for s in symbols]},
+        name='{} vs {} {}'.format(dataset_names[0],
+                                  dataset_names[1],
+                                  param_name)
+    ))
+
+    layout['xaxis'] = {'title': '{} {}'.format(dataset_names[0], axis_title),
+                       'type': 'log' if _param_is_log(fit_param) else None}
+    layout['yaxis'] = {'title': '{} {}'.format(dataset_names[1], axis_title),
+                       'type': 'log' if _param_is_log(fit_param) else None}
+    layout['hovermode'] = 'closest'
+    layout['showlegend'] = False
+
+    return go.Figure(layout=layout, data=data)
+
+
 def plot_dip_params(df_params, fit_param,
                     fit_param_compare=None,
                     fit_param_sort=None,
                     title=None,
-                    subtitle=None, aggregate_cell_lines=False,
-                    aggregate_drugs=False, **kwargs):
+                    subtitle=None,
+                    aggregate_cell_lines=False,
+                    aggregate_drugs=False,
+                    multi_dataset=False,
+                    **kwargs):
     if fit_param_compare and (aggregate_cell_lines or aggregate_drugs):
         raise ValueError('Aggregation is not available when comparing two '
                          'dose response parameters')
+
+    if multi_dataset and fit_param_compare is None and \
+            not aggregate_cell_lines and \
+            not aggregate_drugs and fit_param_sort is None:
+        return plot_two_dataset_param_scatter(
+            df_params,
+            fit_param,
+            title,
+            subtitle,
+            **kwargs
+        )
 
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     if title is None:
         title = _make_title('Dose response parameters', df_params)
+    if subtitle is None:
+        datasets = df_params.index.get_level_values('dataset_id').unique()
+        subtitle = " &amp; ".join(datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     yaxis_param_name = _get_param_name(fit_param)
@@ -310,6 +490,17 @@ def plot_dip_params(df_params, fit_param,
             xdat = dat[fit_param_compare]
             ydat = dat[fit_param]
 
+        xaxis_param_name = _get_param_name(fit_param_compare)
+        xaxis_units = _get_param_units(fit_param_compare)
+        try:
+            xaxis_units = xaxis_units(**kwargs)
+        except TypeError:
+            pass
+        if xaxis_units:
+            xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
+        else:
+            xaxis_title = xaxis_param_name
+
         xdat_fit = np.log10(xdat) if _param_is_log(fit_param_compare) else xdat
         ydat_fit = np.log10(ydat) if _param_is_log(fit_param) else ydat
 
@@ -332,7 +523,9 @@ def plot_dip_params(df_params, fit_param,
                     hoverinfo="none",
                     line=dict(
                         color="darkorange"
-                    )
+                    ),
+                    name='{} vs {} Linear Fit'.format(xaxis_param_name,
+                                                      yaxis_param_name)
                 ))
                 layout['annotations'] = [{
                     'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
@@ -376,18 +569,11 @@ def plot_dip_params(df_params, fit_param,
             mode='markers',
             marker={'symbol': symbols,
                     'color': [colours[1] if s == 'circle' else
-                              'crimson' for s in symbols]}
+                              'crimson' for s in symbols]},
+            name='{} vs {}'.format(xaxis_param_name,
+                                   yaxis_param_name)
         ))
-        xaxis_param_name = _get_param_name(fit_param_compare)
-        xaxis_units = _get_param_units(fit_param_compare)
-        try:
-            xaxis_units = xaxis_units(**kwargs)
-        except TypeError:
-            pass
-        if xaxis_units:
-            xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
-        else:
-            xaxis_title = xaxis_param_name
+
         layout['xaxis'] = {'title': xaxis_title,
                            'type': 'log' if _param_is_log(fit_param_compare)
                            else None}
@@ -430,7 +616,7 @@ def plot_dip_params(df_params, fit_param,
             if text is None:
                 text = [''] * len(df_params)
             for idx in range(len(df_params)):
-                if na_list[idx]:
+                if na_list.iloc[idx]:
                     if text[idx]:
                         text[idx] += '<br>'
                     text[idx] += '{} undefined, sorted by {}'.format(
@@ -438,7 +624,8 @@ def plot_dip_params(df_params, fit_param,
                         _get_param_name(fit_param)
                     )
 
-        data = [go.Bar(x=groups, y=yvals,
+        data = [go.Bar(x=groups,
+                       y=yvals,
                        name=fit_param,
                        text=text,
                        marker={'color': marker_cols}
@@ -450,7 +637,8 @@ def plot_dip_params(df_params, fit_param,
              'yref': 'paper',
              'showarrow': False,
              'font': {'color': 'rgba(150, 150, 150, 1)'}}
-            for x in groups[yvals.isnull()]]
+            for x in groups[yvals.isnull().values]]
+        layout.setdefault('xaxis', {})['type'] = 'category'
         layout['barmode'] = 'group'
     else:
         layout['boxmode'] = 'group'
@@ -477,11 +665,11 @@ def plot_dip_params(df_params, fit_param,
         cell_line_groups = yvals.index.get_level_values('cell_line').unique()
 
         if len(cell_line_groups) > 1:
-            aggregate_by = 'cell_line'
+            aggregate_by = ['dataset_id', 'cell_line']
             groups = drug_groups
         else:
             groups = cell_line_groups
-            aggregate_by = 'drug'
+            aggregate_by = ['dataset_id', 'drug']
 
         # Sort by median effect per drug set, or cell line set if there's
         # only one drug/drug group
@@ -489,7 +677,7 @@ def plot_dip_params(df_params, fit_param,
             yvals['median'] = yvals[fit_param].groupby(
                 level=aggregate_by).transform(np.nanmedian)
             yvals.set_index('median', append=True, inplace=True)
-            yvals.sort_index(level=['median', aggregate_by], ascending=False,
+            yvals.sort_index(level=['median'] + aggregate_by, ascending=False,
                              inplace=True)
             yvals.reset_index('median', drop=True, inplace=True)
         else:
@@ -502,7 +690,7 @@ def plot_dip_params(df_params, fit_param,
                                inplace=True)
             yvals = pd.concat([yvals, median_cols], axis=1)
             yvals.set_index(['median', 'median2'], append=True, inplace=True)
-            yvals.sort_index(level=['median', 'median2', aggregate_by],
+            yvals.sort_index(level=['median', 'median2'] + aggregate_by,
                              ascending=False, inplace=True)
             yvals.reset_index(['median', 'median2'], drop=True, inplace=True)
 
@@ -510,11 +698,20 @@ def plot_dip_params(df_params, fit_param,
         yvals = yvals.iloc[:, 0]
 
         data = []
-        group_by = 'drug' if aggregate_by == 'cell_line' else 'cell_line'
+        aggregate_by.remove('dataset_id')
+        aggregate_by = aggregate_by[0]
+        group_by = ['dataset_id', 'drug'] \
+                    if aggregate_by == 'cell_line' \
+                    else ['dataset_id', 'cell_line']
         for grp_name, grp in yvals.groupby(level=group_by):
+            if len(groups) > 1:
+                group_name = "<br>".join(str(g) for g in grp_name)
+            else:
+                # If there's only one drug/cell line group, just need dataset
+                group_name = grp_name[0]
             data.append(go.Box(x=grp.index.get_level_values(aggregate_by),
                                y=grp,
-                               name=grp_name
+                               name=group_name
                                ))
 
         if len(groups) == 1:
@@ -565,13 +762,10 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
         yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
         new = new.append(yvals_tmp)
 
-    other_label = 'drug' if label_type == 'cell_line' else 'cell_line'
-    new.reset_index(other_label, inplace=True)
-    if label_type == 'cell_line':
-        index_labels = [label_type_tag, other_label]
-    else:
-        index_labels = [other_label, label_type_tag]
-    new.set_index(index_labels, inplace=True, drop=replace_index)
+    labels = list(new.index.names)
+    new.reset_index([l for l in labels if l != label_type], inplace=True)
+    labels[labels.index(label_type)] = label_type_tag
+    new.set_index(labels, inplace=True, drop=replace_index)
     if replace_index:
         new.index.rename(label_type, level=label_type_tag, inplace=True)
 
