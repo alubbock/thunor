@@ -2,6 +2,15 @@ import collections
 import pandas as pd
 
 
+_SI_PREFIXES = collections.OrderedDict([
+    (1e-12, 'p'),
+    (1e-9, 'n'),
+    (1e-6, 'μ'),
+    (1e-3, 'm'),
+    (1, ''),
+])
+
+
 def format_dose(num, sig_digits=12, array_as_string=None):
     """
     Formats a numeric dose like 1.2e-9 into 1.2 nM
@@ -17,17 +26,15 @@ def format_dose(num, sig_digits=12, array_as_string=None):
 
     num = float(num)
 
-    _prefix = {1e-12: 'p',
-               1e-9: 'n',
-               1e-6: 'μ',
-               1e-3: 'm',
-               1: ''}
+    # TODO: Replace this with bisect
     multiplier = 1
-    for i in sorted(_prefix.keys()):
+    for i in _SI_PREFIXES.keys():
         if num >= i:
             multiplier = i
+        else:
+            break
     return ('{0:.' + str(sig_digits) + 'g} {1}M').format(
-        num/multiplier, _prefix[multiplier])
+        num/multiplier, _SI_PREFIXES[multiplier])
 
 
 def plotly_to_dataframe(plot_fig):
