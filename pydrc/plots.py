@@ -853,7 +853,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
         this_colour = colours.pop()
 
         for well_idx, well_id in enumerate(wells['well_id']):
-            timecourse = df_vals.loc[well_id, 'value']
+            timecourse = df_vals.loc[well_id]['value']
             t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)

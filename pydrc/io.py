@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime
 import itertools
+import pickle
 
 
 class PlateMap(object):
@@ -104,10 +105,12 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
     df_doses.is_copy = False
     df_doses.drop(0, level='well', inplace=True)
     df_doses.reset_index(inplace=True)
-    df_doses = df_doses.assign(well=list(zip(df_doses["upid"], df_doses[
-        "well"])))
+    df_doses = df_doses.assign(well=list(
+        ["{}__{}".format(a_, b_) for a_, b_ in
+         zip(df_doses["upid"], df_doses["well"])]))
     df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug')
     df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'], inplace=True)
+    df_doses.drop('plate_id', axis=1, inplace=True)
 
     df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
     df_doses.reset_index(level='well_id', inplace=True)
@@ -117,8 +120,9 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
     df_controls = df[["cell.line", "time", 'cell.count']].xs(0, level='well')
     df_controls.reset_index(inplace=True)
     df_controls.columns = ['plate', 'cell_line', 'timepoint', 'value']
-    df_controls = df_controls.assign(well_id=list(zip(df_controls['plate'],
-                                                      itertools.repeat(0))))
+    df_controls = df_controls.assign(well_id=list(
+        ["{}__{}".format(a_, b_) for a_, b_ in
+         zip(df_controls['plate'], itertools.repeat(0))]))
     df_controls['assay'] = assay_name
     df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
                            'timepoint'], inplace=True)
@@ -127,7 +131,8 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
     # df_vals
     df_vals = df[['time', 'cell.count']]
     df_vals = df_vals[df_vals.index.get_level_values(level='well') != 0]
-    df_vals.index = df_vals.index.tolist()
+    df_vals.index = ["{}__{}".format(a_, b_) for a_, b_ in
+                     df_vals.index.tolist()]
     df_vals.index.name = 'well_id'
     df_vals.columns = ['timepoint', 'value']
     df_vals['assay'] = assay_name
@@ -139,10 +144,10 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
 
 
 def write_hdf(df_data, filename):
-    with pd.HDFStore(filename, 'w') as hdf:
+    with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
         for key, val in df_data.items():
             if isinstance(val, pd.DataFrame):
-                hdf.put(key, val, format='fixed')
+                hdf.put(key, val, format='table')
             elif isinstance(val, str):
                 hdf.root._v_attrs[key] = val
             elif val is None:

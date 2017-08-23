@@ -11,6 +11,8 @@ def main():
           author_email='code@alexlubbock.com',
           packages=['pydrc'],
           install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn'],
+          test_requires=['nose', 'nosebook'],
+          test_suite='nose.collector',
           cmdclass=versioneer.get_cmdclass()
     )
 
