@@ -187,7 +187,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                    custom_e_rel_values=set(),
                    include_dip_rates=True, include_stats=True):
 
-    datasets = expt_dip_data.index.get_level_values('dataset').unique()
+    if 'dataset' in expt_dip_data.index.names:
+        datasets = expt_dip_data.index.get_level_values('dataset').unique()
+    else:
+        datasets = None
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
 
@@ -198,7 +201,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
     else:
         group_by = ['cell_line', 'drug']
 
-    if len(datasets) > 1:
+    if datasets is not None and len(datasets) > 1:
         if len(cell_lines) == 1 and len(drugs) == 1:
             group_by = ['dataset']
         else:
@@ -228,8 +231,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 dataset = group_name[group_by.index('dataset')]
             else:
                 dataset = group_name
-        else:
+        elif datasets is not None:
             dataset = datasets[0]
+        else:
+            dataset = None
 
         if len(group_by) > 1:
             group_name_disp = "\n".join(str(x) for x in group_name)
@@ -237,7 +242,15 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             group_name_disp = str(group_name)
 
         try:
-            ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
+            if dataset is None and 'dataset' in ctrl_dip_data.index.names:
+                raise ValueError('Experimental data does not have "dataset" '
+                                 'in index, but control data does. Please '
+                                 'make sure "dataset" is in both dataframes, '
+                                 'or neither.')
+            if dataset is None:
+                ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
+            else:
+                ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
         except (KeyError, AttributeError):
@@ -278,7 +291,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         fit_data = dict(
             label=group_name_disp,
-            dataset_id=dataset,
+            dataset_id=dataset if dataset is not None else '',
             cell_line=cl_name,
             drug=dr_name,
             divisor=divisor,

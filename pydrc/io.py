@@ -100,6 +100,8 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
 
     # df_doses
     df_doses = df[["drug1.conc", "cell.line", "drug1"]]
+    # Suppress warnings about altering a dataframe slice
+    df_doses.is_copy = False
     df_doses.drop(0, level='well', inplace=True)
     df_doses.reset_index(inplace=True)
     df_doses = df_doses.assign(well=list(zip(df_doses["upid"], df_doses[
@@ -109,6 +111,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
 
     df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
     df_doses.reset_index(level='well_id', inplace=True)
+    df_doses.sort_index(inplace=True)
 
     # df_controls
     df_controls = df[["cell.line", "time", 'cell.count']].xs(0, level='well')
@@ -119,6 +122,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
     df_controls['assay'] = assay_name
     df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
                            'timepoint'], inplace=True)
+    df_controls.sort_index(inplace=True)
 
     # df_vals
     df_vals = df[['time', 'cell.count']]

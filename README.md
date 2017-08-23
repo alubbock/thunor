@@ -57,7 +57,7 @@ Each of the `plot_X` functions returns a plotly `Figure` object which can be
     
 DIP rate dose response
 
-    plot(plot_dip([fit_params[0]]))
+    plot(plot_dip(fit_params))
     
 DIP rate dose response curve parameters (IC50, EC50, AUC etc.)
 
@@ -66,7 +66,9 @@ DIP rate dose response curve parameters (IC50, EC50, AUC etc.)
 Time course plot for the 'Cell count' assay (this is a bit more work at the 
 moment as we need to manually filter a drug/cell line/assay combination)
 
-    df_doses_filtered = hts_data['doses'].loc['abemaciclib', 'BT20']
+    df_doses_filtered = hts_data['doses'].xs(['abemaciclib', 'BT20'],
+                                             level=['drug', 'cell_line'],
+                                             drop_level=False)
     df_controls_filtered = hts_data['controls'].loc['Cell count', 'BT20']
     df_assays_filtered = hts_data['assays'].loc['Cell count']
     plot(plot_time_course(df_doses_filtered, df_assays_filtered, \ 
