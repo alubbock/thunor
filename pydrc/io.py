@@ -87,7 +87,8 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                              d: datetime.strptime(
                              d, '%Y-%m-%d').date()
                      },
-                     index_col=['upid', 'well']
+                     index_col=['upid', 'well'],
+                     sep="\t"
                      )
 
     return df
