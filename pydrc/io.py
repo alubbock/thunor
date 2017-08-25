@@ -87,9 +87,10 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                              d: datetime.strptime(
                              d, '%Y-%m-%d').date()
                      },
-                     index_col=['upid', 'well'],
                      sep="\t"
                      )
+
+    df.set_index(['upid', 'well'], inplace=True)
 
     return df
 
@@ -118,16 +119,21 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
     df_doses.sort_index(inplace=True)
 
     # df_controls
-    df_controls = df[["cell.line", "time", 'cell.count']].xs(0, level='well')
-    df_controls.reset_index(inplace=True)
-    df_controls.columns = ['plate', 'cell_line', 'timepoint', 'value']
-    df_controls = df_controls.assign(well_id=list(
-        ["{}__{}".format(a_, b_) for a_, b_ in
-         zip(df_controls['plate'], itertools.repeat(0))]))
-    df_controls['assay'] = assay_name
-    df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
-                           'timepoint'], inplace=True)
-    df_controls.sort_index(inplace=True)
+    try:
+        df_controls = df[["cell.line", "time", 'cell.count']].xs(0, level='well')
+    except KeyError:
+        df_controls = None
+
+    if df_controls is not None:
+        df_controls.reset_index(inplace=True)
+        df_controls.columns = ['plate', 'cell_line', 'timepoint', 'value']
+        df_controls = df_controls.assign(well_id=list(
+            ["{}__{}".format(a_, b_) for a_, b_ in
+             zip(df_controls['plate'], itertools.repeat(0))]))
+        df_controls['assay'] = assay_name
+        df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
+                               'timepoint'], inplace=True)
+        df_controls.sort_index(inplace=True)
 
     # df_vals
     df_vals = df[['time', 'cell.count']]
