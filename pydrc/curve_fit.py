@@ -16,7 +16,8 @@ def ll4(x, b, c, d, e):
 
 
 # Fitting function
-def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4):
+def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
+            null_rejection_threshold=0.05):
     dip_rate_nans = np.isnan(dip_rates)
     if np.any(dip_rate_nans):
         doses = doses[~dip_rate_nans]
@@ -34,7 +35,10 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4):
                                               )
 
         if popt[1] > popt[2] or popt[0] < 0:
-            # TODO: Maybe try another fit of some kind?
+            # Reject fit if curve goes upwards
+            popt = None
+        elif popt[3] < np.min(doses):
+            # Reject fit if EC50 less than min dose
             popt = None
     except RuntimeError:
         pass
@@ -43,12 +47,31 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4):
     if popt is None:
         divisor = np.mean(dip_rates)
     else:
-        divisor = popt[2]
-        if divisor > 0:
-            # Are cells growing in control?
-            popt_rel = popt.copy()
-            popt_rel[1] /= divisor
-            popt_rel[2] = 1
+        # DIP rate fit
+        dip_rate_fit_curve = hill_fn(doses, *popt)
+
+        # F test vs flat linear "no effect" fit
+        ssq_model = ((dip_rate_fit_curve - dip_rates) ** 2).sum()
+        ssq_null = ((np.mean(dip_rates) - dip_rates) ** 2).sum()
+
+        df = len(doses) - 4
+
+        f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
+        p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
+
+        # print(p)
+
+        if p > null_rejection_threshold:
+            # print(p)
+            popt = None
+            divisor = np.mean(dip_rates)
+        else:
+            divisor = popt[2]
+            if divisor > 0:
+                # Are cells growing in control?
+                popt_rel = popt.copy()
+                popt_rel[1] /= divisor
+                popt_rel[2] = 1
 
     return popt, popt_rel, divisor
 
