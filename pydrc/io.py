@@ -62,7 +62,7 @@ class PlateMap(object):
 
 
 def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
-                                  plate_height=16):
+                                  plate_height=16, sep='\t'):
     pm = PlateMap(width=plate_width, height=plate_height)
 
     df = pd.read_csv(file_or_source,
@@ -87,7 +87,7 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                              d: datetime.strptime(
                              d, '%Y-%m-%d').date()
                      },
-                     sep="\t"
+                     sep=sep
                      )
 
     df.set_index(['upid', 'well'], inplace=True)
@@ -95,9 +95,10 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     return df
 
 
-def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16):
+def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
+                        sep='\t'):
     df = read_vanderbilt_hts_single_df(file_or_source, plate_width,
-                                       plate_height)
+                                       plate_height, sep=sep)
 
     assay_name = 'Cell count'
 
