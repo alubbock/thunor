@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime
 import itertools
-import pickle
+import re
+from .dip import choose_dip_assay
 
 
 class PlateMap(object):
@@ -61,6 +62,42 @@ class PlateMap(object):
         return list(self.well_iterator())
 
 
+class HtsPandas(object):
+    def __init__(self, doses, assays, controls):
+        self.doses = doses
+        self.assays = assays
+        self.controls = controls
+
+    def __getitem__(self, item):
+        if item in ('doses', 'assays', 'controls'):
+            return self.__getattribute__(item)
+
+    def doses_unstacked(self):
+        """ Split multiple drugs/doses into separate columns """
+        doses = self.doses.reset_index()
+        drug_cols = doses['drug'].apply(pd.Series)
+        dose_cols = doses['dose'].apply(pd.Series)
+        n_drugs = len(drug_cols.columns)
+        drug_cols.rename(columns={n: 'drug%d' % (n + 1) for n in range(
+            n_drugs)},
+                         inplace=True)
+        dose_cols.rename(columns={n: 'dose%d' % (n + 1) for n in range(
+            n_drugs)},
+                         inplace=True)
+        doses.drop(['drug', 'dose'], axis=1, inplace=True)
+        doses = pd.concat([doses, drug_cols, dose_cols], axis=1)
+        doses.set_index(['drug%d' % (n + 1) for n in range(n_drugs)]
+                        + ['cell_line'] +
+                        ['dose%d' % (n + 1) for n in range(n_drugs)],
+                        inplace=True)
+        return doses
+
+    @property
+    def dip_assay_name(self):
+        assay_names = self.assays.index.get_level_values('assay').unique()
+        return choose_dip_assay(assay_names)
+
+
 def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                                   plate_height=16, sep='\t'):
     pm = PlateMap(width=plate_width, height=plate_height)
@@ -102,17 +139,39 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     assay_name = 'Cell count'
 
-    # df_doses
-    df_doses = df[["drug1.conc", "cell.line", "drug1"]]
+    multi_drug = False
+    if 'drug2' in df.columns:
+        multi_drug = True
+
+    assert df["drug1.units"].unique() == 'M'
+    if multi_drug:
+        assert df["drug2.units"].unique() == 'M'
+
+    doses_cols = ["drug1.conc", "cell.line", "drug1"]
+
+    if multi_drug:
+        doses_cols += ["drug2", "drug2.conc"]
+
+    df_doses = df[doses_cols]
+    df_doses = df_doses[df_doses["drug1.conc"] > 0]
+    if multi_drug:
+        df_doses = df_doses[df_doses["drug2.conc"] > 0]
     # Suppress warnings about altering a dataframe slice
     df_doses.is_copy = False
-    df_doses.drop(0, level='well', inplace=True)
     df_doses.reset_index(inplace=True)
     df_doses = df_doses.assign(well=list(
         ["{}__{}".format(a_, b_) for a_, b_ in
          zip(df_doses["upid"], df_doses["well"])]))
+
+    if multi_drug:
+        df_doses['drug1'] = df_doses[['drug1', 'drug2']].apply(tuple, axis=1)
+        df_doses['drug1.conc'] = df_doses[['drug1.conc', 'drug2.conc']].apply(
+            tuple, axis=1)
+        df_doses.drop(['drug2', 'drug2.conc'], axis=1, inplace=True)
+
     df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug')
-    df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'], inplace=True)
+    df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'],
+                       inplace=True)
     df_doses.drop('plate_id', axis=1, inplace=True)
 
     df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
@@ -121,16 +180,20 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     # df_controls
     try:
-        df_controls = df[["cell.line", "time", 'cell.count']].xs(0, level='well')
+        df_controls = df[df['drug1.conc'] == 0.0]
+        if multi_drug:
+            df_controls = df_controls[df_controls['drug2.conc'] == 0.0]
+        df_controls = df_controls[["cell.line", "time", 'cell.count']]
     except KeyError:
         df_controls = None
 
     if df_controls is not None:
         df_controls.reset_index(inplace=True)
-        df_controls.columns = ['plate', 'cell_line', 'timepoint', 'value']
-        df_controls = df_controls.assign(well_id=list(
+        df_controls = df_controls.assign(well=list(
             ["{}__{}".format(a_, b_) for a_, b_ in
-             zip(df_controls['plate'], itertools.repeat(0))]))
+             zip(df_controls["upid"], df_controls["well"])]))
+        df_controls.columns = ['plate', 'well_id', 'cell_line', 'timepoint',
+                               'value']
         df_controls['assay'] = assay_name
         df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
                                'timepoint'], inplace=True)
@@ -147,25 +210,17 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     df_vals.reset_index(inplace=True)
     df_vals.set_index(['assay', 'well_id', 'timepoint'], inplace=True)
 
-    return {'controls': df_controls, 'doses': df_doses, 'assays': df_vals,
-            'dip_assay_name': assay_name}
+    return HtsPandas(df_doses, df_vals, df_controls)
 
 
 def write_hdf(df_data, filename):
     with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
-        for key, val in df_data.items():
-            if isinstance(val, pd.DataFrame):
-                hdf.put(key, val, format='table')
-            elif isinstance(val, str):
-                hdf.root._v_attrs[key] = val
-            elif val is None:
-                pass
-            else:
-                raise ValueError('Type not supported: {}'.format(type(val)))
+        hdf.put('doses', df_data.doses_unstacked())
+        hdf.put('assays', df_data.assays)
+        hdf.put('controls', df_data.controls)
 
 
 def read_hdf(filename_or_buffer):
-    df_data = {}
     hdf_kwargs = {'mode': 'r'}
     if isinstance(filename_or_buffer, str):
         hdf_kwargs['path'] = filename_or_buffer
@@ -177,12 +232,23 @@ def read_hdf(filename_or_buffer):
             'driver_core_image': filename_or_buffer
         })
     with pd.HDFStore(**hdf_kwargs) as hdf:
-        df_data['assays'] = hdf['assays']
+        df_assays = hdf['assays']
         try:
-            df_data['controls'] = hdf['controls']
+            df_controls = hdf['controls']
         except KeyError:
-            df_data['controls'] = None
-        df_data['doses'] = hdf['doses']
-        df_data['dip_assay_name'] = hdf.root._v_attrs.dip_assay_name
+            df_controls = None
+        df_doses = hdf['doses']
 
-    return df_data
+    df_doses.reset_index(inplace=True)
+    if 'drug' not in df_doses.columns:
+        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+    if 'dose' not in df_doses.columns:
+        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+    df_doses = df_doses.select(lambda col: not re.match('^(dose|drug)[0-9]+$',
+                                                        col),
+                               axis=1)
+    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
+
+    return HtsPandas(df_doses, df_assays, df_controls)

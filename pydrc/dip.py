@@ -6,6 +6,7 @@ from .curve_fit import fit_drc, ll4
 SECONDS_IN_HOUR = 3600.0
 PARAM_EQUAL_ATOL = 1e-16
 PARAM_EQUAL_RTOL = 1e-12
+DIP_ASSAYS = ('Cell count', 'lum:Lum')
 
 
 class ValueWarning(UserWarning):
@@ -20,21 +21,29 @@ class AAFitWarning(ValueWarning):
     pass
 
 
+def choose_dip_assay(assay_names):
+    for assay in DIP_ASSAYS:
+        if assay in assay_names:
+            return assay
+
+    return None
+
+
 def tyson1(adj_r_sq, rmse, n):
     """ Tyson1 DIP rate selection heuristic """
     return adj_r_sq * ((1 - rmse) ** 2) * ((n - 3) ** 0.25)
 
 
 def dip_rates(df_data, selector_fn=tyson1):
-    if df_data['controls'] is None:
+    if df_data.controls is None:
         ctrl_dips = None
     else:
-        df_controls = df_data['controls'].loc[df_data['dip_assay_name']]
+        df_controls = df_data.controls.loc[df_data.dip_assay_name]
         ctrl_dips = ctrl_dip_rates(df_controls)
-    df_assays = df_data['assays'].loc[df_data['dip_assay_name']]
+    df_assays = df_data.assays.loc[df_data.dip_assay_name]
 
     return ctrl_dips, \
-           expt_dip_rates(df_data['doses'], df_assays, selector_fn=selector_fn)
+           expt_dip_rates(df_data.doses, df_assays, selector_fn=selector_fn)
 
 
 def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
@@ -42,7 +51,6 @@ def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
         apply(_expt_dip, selector_fn=selector_fn).apply(pd.Series).\
         rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
                         2: 'dip_first_timepoint', 3: 'dip_y_intercept'})
-
     dip_df = pd.merge(df_doses, res, left_on='well_id',
                       right_index=True)
     dip_df.sort_index(inplace=True)

@@ -16,11 +16,11 @@ def test_tutorial():
 
     plot_dip_params(fit_params, 'auc')
 
-    df_doses_filtered = vu001['doses'].xs(['abemaciclib', 'BT20'],
-                                          level=['drug', 'cell_line'],
-                                          drop_level=False)
-    df_controls_filtered = vu001['controls'].loc['Cell count', 'BT20']
-    df_assays_filtered = vu001['assays'].loc['Cell count']
+    df_doses_filtered = vu001.doses.xs(['abemaciclib', 'BT20'],
+                                       level=['drug', 'cell_line'],
+                                       drop_level=False)
+    df_controls_filtered = vu001.controls.loc['Cell count', 'BT20']
+    df_assays_filtered = vu001.assays.loc['Cell count']
     plot_time_course(df_doses_filtered,
                      df_assays_filtered,
                      df_controls_filtered)

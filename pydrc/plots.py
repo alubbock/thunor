@@ -482,6 +482,10 @@ def plot_dip_params(df_params, fit_param,
     if fit_param_compare:
         df_params.dropna(subset=[fit_param, fit_param_compare],
                          inplace=True)
+        if df_params.empty:
+            raise ValueError('No data exists for this selection. This may be '
+                             'due to missing drug/cell line combinations, or '
+                             'undefined parameters for the selection.')
         if fit_param == fit_param_compare:
             xdat = df_params.loc[:, fit_param]
             ydat = xdat
