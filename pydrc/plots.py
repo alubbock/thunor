@@ -802,8 +802,9 @@ def plot_time_course(df_doses, df_vals, df_controls,
         "husl", len(df_doses.index.get_level_values(level='dose').unique())))
 
     if show_dip_fit:
-        dip_rate_ctrl = ctrl_dip_rates(df_controls)
-        dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
+        if df_controls is not None:
+            dip_rate_ctrl = ctrl_dip_rates(df_controls)
+            dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
         dip_rates = expt_dip_rates(df_doses, df_vals)
         dip_rates.set_index('well_id', inplace=True)
 
@@ -833,7 +834,7 @@ def plot_time_course(df_doses, df_vals, df_controls,
             ))
             is_first_control = False
 
-            if show_dip_fit:
+            if show_dip_fit and df_controls is not None:
                 dip_well = dip_rate_ctrl.loc[well_id]
                 minmax = [np.min(x_range), np.max(x_range)]
 
