@@ -72,6 +72,44 @@ class HtsPandas(object):
         if item in ('doses', 'assays', 'controls'):
             return self.__getattribute__(item)
 
+    def filter(self, cell_lines=None, drugs=None):
+        """
+        Filter by cell lines and/or drugs
+
+        "None" means "no filter"
+        """
+        doses = self.doses.copy()
+        controls = self.controls.copy()
+        if cell_lines is not None:
+            doses = doses.iloc[doses.index.isin(
+                cell_lines, level='cell_line'), :]
+            controls = controls.iloc[controls.index.isin(
+                cell_lines, level='cell_line'), :]
+
+        if drugs is not None:
+            doses = doses.iloc[doses.index.isin(
+                drugs, level='drug'
+            ), :]
+
+        doses.index = doses.index.remove_unused_levels()
+        controls.index = controls.index.remove_unused_levels()
+
+        assays = self.assays.copy()
+        assays = assays.iloc[assays.index.isin(doses['well_id'].unique(),
+                                               level='well_id'), :]
+
+        return self.__class__(doses, assays, controls)
+
+    def __repr__(self):
+        num_cell_lines = len(self.doses.index.get_level_values(
+                             "cell_line").unique())
+        num_drugs = len(self.doses.index.get_level_values("drug").unique())
+
+        return "HTS Dataset ({} drugs/combos, {} cell lines)".format(
+            num_drugs,
+            num_cell_lines
+        )
+
     def doses_unstacked(self):
         """ Split multiple drugs/doses into separate columns """
         doses = self.doses.reset_index()
@@ -93,9 +131,20 @@ class HtsPandas(object):
         return doses
 
     @property
+    def cell_lines(self):
+        return sorted(self.doses.index.get_level_values("cell_line").unique())
+
+    @property
+    def drugs(self):
+        return sorted(self.doses.index.get_level_values("drug").unique())
+
+    @property
+    def assay_names(self):
+        return sorted(self.assays.index.get_level_values("assay").unique())
+
+    @property
     def dip_assay_name(self):
-        assay_names = self.assays.index.get_level_values('assay').unique()
-        return choose_dip_assay(assay_names)
+        return choose_dip_assay(self.assay_names)
 
 
 def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,

@@ -786,11 +786,36 @@ def _create_label_max_items(items, max_items=5):
     return annotation_label
 
 
-def plot_time_course(df_doses, df_vals, df_controls,
+def plot_time_course(hts_pandas,
                      log_yaxis=False, assay_name='Assay', title=None,
                      subtitle=None, show_dip_fit=False):
     if show_dip_fit and not log_yaxis:
         raise ValueError('log_yaxis must be True when show_dip_fit is True')
+
+    df_doses = hts_pandas.doses
+    if hts_pandas.controls is not None:
+        df_controls = hts_pandas.controls
+    else:
+        df_controls = None
+    df_vals = hts_pandas.assays
+
+    df_assays_avail = hts_pandas.assay_names
+    if len(df_assays_avail) == 1:
+        assay = df_assays_avail[0]
+    elif assay_name in df_assays_avail:
+        assay = assay_name
+    else:
+        raise ValueError('{} is not a valid assay. Options are {}'.format(
+            assay_name, df_assays_avail))
+
+    df_controls = df_controls.loc[assay]
+    df_vals = df_vals.loc[assay]
+
+    if len(hts_pandas.drugs) > 1 or len(hts_pandas.cell_lines) > 1:
+        raise ValueError('Dataset has multiple drugs and/or cell lines. Time '
+                         'courses are currently only available for single '
+                         'drug/cell line combinations.')
+
     traces = []
     traces_fits = []
 
