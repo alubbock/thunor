@@ -153,9 +153,13 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
         doses_cols += ["drug2", "drug2.conc"]
 
     df_doses = df[doses_cols]
-    df_doses = df_doses[df_doses["drug1.conc"] > 0]
     if multi_drug:
-        df_doses = df_doses[df_doses["drug2.conc"] > 0]
+        df_doses = df_doses[
+            np.logical_or(df_doses["drug1.conc"] > 0,
+                          df_doses["drug2.conc"] > 0)
+        ]
+    else:
+        df_doses = df_doses[df_doses["drug1.conc"] > 0]
     # Suppress warnings about altering a dataframe slice
     df_doses.is_copy = False
     df_doses.reset_index(inplace=True)
