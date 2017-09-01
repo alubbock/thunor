@@ -808,7 +808,8 @@ def plot_time_course(hts_pandas,
         raise ValueError('{} is not a valid assay. Options are {}'.format(
             assay_name, df_assays_avail))
 
-    df_controls = df_controls.loc[assay]
+    if df_controls is not None:
+        df_controls = df_controls.loc[assay]
     df_vals = df_vals.loc[assay]
 
     if len(hts_pandas.drugs) > 1 or len(hts_pandas.cell_lines) > 1:
