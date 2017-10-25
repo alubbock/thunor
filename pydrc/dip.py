@@ -211,6 +211,14 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
     has_drug_combos = drugs.map(len).max() > 1
     if has_drug_combos:
         raise DrugCombosNotImplementedError()
+    else:
+        # TODO: Support drug combos
+        expt_dip_data.reset_index(['drug', 'dose'], inplace=True)
+        expt_dip_data['drug'] = expt_dip_data['drug'].apply(pd.Series)
+        expt_dip_data['dose'] = expt_dip_data['dose'].apply(pd.Series)
+        expt_dip_data.set_index(['drug', 'dose'], append=True,
+                                inplace=True)
+        drugs = expt_dip_data.index.get_level_values('drug').unique()
 
     if len(drugs) > 1 and len(cell_lines) == 1:
         group_by = ['drug']
@@ -255,10 +263,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 dr_name = group_name[group_by.index('drug')]
             else:
                 dr_name = group_name
-            dr_name = dr_name[0]
             group_name_components.append(str(dr_name))
         else:
-            dr_name = drugs[0][0]
+            dr_name = drugs[0]
 
         group_name_disp = "\n".join(group_name_components)
 
@@ -281,8 +288,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         n_controls = len(dip_ctrl)
 
-        doses_expt = np.array([x[0] for x in dip_grp.index.get_level_values(
-            'dose').values])
+        doses_expt = dip_grp.index.get_level_values('dose').values
 
         doses_ctrl = np.repeat(np.min(doses_expt) / 10.0, n_controls)
         doses = np.concatenate((doses_ctrl, doses_expt))
