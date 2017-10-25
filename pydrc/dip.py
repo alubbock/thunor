@@ -21,6 +21,11 @@ class AAFitWarning(ValueWarning):
     pass
 
 
+class DrugCombosNotImplementedError(NotImplementedError):
+    """ This function does not support drug combinations yet """
+    pass
+
+
 def choose_dip_assay(assay_names):
     for assay in DIP_ASSAYS:
         if assay in assay_names:
@@ -202,6 +207,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
     cell_lines = expt_dip_data.index.get_level_values('cell_line').unique()
     drugs = expt_dip_data.index.get_level_values('drug').unique()
 
+    has_drug_combos = drugs.map(len).max() > 1
+    if has_drug_combos:
+        raise DrugCombosNotImplementedError()
+
     if len(drugs) > 1 and len(cell_lines) == 1:
         group_by = ['drug']
     elif len(cell_lines) > 1 and len(drugs) == 1:
@@ -218,11 +227,25 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
     fit_params = []
 
     for group_name, dip_grp in expt_dip_data.groupby(level=group_by):
+        group_name_components = []
+
+        if 'dataset' in group_by:
+            if len(group_by) > 1:
+                dataset = group_name[group_by.index('dataset')]
+            else:
+                dataset = group_name
+            group_name_components.append(str(dataset))
+        elif datasets is not None:
+            dataset = datasets[0]
+        else:
+            dataset = None
+
         if 'cell_line' in group_by:
             if len(group_by) > 1:
                 cl_name = group_name[group_by.index('cell_line')]
             else:
                 cl_name = group_name
+            group_name_components.append(str(cl_name))
         else:
             cl_name = cell_lines[0]
 
@@ -231,23 +254,12 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 dr_name = group_name[group_by.index('drug')]
             else:
                 dr_name = group_name
+            dr_name = dr_name[0]
+            group_name_components.append(str(dr_name))
         else:
-            dr_name = drugs[0]
+            dr_name = drugs[0][0]
 
-        if 'dataset' in group_by:
-            if len(group_by) > 1:
-                dataset = group_name[group_by.index('dataset')]
-            else:
-                dataset = group_name
-        elif datasets is not None:
-            dataset = datasets[0]
-        else:
-            dataset = None
-
-        if len(group_by) > 1:
-            group_name_disp = "\n".join(str(x) for x in group_name)
-        else:
-            group_name_disp = str(group_name)
+        group_name_disp = "\n".join(group_name_components)
 
         try:
             if dataset is None and 'dataset' in ctrl_dip_data.index.names:
@@ -268,7 +280,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         n_controls = len(dip_ctrl)
 
-        doses_expt = dip_grp.index.get_level_values('dose').values
+        doses_expt = np.array([x[0] for x in dip_grp.index.get_level_values(
+            'dose').values])
+
         doses_ctrl = np.repeat(np.min(doses_expt) / 10.0, n_controls)
         doses = np.concatenate((doses_ctrl, doses_expt))
         dip_expt = dip_grp['dip_rate'].values
@@ -321,8 +335,13 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                 ctrl_dip_data_cl.reset_index('well_id', inplace=True)
                 ctrl_dip_data_cl.set_index(['dose', 'well_id'], inplace=True)
                 fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
-            fit_data['dip_expt'] = dip_grp['dip_rate'].reset_index(
-                level=['drug', 'cell_line'], drop=True)
+
+            fit_data['dip_expt'] = pd.Series(
+                data=dip_grp['dip_rate'].values,
+                index=[doses_expt, dip_grp.index.get_level_values('well_id')]
+            )
+            fit_data['dip_expt'].index.rename(['dose', 'well_id'],
+                                              inplace=True)
 
         # Only calculate AUC and IC50 if needed
         if include_stats:
@@ -380,7 +399,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                                          emax_obs=emax)
                 fit_data['auc'] = find_auc(fit_params=popt,
                                            min_conc=min_dose_measured)
-
         fit_params.append(fit_data)
 
     df_params = pd.DataFrame(fit_params)

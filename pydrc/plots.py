@@ -4,10 +4,11 @@ import seaborn as sns
 from .helpers import format_dose
 from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated, \
-    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL
+    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL, DrugCombosNotImplementedError
 import scipy.stats
 import re
 import pandas as pd
+import collections
 
 
 def _activity_area_units(**kwargs):
@@ -90,7 +91,11 @@ def _sns_to_rgb(palette):
 def _make_title(title, df):
     drug_list = df.index.get_level_values('drug').unique()
     if len(drug_list) == 1:
-        title += ' for {}'.format(drug_list[0])
+        drug_name = drug_list[0]
+        if isinstance(drug_name, collections.Iterable) and len(drug_name) ==\
+                1:
+            drug_name = drug_name[0]
+        title += ' for {}'.format(drug_name)
 
     cell_line_list = df.index.get_level_values('cell_line').unique()
     if len(cell_line_list) == 1:
