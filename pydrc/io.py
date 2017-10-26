@@ -78,6 +78,9 @@ class HtsPandas(object):
 
         "None" means "no filter"
         """
+        # Convert drugs to tuples if not already
+        drugs = [(drug, ) if isinstance(drug, str) else drug for drug in drugs]
+
         doses = self.doses.copy()
         controls = self.controls.copy()
         if cell_lines is not None:
@@ -221,6 +224,10 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
         df_doses['drug1.conc'] = df_doses[['drug1.conc', 'drug2.conc']].apply(
             tuple, axis=1)
         df_doses.drop(['drug2', 'drug2.conc'], axis=1, inplace=True)
+    else:
+        df_doses[['drug1.conc', 'drug1']] = \
+            df_doses.transform({'drug1.conc': lambda x: (x, ),
+                                'drug1': lambda x: (x, )})
 
     df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug')
     df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'],
@@ -270,7 +277,8 @@ def write_hdf(df_data, filename):
     with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
         hdf.put('doses', df_data.doses_unstacked())
         hdf.put('assays', df_data.assays)
-        hdf.put('controls', df_data.controls)
+        if df_data.controls is not None:
+            hdf.put('controls', df_data.controls)
 
 
 def read_hdf(filename_or_buffer):
@@ -296,9 +304,13 @@ def read_hdf(filename_or_buffer):
     if 'drug' not in df_doses.columns:
         df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
             tuple, axis=1)
+    else:
+        df_doses['drug'] = df_doses['drug'].transform(lambda x: (x, ))
     if 'dose' not in df_doses.columns:
         df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
             tuple, axis=1)
+    else:
+        df_doses['dose'] = df_doses['dose'].transform(lambda x: (x, ))
     df_doses = df_doses.select(lambda col: not re.match('^(dose|drug)[0-9]+$',
                                                         col),
                                axis=1)

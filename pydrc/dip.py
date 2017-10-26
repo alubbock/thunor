@@ -58,6 +58,7 @@ def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
                         2: 'dip_first_timepoint', 3: 'dip_y_intercept'})
     dip_df = pd.merge(df_doses, res, left_on='well_id',
                       right_index=True)
+    dip_df.set_index('well_id', append=True, inplace=True)
     dip_df.sort_index(inplace=True)
     return dip_df
 
