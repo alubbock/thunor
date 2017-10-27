@@ -837,6 +837,7 @@ def plot_time_course(hts_pandas,
             dip_rate_ctrl = ctrl_dip_rates(df_controls)
             dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
         dip_rates = expt_dip_rates(df_doses, df_vals)
+        dip_rates.reset_index(inplace=True)
         dip_rates.set_index('well_id', inplace=True)
 
     # Controls
