@@ -135,7 +135,12 @@ class HtsPandas(object):
 
     @property
     def cell_lines(self):
-        return sorted(self.doses.index.get_level_values("cell_line").unique())
+        cell_lines = set(self.doses.index.get_level_values(
+            "cell_line").unique())
+        if self.controls is not None:
+            cell_lines.update(self.controls.index.get_level_values(
+                "cell_line").unique())
+        return sorted(cell_lines)
 
     @property
     def drugs(self):
