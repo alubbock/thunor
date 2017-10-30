@@ -190,7 +190,19 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
 
 
 def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
-                        sep='\t'):
+                        sep=None):
+    if sep is None:
+        if not isinstance(file_or_source, str):
+            raise ValueError('Need to specify file separator (\\t or ,)')
+        if file_or_source.endswith('.csv'):
+            sep = ','
+        elif file_or_source.endswith('.tsv') or file_or_source.endswith(
+                '.txt'):
+            sep = '\t'
+        else:
+            raise ValueError('Failed to detected file separator from name. '
+                             'Specify sep=\'\\t\', \',\', or other.')
+
     df = read_vanderbilt_hts_single_df(file_or_source, plate_width,
                                        plate_height, sep=sep)
 
@@ -220,6 +232,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     # Suppress warnings about altering a dataframe slice
     df_doses.is_copy = False
     df_doses.reset_index(inplace=True)
+    df_doses['well_num'] = df_doses['well']
     df_doses = df_doses.assign(well=list(
         ["{}__{}".format(a_, b_) for a_, b_ in
          zip(df_doses["upid"], df_doses["well"])]))
@@ -234,10 +247,11 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
             df_doses.transform({'drug1.conc': lambda x: (x, ),
                                 'drug1': lambda x: (x, )})
 
-    df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug')
+    df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug',
+                        'well_num')
     df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'],
                        inplace=True)
-    df_doses.drop('plate_id', axis=1, inplace=True)
+    # df_doses.drop('plate_id', axis=1, inplace=True)
 
     df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
     df_doses.reset_index(level='well_id', inplace=True)
@@ -254,11 +268,12 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     if df_controls is not None:
         df_controls.reset_index(inplace=True)
+        df_controls['well_num'] = df_controls['well']
         df_controls = df_controls.assign(well=list(
             ["{}__{}".format(a_, b_) for a_, b_ in
              zip(df_controls["upid"], df_controls["well"])]))
         df_controls.columns = ['plate', 'well_id', 'cell_line', 'timepoint',
-                               'value']
+                               'value', 'well_num']
         df_controls['assay'] = assay_name
         df_controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
                                'timepoint'], inplace=True)
@@ -278,12 +293,26 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     return HtsPandas(df_doses, df_vals, df_controls)
 
 
-def write_hdf(df_data, filename):
+def write_hdf(df_data, filename, dataset_format='fixed'):
+    """
+    Save a dataset to HDF5
+
+    Parameters
+    ----------
+    df_data
+    filename
+    dataset_format: str
+        One of 'fixed' or 'table'. See pandas HDFStore docs for details
+
+    Returns
+    -------
+
+    """
     with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
-        hdf.put('doses', df_data.doses_unstacked())
-        hdf.put('assays', df_data.assays)
+        hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
+        hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
-            hdf.put('controls', df_data.controls)
+            hdf.put('controls', df_data.controls, format=dataset_format)
 
 
 def read_hdf(filename_or_buffer):
