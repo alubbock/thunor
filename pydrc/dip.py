@@ -99,7 +99,7 @@ def _expt_dip(df_timecourses, selector_fn):
 
 
 def ctrl_dip_rates(df_controls):
-    res = df_controls.groupby(level=('cell_line', 'well_id'))[
+    res = df_controls.groupby(level=('cell_line', 'plate', 'well_id'))[
         'value'].apply(
         _ctrl_dip).apply(pd.Series).\
         rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',

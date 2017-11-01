@@ -873,7 +873,8 @@ def plot_time_course(hts_pandas,
             is_first_control = False
 
             if show_dip_fit and df_controls is not None:
-                dip_well = dip_rate_ctrl.loc[well_id]
+                dip_well = dip_rate_ctrl.loc[
+                    dip_rate_ctrl.index.get_level_values('well_id') == well_id]
                 minmax = [np.min(x_range), np.max(x_range)]
 
                 dip_points = [x * dip_well['dip_rate'] +
@@ -950,4 +951,42 @@ def plot_time_course(hts_pandas,
                        yaxis={'title': assay_name,
                               'range': (-2, 7) if log_yaxis else None},
                        )
+    return go.Figure(data=data, layout=layout)
+
+
+def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
+    # Sort by median DIP rate
+    df_controls = df_controls.copy()
+    df_controls['cl_median'] = df_controls['dip_rate'].groupby(
+        level=['cell_line']).transform(np.nanmedian)
+    df_controls['plate_median'] = df_controls['dip_rate'].groupby(
+        level=['cell_line', 'plate']).transform(np.nanmedian)
+    df_controls.sort_values(by=['cl_median', 'plate_median'], inplace=True)
+
+    if title is None:
+        title = 'Control DIP rates by plate'
+
+    if 'dataset' in df_controls.index.names:
+        dataset_names = df_controls.index.get_level_values('dataset').unique()
+
+        if len(dataset_names) != 1:
+            raise ValueError('This function can only plot controls from a '
+                             'single dataset')
+
+        if subtitle is None:
+            subtitle = dataset_names[0]
+
+    title = _combine_title_subtitle(title, subtitle)
+
+    traces = []
+    for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
+        traces.append(go.Box(
+            x=ctrl_dat.index.get_level_values('plate').values,
+            y=ctrl_dat['dip_rate'].values,
+            name=grp
+        ))
+
+    data = go.Data(traces)
+    layout = go.Layout(title=title,
+                       yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'})
     return go.Figure(data=data, layout=layout)

@@ -1,7 +1,8 @@
 import pkg_resources
 from pydrc.io import read_hdf
 from pydrc.dip import dip_rates, dip_fit_params
-from pydrc.plots import plot_dip, plot_dip_params, plot_time_course
+from pydrc.plots import plot_dip, plot_dip_params, plot_time_course, \
+    plot_ctrl_dip_by_plate
 
 
 def test_tutorial():
@@ -21,3 +22,5 @@ def test_tutorial():
     vu001.cell_lines
 
     plot_time_course(vu001.filter(drugs=['abemaciclib'], cell_lines=['BT20']))
+
+    plot_ctrl_dip_by_plate(ctrl_dip_data)
