@@ -92,9 +92,15 @@ def _make_title(title, df):
     drug_list = df.index.get_level_values('drug').unique()
     if len(drug_list) == 1:
         drug_name = drug_list[0]
-        if isinstance(drug_name, collections.Iterable) and len(drug_name) ==\
-                1:
-            drug_name = drug_name[0]
+        if not isinstance(drug_name, str):
+            if isinstance(drug_name, collections.Iterable):
+                if len(drug_name) == 1:
+                    drug_name = drug_name[0]
+                else:
+                    drug_name = " &amp; ".join(drug_name)
+            else:
+                raise ValueError('Unknown drug_name type: {}'.format(type(
+                    drug_name)))
         title += ' for {}'.format(drug_name)
 
     cell_line_list = df.index.get_level_values('cell_line').unique()
