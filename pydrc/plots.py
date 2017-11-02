@@ -84,8 +84,9 @@ def _out_of_range_msg(param_id):
 
 
 def _sns_to_rgb(palette):
-    return ['rgb(%d, %d, %d)' % (c[0] * 255, c[1] * 255, c[2] * 255) for c
-            in palette]
+    return ['rgb(%d, %d, %d)' % (c[0] * 255, c[1] * 255, c[2] * 255)
+            if not isinstance(c, str) else c
+            for c in palette]
 
 
 def _make_title(title, df):
@@ -989,4 +990,136 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
     data = go.Data(traces)
     layout = go.Layout(title=title,
                        yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'})
+    return go.Figure(data=data, layout=layout)
+
+
+def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
+    """ Plot plate map (experimental) """
+    maintitle = 'DIP Rate Plate Map'
+    subtitle = 'Plate {} ({})'.format(plate_map['plateName'], plate_map[
+        'datasetName'])
+    title = _combine_title_subtitle(maintitle, subtitle)
+
+    wells = plate_map['wells']
+    well_color_basis = np.array([well[color_by] for well in wells],
+                                dtype=np.double)
+
+    well_max = np.nanmax(well_color_basis)
+    well_min = np.nanmin(well_color_basis)
+    pos_pal = sns.light_palette("#f48000", as_cmap=True)
+    neg_pal = sns.light_palette("#3f83a3", as_cmap=True)
+
+    well_color = _sns_to_rgb([
+        missing_color
+        if np.isnan(val)
+        else pos_pal(val / well_max)
+        if val > 0
+        else neg_pal(val / well_min)
+        for val in well_color_basis
+    ])
+
+    cols = plate_map['numCols']
+    rows = len(wells) // cols
+    WELL_DIAM = 0.95
+    ASCII_CAP_A = 65
+
+    well_rad = WELL_DIAM / 2
+
+    col_labels = [str(i + 1) for i in range(cols)]
+    row_labels = [chr(ASCII_CAP_A + i) for i in range(rows)]
+
+    well_shapes = [{
+        'opacity': 1.0,
+        'xref': 'x',
+        'yref': 'y',
+        'fillcolor': well_color[well_num],
+        'x0': (well_num % cols),
+        'y0': rows - (well_num // cols),
+        'x1': (well_num % cols) + WELL_DIAM,
+        'y1': rows - (well_num // cols) + WELL_DIAM,
+        'type': 'circle',
+        'line': {
+            'color': 'darkgray',
+            'width': 0.5
+        }
+    } for well_num, well in enumerate(wells)]
+
+    well_objs = go.Scatter(
+        x=[(well_num % cols) + well_rad for well_num in range(len(
+            wells))],
+        y=[rows - (well_num // cols) + well_rad for well_num in range(
+            len(wells))],
+        text='',
+        hovertext=['Well {}{}<br>'
+                   'DIP: {}<br>'
+                   'Cell Line: {}<br>'
+                   'Drug: {}<br>'
+                   'Dose: {}'.format(
+                        row_labels[well_num // cols],
+                        col_labels[well_num % cols],
+                        well['dipRate'],
+                        well['cellLine'],
+                        " &amp; ".join(["(None)" if d is None else d for d in
+                                        well['drugs']]) if well['drugs']
+                        else 'None',
+                        " &amp; ".join([format_dose(d) for d in well[
+                            'doses']]) if well['doses'] else 'N/A'
+            )
+            for well_num, well in enumerate(wells)],
+        hoverinfo='text',
+        mode='text'
+    )
+
+    col_labels = go.Scatter(
+        x=[i + well_rad for i in range(cols)],
+        y=[rows + 1.2] * cols,
+        mode='text',
+        text=col_labels,
+        hoverinfo='none',
+        textfont=dict(
+            color='black',
+            # size=18,
+        )
+    )
+
+    row_labels = go.Scatter(
+        x=[-well_rad] * rows,
+        y=[i + 1 + well_rad for i in reversed(range(rows))],
+        mode='text',
+        text=row_labels,
+        hoverinfo='none',
+        textfont=dict(
+            color='black',
+            # size=18,
+        )
+    )
+
+    data = go.Data([well_objs, col_labels, row_labels])
+
+    layout = go.Layout({
+        'xaxis': {
+            'showticklabels': False,
+            'autotick': False,
+            'showgrid': False,
+            'zeroline': False,
+        },
+        'yaxis': {
+            'showticklabels': False,
+            'autotick': False,
+            'showgrid': False,
+            'zeroline': False,
+            'scaleanchor': 'x'
+        },
+        'shapes': well_shapes,
+        'margin': {
+            'l': 0,
+            'r': 0,
+            'b': 0,
+            't': 50
+        },
+        'hovermode': 'closest',
+        'showlegend': False,
+        'title': title
+    })
+
     return go.Figure(data=data, layout=layout)
