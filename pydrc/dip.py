@@ -384,18 +384,19 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                     fit_data['ec{:d}'.format(ec_num)] = None
 
             for e_num in custom_e_values:
-                if popt is None:
+                ec_val = fit_data['ec{:d}'.format(e_num)]
+                if popt is None or ec_val is None:
                     fit_data['e{:d}'.format(e_num)] = None
                 else:
-                    fit_data['e{:d}'.format(e_num)] = \
-                        hill_fn(fit_data['ec{:d}'.format(e_num)], *popt)
+                    fit_data['e{:d}'.format(e_num)] = hill_fn(ec_val, *popt)
 
             for e_num in custom_e_rel_values:
-                if popt_rel is None:
+                ec_val = fit_data['ec{:d}'.format(e_num)]
+                if popt_rel is None or ec_val is None:
                     fit_data['e{:d}_rel'.format(e_num)] = None
                 else:
                     fit_data['e{:d}_rel'.format(e_num)] = \
-                        hill_fn(fit_data['ec{:d}'.format(e_num)], *popt_rel)
+                        hill_fn(ec_val, *popt_rel)
 
             if popt is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None
