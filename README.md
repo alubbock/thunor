@@ -2,7 +2,7 @@
 
 ## Implementation
 
-PyDRC makes extensive use of [pandas](http://pandas.pydata.org/) and 
+Thunor makes extensive use of [pandas](http://pandas.pydata.org/) and 
 [plotly](http://plot.ly/python/), so familiarity with those libraries is 
 recommended.
 

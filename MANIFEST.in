@@ -1,2 +1,2 @@
 include versioneer.py
-include pydrc/_version.py
+include thunor/_version.py

@@ -1,5 +1,11 @@
-pyDRC Changelog
-===============
+Thunor Changelog
+================
+
+## v0.1.7 - 2018-02-15
+
+### New features
+
+* Packaged renamed to Thunor
 
 ## v0.1.6 - 2018-01-11
 

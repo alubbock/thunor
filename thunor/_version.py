@@ -42,8 +42,8 @@ def get_config():
     cfg.VCS = "git"
     cfg.style = "pep440"
     cfg.tag_prefix = "v"
-    cfg.parentdir_prefix = "pydrc-"
-    cfg.versionfile_source = "pydrc/_version.py"
+    cfg.parentdir_prefix = "thunor-"
+    cfg.versionfile_source = "thunor/_version.py"
     cfg.verbose = False
     return cfg
 
