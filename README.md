@@ -1,4 +1,8 @@
-# Dose response curves and drug induced proliferation (DIP) rates in Python
+# Thunor
+
+Thunor is a Python package for managing and viewing multi-timepoint high
+throughput screen data. It utilizes the drug-induced proliferation rate (DIP
+rate) metric, which is a dynamic measure of drug response.
 
 ## Implementation
 

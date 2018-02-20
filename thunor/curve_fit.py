@@ -7,17 +7,58 @@ def ll4(x, b, c, d, e):
     """
     Four parameter log-logistic function ("Hill curve")
 
-     - b: Hill slope
-     - c: min response
-     - d: max response
-     - e: EC50
-     """
+    Parameters
+    ----------
+    x: np.ndarray
+        One-dimensional array of "x" values
+    b: float
+        Hill slope
+    c: float
+        Minimum response (lower plateau)
+    d: float
+        Maximum response (upper plateau)
+    e: float
+        EC50 value
+
+    Returns
+    -------
+    np.ndarray
+        Array of "y" values using the supplied curve fit parameters on "x"
+    """
     return c+(d-c)/(1+np.exp(b*(np.log(x)-np.log(e))))
 
 
-# Fitting function
 def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
             null_rejection_threshold=0.05):
+    """
+    Fit a dose response curve
+
+    Parameters
+    ----------
+    doses: np.ndarray
+        Array of dose values
+    dip_rates: np.ndarray
+        Array of DIP rates (response values)
+    dip_std_errs: np.ndarray, optional
+        Array of fit standard errors for the DIP rates
+    hill_fn: function
+        Function to use for fitting (default: 4 parameter log logistic
+        "Hill" curve)
+    null_rejection_threshold: float
+        p-value for rejecting curve fit against no effect "flat" response
+        model by F-test (default: 0.05)
+
+    Returns
+    -------
+    list
+        The return value is a list with three entries:
+
+        - tuple of (absolute scale) fit parameters
+        - tuple of fit parameters on relative scale (max response=1)
+        - float - the divisor used to convert the absolute fit parameters to
+          relative scale
+
+    """
     dip_rate_nans = np.isnan(dip_rates)
     if np.any(dip_rate_nans):
         doses = doses[~dip_rate_nans]
@@ -59,10 +100,7 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
         f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
         p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
 
-        # print(p)
-
         if p > null_rejection_threshold:
-            # print(p)
             popt = None
             divisor = np.mean(dip_rates)
         else:
@@ -78,6 +116,25 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
 
 # Functions for finding initial parameter estimates for curve fitting
 def ll4_initials(x, y):
+    """
+    Heuristic function for initial fit values for ll4 function
+
+    Uses the approach followed by R's drc library:
+    https://cran.r-project.org/web/packages/drc/index.html
+
+    Parameters
+    ----------
+    x: np.ndarray
+        Array of "x" (dose) values
+    y: np.ndarray
+        Array of "y" (response) values
+
+    Returns
+    -------
+    list
+        Four-valued list corresponding to initial estimates of the
+        parameters defined in the :func:`ll4` function.
+    """
     c_val, d_val = _find_cd_ll4(y)
     b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
 

@@ -121,6 +121,27 @@ def _combine_title_subtitle(title, subtitle):
 
 def plot_dip(fit_params, is_absolute=False,
              title=None, subtitle=None, hill_fn=ll4):
+    """
+    Plot DIP rate curve fits
+
+    Parameters
+    ----------
+    fit_params: pd.DataFrame
+        DIP fit parameters from :func:`thunor.dip.dip_params`
+    is_absolute: bool
+        Plot using absolute (True) or relative (False) scale
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+    hill_fn: function
+        Curve fitting function to use (default: :func:`thunor.curve_fit.ll4`)
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
 
     colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
     # Shapes used for replicate markers
@@ -305,6 +326,27 @@ def plot_dip(fit_params, is_absolute=False,
 
 def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                                    **kwargs):
+    """
+    Plot a parameter comparison across two datasets
+
+    Parameters
+    ----------
+    df_params: pd.DataFrame
+        DIP fit parameters from :func:`thunor.dip.dip_params`
+    fit_param: str
+        The name of the parameter to compare across datasets, e.g. ic50
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+    kwargs: dict, optional
+        Additional keyword arguments
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     if title is None:
         title = _make_title('Dose response parameters', df_params)
     if subtitle is None:
@@ -452,6 +494,40 @@ def plot_dip_params(df_params, fit_param,
                     aggregate_drugs=False,
                     multi_dataset=False,
                     **kwargs):
+    """
+    Box, bar, or scatter plots of DIP rate fit parameters
+
+    Parameters
+    ----------
+    df_params: pd.DataFrame
+        DIP fit parameters from :func:`thunor.dip.dip_params`
+    fit_param: str
+        Fit parameter name, e.g. 'ic50'
+    fit_param_compare: str, optional
+        Second fit parameter name for comparative plots, e.g. 'ec50'
+    fit_param_sort: str, optional
+        Fit parameter name to use for sorting the x-axis, if different from
+        fit_param
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+    aggregate_cell_lines: bool or list, optional
+        Aggregate all cell lines (if True), or aggregate by the specified
+        groups (dict of cell line names as values, with group labels as keys)
+    aggregate_drugs, bool or list, optional
+        Aggregate all drugs (if True), or aggregate by the specified
+        groups (dict of drug names as values, with group labels as keys)
+    multi_dataset: bool
+        Set to true to compare two datasets contained in fit_params
+    kwargs: dict, optional
+        Additional keyword arguments
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     if fit_param_compare and (aggregate_cell_lines or aggregate_drugs):
         raise ValueError('Aggregation is not available when comparing two '
                          'dose response parameters')
@@ -801,6 +877,30 @@ def _create_label_max_items(items, max_items=5):
 def plot_time_course(hts_pandas,
                      log_yaxis=False, assay_name='Assay', title=None,
                      subtitle=None, show_dip_fit=False):
+    """
+    Plot a dose response time course
+
+    Parameters
+    ----------
+    hts_pandas: HtsPandas
+        Dataset containing a single cell line/drug combination
+    log_yaxis: bool
+        Use log scale on y-axis
+    assay_name: str
+        The name of the assay to use for the time course (only used for
+        multi-assay datasets)
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+    show_dip_fit: bool
+        Overlay the DIP rate fit on the time course
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     if show_dip_fit and not log_yaxis:
         raise ValueError('log_yaxis must be True when show_dip_fit is True')
 
@@ -956,6 +1056,22 @@ def plot_time_course(hts_pandas,
 
 
 def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
+    """
+
+    Parameters
+    ----------
+    df_controls: pd.DataFrame
+        Control well DIP values
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     # Sort by median DIP rate
     df_controls = df_controls.copy()
     df_controls['cl_median'] = df_controls['dip_rate'].groupby(
@@ -994,7 +1110,22 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
 
 
 def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
-    """ Plot plate map (experimental) """
+    """
+
+    Parameters
+    ----------
+    plate_map: dict
+        Plate map layout data
+    color_by: str
+        Attribute to color wells by (default: dipRate)
+    missing_color: str
+        Color to use for missing values (default: lightgray)
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     maintitle = 'DIP Rate Plate Map'
     subtitle = 'Plate {} ({})'.format(plate_map['plateName'], plate_map[
         'datasetName'])

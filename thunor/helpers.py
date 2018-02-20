@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import collections
 import pandas as pd
 
@@ -13,7 +14,22 @@ _SI_PREFIXES = collections.OrderedDict([
 
 def format_dose(num, sig_digits=12, array_as_string=None):
     """
-    Formats a numeric dose like 1.2e-9 into 1.2 nM
+    Format a numeric dose like 1.2e-9 into 1.2 nM
+
+    Parameters
+    ----------
+    num: float or np.ndarray
+        Dose value, or array of such
+    sig_digits: int
+        Number of significant digits to include
+    array_as_string: str, optional
+        Combine array into a single string using the supplied join string.
+        If not supplied, a list of strings is returned.
+
+    Returns
+    -------
+    str or list of str
+        Formatted dose values
     """
     if not isinstance(num, str) and isinstance(num, collections.Iterable):
         retval = [format_dose(each_num) for each_num in num]
@@ -38,6 +54,19 @@ def format_dose(num, sig_digits=12, array_as_string=None):
 
 
 def plotly_to_dataframe(plot_fig):
+    """
+    Extract data from a plotly figure into a pandas DataFrame
+
+    Parameters
+    ----------
+    plot_fig: plotly.graph_objs.Figure
+        A plotly figure object
+
+    Returns
+    -------
+    pd.DataFrame
+        A pandas DataFrame containing the extracted traces from the figure
+    """
     series = []
     for trace in plot_fig['data']:
         try:

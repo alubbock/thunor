@@ -26,7 +26,7 @@ class DrugCombosNotImplementedError(NotImplementedError):
     pass
 
 
-def choose_dip_assay(assay_names):
+def _choose_dip_assay(assay_names):
     for assay in DIP_ASSAYS:
         if assay in assay_names:
             return assay
@@ -35,11 +35,44 @@ def choose_dip_assay(assay_names):
 
 
 def tyson1(adj_r_sq, rmse, n):
-    """ Tyson1 DIP rate selection heuristic """
+    """
+    Tyson1 algorithm for selecting optimal DIP rate fit
+
+    Parameters
+    ----------
+    adj_r_sq: float
+        Adjusted r-squared value
+    rmse: float
+        Root mean squared error of fit
+    n: int
+        Number of data points used in fit
+
+    Returns
+    -------
+    float
+        Fit value (higher is better)
+    """
     return adj_r_sq * ((1 - rmse) ** 2) * ((n - 3) ** 0.25)
 
 
 def dip_rates(df_data, selector_fn=tyson1):
+    """
+    Calculate DIP rates on a dataset
+
+    Parameters
+    ----------
+    df_data: thunor.io.HtsPandas
+        Thunor HTS dataset
+    selector_fn: function
+        Selection function for choosing optimal DIP rate fit (default:
+        :func:`tyson1`
+
+    Returns
+    -------
+    list
+        Two entry list, giving control DIP rates and experiment
+        (non-control) DIP rates (both as Pandas DataFrames)
+    """
     if df_data.controls is None:
         ctrl_dips = None
     else:
@@ -52,6 +85,26 @@ def dip_rates(df_data, selector_fn=tyson1):
 
 
 def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
+    """
+    Calculate experiment (non-control) DIP rates
+
+    Parameters
+    ----------
+    df_doses: pd.DataFrame
+        Pandas DataFrame of dose values from a
+        :class:`thunor.io.HtsPandas` object
+    df_vals: pd.DataFrame
+        Pandas DataFrame of cell counts from a :class:`thunor.io.HtsPandas`
+        object
+    selector_fn: function
+        Selection function for choosing optimal DIP rate fit (default:
+        :func:`tyson1`
+
+    Returns
+    -------
+    pd.DataFrame
+        Fitted DIP rate values
+    """
     res = df_vals.groupby(level='well_id')['value'].\
         apply(_expt_dip, selector_fn=selector_fn).apply(pd.Series).\
         rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
@@ -99,6 +152,20 @@ def _expt_dip(df_timecourses, selector_fn):
 
 
 def ctrl_dip_rates(df_controls):
+    """
+    Calculate control DIP rates
+
+    Parameters
+    ----------
+    df_controls: pd.DataFrame
+        Pandas DataFrame of control cell counts from a
+        :class:`thunor.io.HtsPandas` object
+
+    Returns
+    -------
+    pd.DataFrame
+        Fitted control DIP rate values
+    """
     res = df_controls.groupby(level=('cell_line', 'plate', 'well_id'))[
         'value'].apply(
         _ctrl_dip).apply(pd.Series).\
@@ -143,6 +210,21 @@ def adjusted_r_squared(r, n, p):
 
 
 def find_icN(fit_params, ic_num=50):
+    """
+    Find the inhibitory concentration value (e.g. IC50)
+
+    Parameters
+    ----------
+    fit_params: Iterable
+        List of fit parameters: Hill slope, E0, Emax, EC50
+    ic_num: int
+        IC number between 0 and 100 (response level)
+
+    Returns
+    -------
+    float
+        Inhibitory concentration value for requested response value
+    """
     hill_slope, e0, emax, ec50 = fit_params
 
     if emax > e0:
@@ -159,6 +241,21 @@ def find_icN(fit_params, ic_num=50):
 
 
 def find_ecN(fit_params, ec_num=50):
+    """
+    Find the effective concentration value (e.g. IC50)
+
+    Parameters
+    ----------
+    fit_params: Iterable
+        List of fit parameters: Hill slope, E0, Emax, EC50
+    ec_num: int
+        EC number between 0 and 100 (response level)
+
+    Returns
+    -------
+    float
+        Effective concentration value for requested response value
+    """
     hill_slope, e0, emax, ec50 = fit_params
 
     if ec_num >= 100:
@@ -170,6 +267,21 @@ def find_ecN(fit_params, ec_num=50):
 
 
 def find_auc(fit_params, min_conc):
+    """
+    Find the area under the curve
+
+    Parameters
+    ----------
+    fit_params: Iterable
+        List of fit parameters: Hill slope, E0, Emax, EC50
+    min_conc: float
+        Minimum concentration to consider for fitting the curve
+
+    Returns
+    -------
+    float
+        Area under the curve (AUC) value
+    """
     hill_slope, e0, emax, ec50 = fit_params
 
     if emax > e0:
@@ -180,6 +292,23 @@ def find_auc(fit_params, min_conc):
 
 
 def find_aa(fit_params, max_conc, emax_obs=None):
+    """
+    Find the activity area (area over the curve)
+
+    Parameters
+    ----------
+    fit_params: Iterable
+        List of fit parameters: Hill slope, E0, Emax, EC50
+    max_conc: float
+        Maximum concentration to consider for fitting the curve
+    emax_obs: float, optional
+        Observed Emax value
+
+    Returns
+    -------
+    float
+        Activity area value
+    """
     hill_slope, e0, emax, ec50 = fit_params
 
     if emax > e0:
@@ -200,6 +329,41 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
                    custom_e_values=set(),
                    custom_e_rel_values=set(),
                    include_dip_rates=True, include_stats=True):
+    """
+    Fit dose response curves to DIP rates and calculate statistics
+
+    Parameters
+    ----------
+    ctrl_dip_data: pd.DataFrame
+        Control DIP rates from :func:`dip_rates` or :func:`ctrl_dip_rates`
+    expt_dip_data: pd.DataFrame
+        Experiment (non-control) DIP rates from :func:`dip_rates` or
+        :func:`expt_dip_rates`
+    hill_fn: function
+        Function to use for curve fitting (default: :func:`ll4`)
+    custom_ic_concentrations: set
+        Set of additional inhibitory concentrations to calculate. Integer 
+        values 0-100.
+    custom_ec_concentrations: set
+        Set of additional effective concentrations to calculate. Integer
+        values 0-100.
+    custom_e_values: set
+        Set of additional effect values to calculate. Integer
+        values 0-100.
+    custom_e_rel_values: set
+        Set of additional relative effect values to calculate. Integer
+        values 0-100.
+    include_dip_rates: bool
+        Include the supplied DIP rates in the return value if True
+    include_stats: bool
+        Include extra statistics such as IC50 and AUC if True (increases
+        processing time)
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing DIP rate curve fits and parameters
+    """
 
     if 'dataset' in expt_dip_data.index.names:
         datasets = expt_dip_data.index.get_level_values('dataset').unique()
@@ -416,6 +580,22 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
 
 def is_param_truncated(df_params, param_name):
+    """
+    Checks if parameter values are truncated at boundaries of measured range
+
+    Parameters
+    ----------
+    df_params: pd.DataFrame
+        DataFrame of DIP curve fits with parameters from :func:`dip_fit_params`
+    param_name: str
+        Name of a parameter, e.g. 'ic50'
+
+    Returns
+    -------
+    np.ndarray
+        Array of booleans showing whether each entry in the DataFrame is
+        truncated
+    """
     return np.isclose(df_params[param_name].fillna(value=np.nan),
                       df_params['max_dose_measured'],
                       atol=PARAM_EQUAL_ATOL,

@@ -3,10 +3,18 @@ import numpy as np
 from datetime import timedelta, datetime
 import itertools
 import re
-from .dip import choose_dip_assay
+from .dip import _choose_dip_assay
 
 
 class PlateMap(object):
+    """
+    Representation of a High Throughput Screening plate
+
+    Parameters
+    ----------
+    kwargs: dict, optional
+        Optionally supply "width" and "height" values for the plate
+    """
     def __init__(self, **kwargs):
         if 'width' in kwargs:
             self.width = kwargs['width']
@@ -19,19 +27,69 @@ class PlateMap(object):
 
     @property
     def num_wells(self):
+        """
+        Number of wells in the plate
+        """
         return self.width * self.height
 
     def row_iterator(self):
+        """
+        Iterate over the row letters in the plate
+
+        Returns
+        -------
+        Iterator of str
+            Iterator over the row letters (A, B, C, etc.)
+        """
         return map(chr, range(65, 65 + self.height))
 
     def col_iterator(self):
+        """
+        Iterate over the column numbers in the plate
+
+        Returns
+        -------
+        Iterator of int
+            Iterator over the column numbers (1, 2, 3, etc.)
+        """
         return range(1, self.width + 1)
 
     def well_id_to_name(self, well_id):
+        """
+        Convert a Well ID into a well name
+
+        Well IDs use a numerical counter from left to right, top to
+        bottom, and are zero based.
+
+        Parameters
+        ----------
+        well_id: int
+            Well ID on this plate
+
+        Returns
+        -------
+        str
+            Name for this well, e.g. A1
+        """
         return '{}{}'.format(chr(65 + (well_id // self.width)),
                              (well_id % self.width) + 1)
 
     def well_name_to_id(self, well_name, raise_error=True):
+        """
+        Convert a well name to a Well ID
+
+        Parameters
+        ----------
+        well_name: str
+            A well name, e.g. A1
+        raise_error: bool
+            Raise an error if the well name is invalid if True (default),
+            otherwise return -1 for invalid well names
+        Returns
+        -------
+        int
+            Well ID for this well. See also :func:`well_id_to_name`
+        """
         try:
             row_num = ord(well_name[0]) - 65  # zero-based
             if row_num < 0 or row_num > (self.height - 1):
@@ -51,6 +109,15 @@ class PlateMap(object):
                 return -1
 
     def well_iterator(self):
+        """
+        Iterator over the plate's wells
+
+        Returns
+        -------
+        Iterator of dict
+            Iterator over the wells in the plate. Each well is given as a dict
+            of 'well' (well ID), 'row' (row character) and 'col' (column number)
+        """
         row_it = iter(np.repeat(list(self.row_iterator()), self.width))
         col_it = itertools.cycle(self.col_iterator())
         for i in range(self.num_wells):
@@ -59,10 +126,43 @@ class PlateMap(object):
                    'col': next(col_it)}
 
     def well_list(self):
+        """
+        List of the plate's wells
+
+        Returns
+        -------
+        list
+            The return value of :func:`well_iterator` as a list
+        """
         return list(self.well_iterator())
 
 
 class HtsPandas(object):
+    """
+    High throughput screen dataset
+
+    Represented internally using pandas dataframes
+
+    Parameters
+    ----------
+    doses: pd.DataFrame
+        DataFrame of doses
+    assays: pd.DataFrame
+        DataFrame of assays
+    controls: pd.DataFrame
+        DataFrame of controls
+
+    Attributes
+    ----------
+    cell_lines: list
+        List of cell lines in the dataset
+    drugs: list
+        List of drugs in the dataset
+    assay_names: list
+        List of assay names in the dataset
+    dip_assay_name: str
+        The assay name used for DIP rate calculations, e.g. "Cell count"
+    """
     def __init__(self, doses, assays, controls):
         self.doses = doses
         self.assays = assays
@@ -77,6 +177,18 @@ class HtsPandas(object):
         Filter by cell lines and/or drugs
 
         "None" means "no filter"
+        
+        Parameters
+        ----------
+        cell_lines: Iterable, optional
+            List of cell lines to filter on
+        drugs: Iterable, optional
+            List of drugs to filter on
+
+        Returns
+        -------
+        HtsPandas
+            A new dataset filtered using the supplied arguments
         """
         # Convert drugs to tuples if not already
         drugs = [(drug, ) if isinstance(drug, str) else drug for drug in drugs]
@@ -152,11 +264,32 @@ class HtsPandas(object):
 
     @property
     def dip_assay_name(self):
-        return choose_dip_assay(self.assay_names)
+        return _choose_dip_assay(self.assay_names)
 
 
 def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                                   plate_height=16, sep='\t'):
+    """
+    Read a Vanderbilt HTS format file as a single dataframe
+
+    See the wiki for a file format description
+    
+    Parameters
+    ----------
+    file_or_source: str or object
+        Source for CSV data
+    plate_width: int
+        Width of the microtiter plates (default: 24, for 384 well plate)
+    plate_height: int
+        Width of the microtiter plates (default: 16, for 384 well plate)
+    sep: str
+        Source file delimiter (default: tab)
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame representing the source CSV
+    """
     pm = PlateMap(width=plate_width, height=plate_height)
 
     df = pd.read_csv(file_or_source,
@@ -191,6 +324,27 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
 
 def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
                         sep=None):
+    """
+    Read a Vanderbilt HTS format file
+
+    See the wiki for a file format description
+
+    Parameters
+    ----------
+    file_or_source: str or object
+        Source for CSV data
+    plate_width: int
+        Width of the microtiter plates (default: 24, for 384 well plate)
+    plate_height: int
+        Width of the microtiter plates (default: 16, for 384 well plate)
+    sep: str
+        Source file delimiter (default: tab)
+
+    Returns
+    -------
+    HtsPandas
+        HTS Dataset containing the data read from the CSV
+    """
     if sep is None:
         if not isinstance(file_or_source, str):
             raise ValueError('Need to specify file separator (\\t or ,)')
@@ -295,18 +449,16 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
 def write_hdf(df_data, filename, dataset_format='fixed'):
     """
-    Save a dataset to HDF5
+    Save a dataset to Thunor HDF5 format
 
     Parameters
     ----------
-    df_data
-    filename
+    df_data: HtsPandas
+        HTS dataset
+    filename: str
+        Output filename
     dataset_format: str
         One of 'fixed' or 'table'. See pandas HDFStore docs for details
-
-    Returns
-    -------
-
     """
     with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
@@ -316,6 +468,19 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
 
 
 def read_hdf(filename_or_buffer):
+    """
+    Read a HtsPandas dataset from Thunor HDF5 format file
+
+    Parameters
+    ----------
+    filename_or_buffer: str or object
+        Filename or buffer from which to read the data
+
+    Returns
+    -------
+    HtsPandas
+        Thunor HTS dataset
+    """
     hdf_kwargs = {'mode': 'r'}
     if isinstance(filename_or_buffer, str):
         hdf_kwargs['path'] = filename_or_buffer

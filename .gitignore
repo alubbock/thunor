@@ -3,3 +3,5 @@ build/*
 dist/*
 thunor.egg-info/*
 .idea/
+doc/_build/
+doc/.ipynb_checkpoints/
