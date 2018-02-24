@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats
 import pandas as pd
-from .curve_fit import fit_drc, ll4
+from .curve_fit import fit_drc, ll4, ll4_initials
 
 SECONDS_IN_HOUR = 3600.0
 PARAM_EQUAL_ATOL = 1e-16
@@ -323,7 +323,10 @@ def find_aa(fit_params, max_conc, emax_obs=None):
         * ((e0 - emax) / e0) / hill_slope
 
 
-def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
+def dip_fit_params(ctrl_dip_data, expt_dip_data,
+                   hill_fn=ll4,
+                   curve_initial_guess_fn=ll4_initials,
+                   ctrl_dose_fn=lambda doses: np.min(doses) / 10.0,
                    custom_ic_concentrations=set(),
                    custom_ec_concentrations=set(),
                    custom_e_values=set(),
@@ -341,6 +344,12 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
         :func:`expt_dip_rates`
     hill_fn: function
         Function to use for curve fitting (default: :func:`ll4`)
+    curve_initial_guess_fn: function
+        Function to use for initial guesses before curve fitting (default:
+        :func:`ll4_initials`)
+    ctrl_dose_fn: function
+        Function to use to set an effective "dose" (non-zero) for controls.
+        Takes the list of experiment doses as an argument.
     custom_ic_concentrations: set
         Set of additional inhibitory concentrations to calculate. Integer 
         values 0-100.
@@ -454,7 +463,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
 
         doses_expt = dip_grp.index.get_level_values('dose').values
 
-        doses_ctrl = np.repeat(np.min(doses_expt) / 10.0, n_controls)
+        doses_ctrl = np.repeat(ctrl_dose_fn(doses_expt), n_controls)
         doses = np.concatenate((doses_ctrl, doses_expt))
         dip_expt = dip_grp['dip_rate'].values
         dip_all = np.concatenate((dip_ctrl, dip_expt))
@@ -462,8 +471,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data, hill_fn=ll4,
             dip_ctrl_std_err,
             dip_grp['dip_fit_std_err'].values))
 
-        popt, popt_rel, divisor = fit_drc(doses, dip_all,
-                                          dip_std_errs, hill_fn=hill_fn)
+        popt, popt_rel, divisor = fit_drc(
+            doses, dip_all, dip_std_errs,
+            hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
+        )
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)

@@ -199,19 +199,29 @@ def plot_dip(fit_params, is_absolute=False,
         dose_x_range = np.append([10 ** log_dose_min], dose_x_range,
                                  axis=0)
 
-        if popt_plot is None:
+        line_dash = 'solid'
+        line_mode = 'lines'
+        if np.isnan(fp.divisor):
+            # Curve fit numerical error or QC failure
+            dip_rate_fit = None
+            line_mode = 'none'
+            group_name_disp = '<i>{}</i>'.format(
+                group_name_disp)
+        elif popt_plot is None:
+            # No effect null hypothesis
             dip_rate_fit = [1 if not is_absolute else fp.divisor] * \
-                           len(dose_x_range)
+                            len(dose_x_range)
+            line_dash = 5
         else:
+            # Fit succeeded
             dip_rate_fit = hill_fn(dose_x_range, *popt_plot)
 
         traces.append(go.Scatter(x=dose_x_range,
                                  y=dip_rate_fit,
-                                 mode='lines',
+                                 mode=line_mode,
                                  line={'shape': 'spline',
                                        'color': this_colour,
-                                       'dash': 5 if popt_plot is None else
-                                       'solid',
+                                       'dash': line_dash,
                                        'width': 3},
                                  legendgroup=group_name_disp,
                                  showlegend=not show_replicates or
@@ -226,9 +236,10 @@ def plot_dip(fit_params, is_absolute=False,
             except AttributeError:
                 dip_ctrl = None
             if not is_absolute:
-                y_trace /= fp.divisor
+                divisor = fp.divisor if fp.divisor else np.mean(y_trace)
+                y_trace /= divisor
                 if dip_ctrl is not None:
-                    dip_ctrl /= fp.divisor
+                    dip_ctrl /= divisor
 
             repl_name = 'Replicate'
             ctrl_name = 'Control'

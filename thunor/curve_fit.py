@@ -28,93 +28,6 @@ def ll4(x, b, c, d, e):
     return c+(d-c)/(1+np.exp(b*(np.log(x)-np.log(e))))
 
 
-def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
-            null_rejection_threshold=0.05):
-    """
-    Fit a dose response curve
-
-    Parameters
-    ----------
-    doses: np.ndarray
-        Array of dose values
-    dip_rates: np.ndarray
-        Array of DIP rates (response values)
-    dip_std_errs: np.ndarray, optional
-        Array of fit standard errors for the DIP rates
-    hill_fn: function
-        Function to use for fitting (default: 4 parameter log logistic
-        "Hill" curve)
-    null_rejection_threshold: float
-        p-value for rejecting curve fit against no effect "flat" response
-        model by F-test (default: 0.05)
-
-    Returns
-    -------
-    list
-        The return value is a list with three entries:
-
-        - tuple of (absolute scale) fit parameters
-        - tuple of fit parameters on relative scale (max response=1)
-        - float - the divisor used to convert the absolute fit parameters to
-          relative scale
-
-    """
-    dip_rate_nans = np.isnan(dip_rates)
-    if np.any(dip_rate_nans):
-        doses = doses[~dip_rate_nans]
-        dip_rates = dip_rates[~dip_rate_nans]
-        if dip_std_errs is not None:
-            dip_std_errs = dip_std_errs[~dip_rate_nans]
-    popt = None
-    curve_initial_guess = ll4_initials(doses, dip_rates)
-    try:
-        popt, pcov = scipy.optimize.curve_fit(hill_fn,
-                                              doses,
-                                              dip_rates,
-                                              p0=curve_initial_guess,
-                                              sigma=dip_std_errs
-                                              )
-
-        if popt[1] > popt[2] or popt[0] < 0:
-            # Reject fit if curve goes upwards
-            popt = None
-        elif popt[3] < np.min(doses):
-            # Reject fit if EC50 less than min dose
-            popt = None
-    except RuntimeError:
-        pass
-
-    popt_rel = None
-    if popt is None:
-        divisor = np.mean(dip_rates)
-    else:
-        # DIP rate fit
-        dip_rate_fit_curve = hill_fn(doses, *popt)
-
-        # F test vs flat linear "no effect" fit
-        ssq_model = ((dip_rate_fit_curve - dip_rates) ** 2).sum()
-        ssq_null = ((np.mean(dip_rates) - dip_rates) ** 2).sum()
-
-        df = len(doses) - 4
-
-        f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
-        p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
-
-        if p > null_rejection_threshold:
-            popt = None
-            divisor = np.mean(dip_rates)
-        else:
-            divisor = popt[2]
-            if divisor > 0:
-                # Are cells growing in control?
-                popt_rel = popt.copy()
-                popt_rel[1] /= divisor
-                popt_rel[2] = 1
-
-    return popt, popt_rel, divisor
-
-
-# Functions for finding initial parameter estimates for curve fitting
 def ll4_initials(x, y):
     """
     Heuristic function for initial fit values for ll4 function
@@ -139,6 +52,89 @@ def ll4_initials(x, y):
     b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
 
     return b_val, c_val, d_val, e_val
+
+
+def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
+            curve_initial_guess_fn=ll4_initials,
+            null_rejection_threshold=0.05):
+    """
+    Fit a dose response curve
+
+    Parameters
+    ----------
+    doses: np.ndarray
+        Array of dose values
+    dip_rates: np.ndarray
+        Array of DIP rates (response values)
+    dip_std_errs: np.ndarray, optional
+        Array of fit standard errors for the DIP rates
+    hill_fn: function
+        Function to use for fitting (default: 4 parameter log logistic
+        "Hill" curve)
+    curve_initial_guess_fn: function
+        Function to use for initial parameter guess before curve fitting
+    null_rejection_threshold: float
+        p-value for rejecting curve fit against no effect "flat" response
+        model by F-test (default: 0.05)
+
+    Returns
+    -------
+    list
+        The return value is a list with three entries:
+
+        - tuple of (absolute scale) fit parameters
+        - tuple of fit parameters on relative scale (max response=1)
+        - float - the divisor used to convert the absolute fit parameters to
+          relative scale
+
+    """
+    dip_rate_nans = np.isnan(dip_rates)
+    if np.any(dip_rate_nans):
+        doses = doses[~dip_rate_nans]
+        dip_rates = dip_rates[~dip_rate_nans]
+        if dip_std_errs is not None:
+            dip_std_errs = dip_std_errs[~dip_rate_nans]
+    curve_initial_guess = curve_initial_guess_fn(doses, dip_rates)
+    try:
+        popt, pcov = scipy.optimize.curve_fit(hill_fn,
+                                              doses,
+                                              dip_rates,
+                                              p0=curve_initial_guess,
+                                              sigma=dip_std_errs
+                                              )
+    except RuntimeError:
+        # Some numerical issue with curve fitting
+        return None, None, None
+
+    if any(np.isnan(popt)):
+        # Ditto
+        return None, None, None
+
+    if popt[3] < np.min(doses):
+        # Reject fit if EC50 less than min dose
+        return None, None, None
+
+    # DIP rate fit
+    dip_rate_fit_curve = hill_fn(doses, *popt)
+
+    # F test vs flat linear "no effect" fit
+    ssq_model = ((dip_rate_fit_curve - dip_rates) ** 2).sum()
+    ssq_null = ((np.mean(dip_rates) - dip_rates) ** 2).sum()
+
+    df = len(doses) - 4
+
+    f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
+    p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
+
+    if p > null_rejection_threshold:
+        return None, None, np.mean(dip_rates)
+
+    divisor = max(popt[1], popt[2])
+    popt_rel = popt.copy()
+    popt_rel[2] /= divisor
+    popt_rel[1] /= divisor
+
+    return popt, popt_rel, divisor
 
 
 def _response_transform(y, c_val, d_val):
