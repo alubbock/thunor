@@ -110,10 +110,6 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
         # Ditto
         return None, None, None
 
-    if popt[3] < np.min(doses):
-        # Reject fit if EC50 less than min dose
-        return None, None, None
-
     # DIP rate fit
     dip_rate_fit_curve = hill_fn(doses, *popt)
 
@@ -128,6 +124,10 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
 
     if p > null_rejection_threshold:
         return None, None, np.mean(dip_rates)
+
+    if popt[3] < np.min(doses):
+        # Reject fit if EC50 less than min dose
+        return None, None, None
 
     divisor = max(popt[1], popt[2])
     popt_rel = popt.copy()
