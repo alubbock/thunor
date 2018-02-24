@@ -1,3 +1,5 @@
+from thunor import __name__ as package_name
+from thunor import __version__
 import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime
@@ -596,6 +598,8 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
         One of 'fixed' or 'table'. See pandas HDFStore docs for details
     """
     with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
+        hdf.root._v_attrs.generator = package_name
+        hdf.root._v_attrs.generator_version = __version__
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
         hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
