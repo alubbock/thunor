@@ -11,8 +11,7 @@ def main():
           author_email='code@alexlubbock.com',
           packages=['thunor'],
           install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn'],
-          tests_require=['nose', 'nosebook'],
-          test_suite='nose.collector',
+          tests_require=['pytest', 'nbformat', 'nbconvert'],
           cmdclass=versioneer.get_cmdclass(),
           zip_safe=True
     )

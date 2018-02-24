@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime
 import itertools
-import re
-from .dip import _choose_dip_assay
+from .dip import _choose_dip_assay, dip_rates
+
+# assume 3x2 aspect ratio for plates
 
 
 class PlateMap(object):
@@ -15,6 +16,9 @@ class PlateMap(object):
     kwargs: dict, optional
         Optionally supply "width" and "height" values for the plate
     """
+    PLATE_ASPECT_RATIO_W = 3
+    PLATE_ASPECT_RATIO_H = 2
+
     def __init__(self, **kwargs):
         if 'width' in kwargs:
             self.width = kwargs['width']
@@ -136,6 +140,55 @@ class PlateMap(object):
         """
         return list(self.well_iterator())
 
+    @classmethod
+    def plate_size_from_num_wells(cls, num_wells):
+        """
+        Calculate plate size from number of wells, assuming 3x2 ratio
+
+        Parameters
+        ----------
+        num_wells: int
+            Number of wells in a plate
+
+        Returns
+        -------
+        tuple
+            Width and height of plate (numbers of wells)
+        """
+        plate_base_unit = np.sqrt(num_wells / (cls.PLATE_ASPECT_RATIO_W *
+                                               cls.PLATE_ASPECT_RATIO_H))
+        plate_width = int(plate_base_unit * cls.PLATE_ASPECT_RATIO_W)
+        plate_height = int(plate_base_unit * cls.PLATE_ASPECT_RATIO_H)
+        return plate_width, plate_height
+
+
+class PlateData(PlateMap):
+    """
+    A High Throughput Screening Plate with Data
+    """
+    def __init__(self, width=24, height=16, dataset_name=None,
+                 plate_name=None, cell_lines=[], drugs=[], doses=[],
+                 dip_rates=[]):
+        super(PlateData, self).__init__(width=width, height=height)
+        self.dataset_name = dataset_name
+        self.plate_name = plate_name
+        self.cell_lines = cell_lines
+        self.drugs = drugs
+        self.doses = doses
+        self.dip_rates = dip_rates
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(dataset_name=d['datasetName'],
+                   plate_name=d['plateName'],
+                   width=d['numCols'],
+                   height=d['numRows'],
+                   drugs=[w['drugs'] for w in d['wells']],
+                   doses=[w['doses'] for w in d['wells']],
+                   cell_lines=[w['cellLine'] for w in d['wells']],
+                   dip_rates=[w['dipRate'] for w in d['wells']]
+                   )
+
 
 class HtsPandas(object):
     """
@@ -172,7 +225,7 @@ class HtsPandas(object):
         if item in ('doses', 'assays', 'controls'):
             return self.__getattribute__(item)
 
-    def filter(self, cell_lines=None, drugs=None):
+    def filter(self, cell_lines=None, drugs=None, plate=None):
         """
         Filter by cell lines and/or drugs
 
@@ -184,6 +237,7 @@ class HtsPandas(object):
             List of cell lines to filter on
         drugs: Iterable, optional
             List of drugs to filter on
+        plate_name: Iterable, optional
 
         Returns
         -------
@@ -191,10 +245,19 @@ class HtsPandas(object):
             A new dataset filtered using the supplied arguments
         """
         # Convert drugs to tuples if not already
-        drugs = [(drug, ) if isinstance(drug, str) else drug for drug in drugs]
+        if drugs is not None:
+            drugs = [(drug, ) if isinstance(drug, str) else drug
+                     for drug in drugs]
 
         doses = self.doses.copy()
         controls = self.controls.copy()
+        if plate is not None:
+            if isinstance(plate, str):
+                plate = [plate, ]
+            doses = doses.loc[doses['plate_id'].isin(plate), :]
+            controls = controls.iloc[controls.index.isin(
+                plate, level='plate'), :]
+
         if cell_lines is not None:
             doses = doses.iloc[doses.index.isin(
                 cell_lines, level='cell_line'), :]
@@ -265,6 +328,78 @@ class HtsPandas(object):
     @property
     def dip_assay_name(self):
         return _choose_dip_assay(self.assay_names)
+
+    def plate(self, plate_name, plate_size=384, include_dip_rates=False):
+        """
+        Return a single plate in PlateData format
+
+        Parameters
+        ----------
+        plate_name: str
+            The name of a plate in the dataset
+        plate_size: int
+            The number of wells on the plate (default: 384)
+        include_dip_rates: bool
+            Calculate and include DIP rates for each well if True
+
+        Returns
+        -------
+        PlateData
+            The plate data for the requested plate name
+        """
+        new_dset = self.filter(plate=plate_name)
+
+        dip_values = None
+        if include_dip_rates:
+            ctrl_dip, expt_dip = dip_rates(new_dset)
+
+            expt_dip.reset_index(inplace=True)
+            expt_dip.set_index('well_num', inplace=True)
+            expt_dip = expt_dip['dip_rate']
+
+            if ctrl_dip is not None:
+                # Need to re-merge in the well numbers in the control data
+                controls = new_dset.controls.loc[new_dset.dip_assay_name,
+                                                 'well_num']
+                controls.reset_index(['cell_line', 'plate', 'timepoint'],
+                                     drop=True, inplace=True)
+                controls.drop_duplicates(inplace=True)
+                controls = controls.to_frame()
+                ctrl_dip.reset_index(['cell_line', 'plate'], drop=True,
+                                     inplace=True)
+
+                # Merge in the well_num column
+                ctrl_dip = ctrl_dip.merge(controls, left_index=True,
+                                          right_index=True, how='outer')
+
+                # Set the index to the well_num column
+                ctrl_dip.reset_index(drop=True, inplace=True)
+                ctrl_dip.set_index('well_num', inplace=True)
+                ctrl_dip = ctrl_dip['dip_rate']
+
+                # Merge ctrl_dip into expt_dip by well_num
+                expt_dip = pd.concat([ctrl_dip, expt_dip])
+
+            dip_values = list(expt_dip.reindex(range(plate_size)).values)
+
+        new_dset.doses.reset_index(inplace=True)
+        new_dset.doses.set_index('well_num', inplace=True)
+        doses = new_dset.doses.reindex(range(plate_size))
+        # Replace NaN with None
+        doses = doses.where((pd.notnull(doses)), None)
+
+        width, height = PlateMap.plate_size_from_num_wells(plate_size)
+
+        return PlateData(
+            width=width,
+            height=height,
+            dataset_name=None,
+            plate_name=plate_name,
+            cell_lines=list(doses.cell_line),
+            drugs=list(doses.drug),
+            doses=list(doses.dose),
+            dip_rates=dip_values
+        )
 
 
 def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,

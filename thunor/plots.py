@@ -24,7 +24,10 @@ def _auc_units(**kwargs):
     else:
         return ''
 
+
 SECONDS_IN_HOUR = 3600.0
+PLATE_MAP_WELL_DIAM = 0.95
+ASCII_CAP_A = 65
 PARAM_UNITS = {'auc': _activity_area_units,
                'aa': _activity_area_units,
                'einf': 'h<sup>-1</sup>',
@@ -1120,17 +1123,20 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
     return go.Figure(data=data, layout=layout)
 
 
-def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
+def plot_plate_map(plate_data, color_by='dip_rates',
+                   missing_color='lightgray', subtitle=None):
     """
 
     Parameters
     ----------
-    plate_map: dict
+    plate_data: thunor.io.PlateData
         Plate map layout data
     color_by: str
-        Attribute to color wells by (default: dipRate)
+        Attribute to color wells by, must be numerical (default: dip_rates)
     missing_color: str
         Color to use for missing values (default: lightgray)
+    subtitle: str or None
+        Subtitle, or None to auto-generate
 
     Returns
     -------
@@ -1138,12 +1144,13 @@ def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
         A plotly figure object containing the graph
     """
     maintitle = 'DIP Rate Plate Map'
-    subtitle = 'Plate {} ({})'.format(plate_map['plateName'], plate_map[
-        'datasetName'])
+    if subtitle is None:
+        subtitle = 'Plate {}'.format(plate_data.plate_name)
+        if plate_data.dataset_name:
+            subtitle += ' ({})'.format(plate_data.dataset_name)
     title = _combine_title_subtitle(maintitle, subtitle)
 
-    wells = plate_map['wells']
-    well_color_basis = np.array([well[color_by] for well in wells],
+    well_color_basis = np.array(getattr(plate_data, color_by),
                                 dtype=np.double)
 
     well_max = np.nanmax(well_color_basis)
@@ -1160,12 +1167,11 @@ def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
         for val in well_color_basis
     ])
 
-    cols = plate_map['numCols']
-    rows = len(wells) // cols
-    WELL_DIAM = 0.95
-    ASCII_CAP_A = 65
+    cols = plate_data.width
+    rows = plate_data.height
+    num_wells = cols * rows
 
-    well_rad = WELL_DIAM / 2
+    well_rad = PLATE_MAP_WELL_DIAM / 2
 
     col_labels = [str(i + 1) for i in range(cols)]
     row_labels = [chr(ASCII_CAP_A + i) for i in range(rows)]
@@ -1177,20 +1183,19 @@ def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
         'fillcolor': well_color[well_num],
         'x0': (well_num % cols),
         'y0': rows - (well_num // cols),
-        'x1': (well_num % cols) + WELL_DIAM,
-        'y1': rows - (well_num // cols) + WELL_DIAM,
+        'x1': (well_num % cols) + PLATE_MAP_WELL_DIAM,
+        'y1': rows - (well_num // cols) + PLATE_MAP_WELL_DIAM,
         'type': 'circle',
         'line': {
             'color': 'darkgray',
             'width': 0.5
         }
-    } for well_num, well in enumerate(wells)]
+    } for well_num in range(num_wells)]
 
     well_objs = go.Scatter(
-        x=[(well_num % cols) + well_rad for well_num in range(len(
-            wells))],
-        y=[rows - (well_num // cols) + well_rad for well_num in range(
-            len(wells))],
+        x=[(well_num % cols) + well_rad for well_num in range(num_wells)],
+        y=[rows - (well_num // cols) + well_rad for well_num in
+           range(num_wells)],
         text='',
         hovertext=['Well {}{}<br>'
                    'DIP: {}<br>'
@@ -1199,15 +1204,16 @@ def plot_plate_map(plate_map, color_by='dipRate', missing_color='lightgray'):
                    'Dose: {}'.format(
                         row_labels[well_num // cols],
                         col_labels[well_num % cols],
-                        well['dipRate'],
-                        well['cellLine'],
+                        plate_data.dip_rates[well_num],
+                        plate_data.cell_lines[well_num],
                         " &amp; ".join(["(None)" if d is None else d for d in
-                                        well['drugs']]) if well['drugs']
-                        else 'None',
-                        " &amp; ".join([format_dose(d) for d in well[
-                            'doses']]) if well['doses'] else 'N/A'
+                                        plate_data.drugs[well_num]]) if
+                                        plate_data.drugs[well_num] else 'None',
+                        " &amp; ".join([format_dose(d) for d in
+                                        plate_data.doses[well_num]]) if
+                                        plate_data.doses[well_num] else 'N/A'
             )
-            for well_num, well in enumerate(wells)],
+            for well_num in range(num_wells)],
         hoverinfo='text',
         mode='text'
     )

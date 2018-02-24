@@ -5,3 +5,5 @@ thunor.egg-info/*
 .idea/
 doc/_build/
 doc/.ipynb_checkpoints/
+.coverage
+.pytest_cache/

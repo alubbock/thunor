@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import collections
 import pandas as pd
+from pandas.core.indexes.base import InvalidIndexError
+from functools import reduce
 
 
 _SI_PREFIXES = collections.OrderedDict([
@@ -99,4 +101,13 @@ def plotly_to_dataframe(plot_fig):
         else:
             series.append(pd.Series(yvals, index=xvals, name=trace_name))
 
-    return pd.concat(series, axis=1)
+    try:
+        return pd.concat(series, axis=1)
+    except (ValueError, InvalidIndexError):
+        # At least one of the indices contains duplicates, so we'll have to
+        # fall back on a (slower) merge, rather than trying to
+        # concatentate them
+        dflist = [pd.DataFrame(s) for s in series]
+        return reduce(lambda x, y: pd.merge(x, y, left_index=True,
+                                            right_index=True, how='outer'),
+                      dflist)
