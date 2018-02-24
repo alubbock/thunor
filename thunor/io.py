@@ -499,6 +499,7 @@ def read_hdf(filename_or_buffer):
             df_controls = None
         df_doses = hdf['doses']
 
+    # Aggregate multi-drugs into single column and drop the separates
     df_doses.reset_index(inplace=True)
     if 'drug' not in df_doses.columns:
         df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
@@ -510,9 +511,8 @@ def read_hdf(filename_or_buffer):
             tuple, axis=1)
     else:
         df_doses['dose'] = df_doses['dose'].transform(lambda x: (x, ))
-    df_doses = df_doses.select(lambda col: not re.match('^(dose|drug)[0-9]+$',
-                                                        col),
-                               axis=1)
+    df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
+                  axis=1, inplace=True)
     df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
 
     return HtsPandas(df_doses, df_assays, df_controls)
