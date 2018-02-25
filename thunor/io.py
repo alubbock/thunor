@@ -651,7 +651,7 @@ def write_vanderbilt_hts(df_data, filename, plate_width=24,
     if 'drug2' in df.columns:
         df['drug2.units'] = 'M'
 
-    df.to_csv(path_or_buf=filename, sep=sep)
+    df.to_csv(path_or_buf=filename, sep=sep, index=False)
 
 
 def write_hdf(df_data, filename, dataset_format='fixed'):
