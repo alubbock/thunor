@@ -3,7 +3,7 @@ import pkg_resources
 import thunor.io
 import thunor.dip
 from thunor.plots import plot_time_course, plot_dip, plot_dip_params, \
-    plot_two_dataset_param_scatter, plot_plate_map
+    plot_plate_map
 from thunor.helpers import plotly_to_dataframe
 import pandas as pd
 
@@ -19,11 +19,23 @@ class TestWithDataset(unittest.TestCase):
         cls.fit_params = thunor.dip.dip_fit_params(ctrl_dip_data,
                                                    expt_dip_data)
 
+    def test_plot_param_comparison(self):
+        # Mock up a two-dataset set of fit params
+        df1 = self.fit_params.copy()
+        df1.index.set_levels(['one'], level='dataset_id', inplace=True)
+
+        df2 = df1.copy()
+        df2.index.set_levels(['two'], level='dataset_id', inplace=True)
+
+        df = pd.concat([df1, df2])
+
+        plot_dip_params(df, fit_param='auc', multi_dataset=True)
+
     def test_plot_time_course(self):
         abe_bt20 = self.dataset.filter(drugs=['abemaciclib'],
                                        cell_lines=['BT20'])
 
-        tc = plot_time_course(abe_bt20)
+        tc = plot_time_course(abe_bt20, show_dip_fit=True, log_yaxis=True)
         assert isinstance(plotly_to_dataframe(tc), pd.DataFrame)
 
     def test_plot_dip(self):
