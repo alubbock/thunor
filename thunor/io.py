@@ -6,7 +6,7 @@ from datetime import timedelta, datetime
 import itertools
 from .dip import _choose_dip_assay, dip_rates
 
-# assume 3x2 aspect ratio for plates
+SECONDS_IN_HOUR = 3600
 
 
 class PlateMap(object):
@@ -459,6 +459,18 @@ def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     return df
 
 
+def _select_csv_separator(file_or_buf):
+    if not isinstance(file_or_buf, str):
+        raise ValueError('Need to specify file separator (\\t or ,)')
+    if file_or_buf.endswith('.csv'):
+        return ','
+    elif file_or_buf.endswith('.tsv') or file_or_buf.endswith('.txt'):
+        return '\t'
+    else:
+        raise ValueError('Failed to detected file separator from name. '
+                         'Specify sep=\'\\t\', \',\', or other.')
+
+
 def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
                         sep=None):
     """
@@ -475,7 +487,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     plate_height: int
         Width of the microtiter plates (default: 16, for 384 well plate)
     sep: str
-        Source file delimiter (default: tab)
+        Source file delimiter (default: detect from file extension)
 
     Returns
     -------
@@ -483,16 +495,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
         HTS Dataset containing the data read from the CSV
     """
     if sep is None:
-        if not isinstance(file_or_source, str):
-            raise ValueError('Need to specify file separator (\\t or ,)')
-        if file_or_source.endswith('.csv'):
-            sep = ','
-        elif file_or_source.endswith('.tsv') or file_or_source.endswith(
-                '.txt'):
-            sep = '\t'
-        else:
-            raise ValueError('Failed to detected file separator from name. '
-                             'Specify sep=\'\\t\', \',\', or other.')
+        sep = _select_csv_separator(file_or_source)
 
     df = read_vanderbilt_hts_single_df(file_or_source, plate_width,
                                        plate_height, sep=sep)
@@ -582,6 +585,73 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     df_vals.set_index(['assay', 'well_id', 'timepoint'], inplace=True)
 
     return HtsPandas(df_doses, df_vals, df_controls)
+
+
+def write_vanderbilt_hts(df_data, filename, plate_width=24,
+                         plate_height=16, sep=None):
+    """
+    Read a Vanderbilt HTS format file
+
+    See the wiki for a file format description
+
+    Parameters
+    ----------
+    df_data: HtsPandas
+        HtsPandas - HTS dataset
+    filename: str or object
+        filename or buffer to write into
+    plate_width: int
+        plate width (number of wells)
+    plate_height: int
+        plate height (number of wells)
+    sep: str
+        Source file delimiter (default: detect from file extension)
+    """
+    if sep is None:
+        sep = _select_csv_separator(filename)
+
+    # Construct a unified dataframe
+    assays = df_data.assays.loc[df_data.dip_assay_name].reset_index()
+    assays.set_index('well_id', inplace=True)
+
+    doses = df_data.doses_unstacked().reset_index()
+    doses.set_index('well_id', inplace=True)
+    doses.rename({'plate_id': 'plate'}, axis='columns', inplace=True)
+
+    df = doses.merge(assays, how='outer', left_index=True, right_index=True)
+
+    # Add controls, if applicable
+    if df_data.controls is not None:
+        controls = df_data.controls.loc[df_data.dip_assay_name].reset_index()
+        controls.set_index('well_id', inplace=True)
+        controls['drug1'] = 'control'
+        controls['dose1'] = 0.0
+        if 'drug2' in df.columns:
+            controls['drug2'] = 'control'
+            controls['dose2'] = 0.0
+
+        df = pd.concat([df, controls])
+
+    pm = PlateMap(width=plate_width, height=plate_height)
+    df.reset_index(drop=True, inplace=True)
+    df['well_num'] = [pm.well_id_to_name(wn) for wn in
+                      df['well_num'].astype(int)]
+    df.rename({'plate': 'upid',
+               'dose1': 'drug1.conc',
+               'dose2': 'drug2.conc',
+               'timepoint': 'time',
+               'well_num': 'well',
+               'value': 'cell.count',
+               'cell_line': 'cell.line'
+               },
+              axis='columns', inplace=True)
+
+    df['time'] = [td.total_seconds() / SECONDS_IN_HOUR for td in df['time']]
+    df['drug1.units'] = 'M'
+    if 'drug2' in df.columns:
+        df['drug2.units'] = 'M'
+
+    df.to_csv(path_or_buf=filename, sep=sep)
 
 
 def write_hdf(df_data, filename, dataset_format='fixed'):
