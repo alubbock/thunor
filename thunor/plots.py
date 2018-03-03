@@ -204,7 +204,7 @@ def plot_dip(fit_params, is_absolute=False,
 
         line_dash = 'solid'
         line_mode = 'lines'
-        if np.isnan(fp.divisor):
+        if fp.divisor is None or np.isnan(fp.divisor):
             # Curve fit numerical error or QC failure
             dip_rate_fit = None
             line_mode = 'none'
