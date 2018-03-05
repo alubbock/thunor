@@ -332,6 +332,12 @@ def plot_drc(fit_params, is_absolute=False,
                     'text': annotation_label
                 })
     data = go.Data(traces)
+    yaxis_range = None
+    if not is_absolute:
+        yaxis_range = (-0.2, 1.2)
+    elif not is_viability:
+        yaxis_range = (-0.02, 0.07)
+
     layout = go.Layout(title=title,
                        hovermode='closest' if show_replicates
                                  or len(traces) > 50 else 'x',
@@ -339,8 +345,7 @@ def plot_drc(fit_params, is_absolute=False,
                               'range': np.log10((1e-12, 1e-5)),
                               'type': 'log'},
                        yaxis={'title': yaxis_title,
-                              'range': (-0.02, 0.07) if is_absolute else
-                              (-0.2, 1.2)
+                              'range': yaxis_range
                               },
                        annotations=annotations,
                        )
