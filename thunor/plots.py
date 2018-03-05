@@ -26,6 +26,7 @@ def _auc_units(**kwargs):
 
 
 SECONDS_IN_HOUR = 3600.0
+NS_IN_SEC = 1e9
 PLATE_MAP_WELL_DIAM = 0.95
 ASCII_CAP_A = 65
 PARAM_UNITS = {'auc': _activity_area_units,
@@ -45,6 +46,25 @@ IC_REGEX = re.compile('^ic([0-9]+)$')
 EC_REGEX = re.compile('^ec([0-9]+)$')
 E_REGEX = re.compile('^e([0-9]+)$')
 E_REL_REGEX = re.compile('^e([0-9]+)_rel$')
+
+
+def _secs_to_str(seconds):
+    """
+    Convert seconds to HH:MM:SS string
+
+    Parameters
+    ----------
+    seconds: int
+        Number of seconds
+
+    Returns
+    -------
+    str
+        Formatted string like "Time: 2:04:00"
+    """
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+    return "Time: %d:%02d:%02d" % (h, m, s)
 
 
 def _param_is_log(param_id):
@@ -260,6 +280,13 @@ def plot_drc(fit_params, is_absolute=False,
                 repl_name = '{} {}'.format(fp.Index[0], repl_name)
                 ctrl_name = '{} {}'.format(fp.Index[0], ctrl_name)
 
+            if is_viability:
+                # viability times are in nanoseconds - convert
+                hoverlabels = [_secs_to_str(int(x) / 1e9) for x in
+                               fp.viability_time]
+            else:
+                hoverlabels = repl_name
+
             shape = shapes.pop(0)
 
             traces.append(go.Scatter(x=expt_doses,
@@ -270,7 +297,7 @@ def plot_drc(fit_params, is_absolute=False,
                                              'size': 5},
                                      legendgroup=group_name_disp,
                                      hoverinfo='x+y+text',
-                                     text=repl_name,
+                                     text=hoverlabels,
                                      showlegend=False,
                                      name=repl_name)
                           )

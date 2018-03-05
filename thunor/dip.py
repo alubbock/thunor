@@ -534,6 +534,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
 
             if is_viability:
+                fit_data['viability_time'] = dip_grp['timepoint'].values
                 fit_data['viability'] = pd.Series(
                     data=dip_grp['viability'].values,
                     index=[doses_expt, dip_grp.index.get_level_values(
