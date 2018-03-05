@@ -2,7 +2,8 @@ import unittest
 import pkg_resources
 import thunor.io
 import thunor.dip
-from thunor.plots import plot_time_course, plot_dip, plot_dip_params, \
+import thunor.viability
+from thunor.plots import plot_time_course, plot_drc, plot_drc_params, \
     plot_plate_map
 from thunor.helpers import plotly_to_dataframe
 import pandas as pd
@@ -19,6 +20,19 @@ class TestWithDataset(unittest.TestCase):
         cls.fit_params = thunor.dip.dip_fit_params(ctrl_dip_data,
                                                    expt_dip_data)
 
+        viability_data = thunor.viability.viability(cls.dataset)
+        cls.viability_params = thunor.viability.viability_fit_params(
+            viability_data)
+
+    def test_plot_viability_curves(self):
+        assert isinstance(plotly_to_dataframe(plot_drc(
+            self.viability_params)), pd.DataFrame)
+
+    def test_plot_viability_params_single_param(self):
+        assert isinstance(plotly_to_dataframe(plot_drc_params(
+            self.viability_params, fit_param='ic50')),
+                          pd.DataFrame)
+
     def test_plot_param_comparison(self):
         # Mock up a two-dataset set of fit params
         df1 = self.fit_params.copy()
@@ -29,7 +43,7 @@ class TestWithDataset(unittest.TestCase):
 
         df = pd.concat([df1, df2])
 
-        plot_dip_params(df, fit_param='auc', multi_dataset=True)
+        plot_drc_params(df, fit_param='auc', multi_dataset=True)
 
     def test_plot_time_course(self):
         abe_bt20 = self.dataset.filter(drugs=['abemaciclib'],
@@ -39,16 +53,16 @@ class TestWithDataset(unittest.TestCase):
         assert isinstance(plotly_to_dataframe(tc), pd.DataFrame)
 
     def test_plot_dip(self):
-        assert isinstance(plotly_to_dataframe(plot_dip(self.fit_params)),
+        assert isinstance(plotly_to_dataframe(plot_drc(self.fit_params)),
                           pd.DataFrame)
 
     def test_plot_dip_params_single_param(self):
-        assert isinstance(plotly_to_dataframe(plot_dip_params(
+        assert isinstance(plotly_to_dataframe(plot_drc_params(
             self.fit_params, fit_param='ic50')),
                           pd.DataFrame)
 
     def test_plot_two_params(self):
-        x = plot_dip_params(
+        x = plot_drc_params(
             self.fit_params, fit_param='ic50', fit_param_compare='ec50',
             fit_param_sort='ec25')
 
@@ -56,7 +70,7 @@ class TestWithDataset(unittest.TestCase):
             pd.DataFrame)
 
     def test_plot_dip_params_aggregation(self):
-        assert isinstance(plotly_to_dataframe(plot_dip_params(
+        assert isinstance(plotly_to_dataframe(plot_drc_params(
             self.fit_params, aggregate_cell_lines={'tag': ['BT20', 'HCC1143']},
             aggregate_drugs={'tag': ['abemaciclib', 'Panobinostat']},
             fit_param='ic50')),

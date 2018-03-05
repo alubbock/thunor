@@ -122,15 +122,16 @@ def _combine_title_subtitle(title, subtitle):
     return title
 
 
-def plot_dip(fit_params, is_absolute=False,
+def plot_drc(fit_params, is_absolute=False,
              title=None, subtitle=None, hill_fn=ll4):
     """
-    Plot DIP rate curve fits
+    Plot dose response curve fits
 
     Parameters
     ----------
     fit_params: pd.DataFrame
-        DIP fit parameters from :func:`thunor.dip.dip_params`
+        Fit parameters from :func:`thunor.dip.dip_fit_params` or
+        :func:`thunor.viability.viability_fit_params`
     is_absolute: bool
         Plot using absolute (True) or relative (False) scale
     title: str, optional
@@ -152,8 +153,13 @@ def plot_dip(fit_params, is_absolute=False,
 
     datasets = fit_params.index.get_level_values('dataset_id').unique()
 
-    yaxis_title = 'DIP rate'
-    if is_absolute:
+    is_viability = 'viability' in fit_params.columns
+
+    if is_viability:
+        yaxis_title = '{:g} hr viability'.format(fit_params._viability_time)
+    else:
+        yaxis_title = 'DIP rate'
+    if is_absolute and not is_viability:
         yaxis_title += ' (h<sup>-1</sup>)'
     else:
         yaxis_title = 'Relative ' + yaxis_title
@@ -185,7 +191,10 @@ def plot_dip(fit_params, is_absolute=False,
         except AttributeError:
             ctrl_doses = []
 
-        expt_doses = fp.dip_expt.index.get_level_values('dose')
+        if is_viability:
+            expt_doses = fp.viability.index.get_level_values('dose')
+        else:
+            expt_doses = fp.dip_expt.index.get_level_values('dose')
 
         doses = np.concatenate((ctrl_doses, expt_doses))
 
@@ -206,6 +215,7 @@ def plot_dip(fit_params, is_absolute=False,
         line_mode = 'lines'
         if fp.divisor is None or np.isnan(fp.divisor):
             # Curve fit numerical error or QC failure
+            dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
@@ -233,7 +243,7 @@ def plot_dip(fit_params, is_absolute=False,
                       )
 
         if show_replicates:
-            y_trace = fp.dip_expt
+            y_trace = fp.viability if is_viability else fp.dip_expt
             try:
                 dip_ctrl = fp.dip_ctrl
             except AttributeError:
@@ -499,7 +509,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     return go.Figure(layout=layout, data=data)
 
 
-def plot_dip_params(df_params, fit_param,
+def plot_drc_params(df_params, fit_param,
                     fit_param_compare=None,
                     fit_param_sort=None,
                     title=None,
@@ -576,6 +586,11 @@ def plot_dip_params(df_params, fit_param,
         yaxis_title = '{} ({})'.format(yaxis_param_name, yaxis_units)
     else:
         yaxis_title = yaxis_param_name
+    if df_params._drmetric == 'dip':
+        yaxis_title = 'DIP {}'.format(yaxis_title)
+    else:
+        yaxis_title = '{:g} hr viability {}'.format(df_params._viability_time,
+                                                     yaxis_title)
 
     layout = dict(title=title,
                   yaxis={'title': yaxis_title,
@@ -606,6 +621,12 @@ def plot_dip_params(df_params, fit_param,
             xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
         else:
             xaxis_title = xaxis_param_name
+        if df_params._drmetric == 'dip':
+            xaxis_title = 'DIP {}'.format(xaxis_title)
+        else:
+            xaxis_title = '{:g} hr viability {}'.format(
+                df_params._viability_time,
+                xaxis_title)
 
         xdat_fit = np.log10(xdat) if _param_is_log(fit_param_compare) else xdat
         ydat_fit = np.log10(ydat) if _param_is_log(fit_param) else ydat
@@ -935,6 +956,15 @@ def plot_time_course(hts_pandas,
             assay_name, df_assays_avail))
 
     if df_controls is not None:
+        if 'dataset' in df_controls.index.names:
+            dsets = df_controls.index.levels[df_controls.index.names.index(
+                                             'dataset')]
+            if len(dsets) > 1:
+                raise ValueError('Multiple control datasets present. '
+                                 'Plotting a time course requires a single '
+                                 'dataset.')
+            df_controls = df_controls.loc[dsets[0]]
+
         df_controls = df_controls.loc[assay]
     df_vals = df_vals.loc[assay]
 

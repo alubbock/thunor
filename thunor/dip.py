@@ -76,7 +76,11 @@ def dip_rates(df_data, selector_fn=tyson1):
     if df_data.controls is None:
         ctrl_dips = None
     else:
-        df_controls = df_data.controls.loc[df_data.dip_assay_name]
+        if 'dataset' in df_data.controls.index.names:
+            df_controls = df_data.controls.loc[(slice(None),
+                                                df_data.dip_assay_name), :]
+        else:
+            df_controls = df_data.controls.loc[df_data.dip_assay_name]
         ctrl_dips = ctrl_dip_rates(df_controls)
     df_assays = df_data.assays.loc[df_data.dip_assay_name]
 
@@ -327,18 +331,19 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                    hill_fn=ll4,
                    curve_initial_guess_fn=ll4_initials,
                    ctrl_dose_fn=lambda doses: np.min(doses) / 10.0,
-                   custom_ic_concentrations=set(),
-                   custom_ec_concentrations=set(),
-                   custom_e_values=set(),
-                   custom_e_rel_values=set(),
-                   include_dip_rates=True, include_stats=True):
+                   custom_ic_concentrations=None,
+                   custom_ec_concentrations=None,
+                   custom_e_values=None,
+                   custom_e_rel_values=None,
+                   include_response_values=True, extra_stats=True):
     """
     Fit dose response curves to DIP rates and calculate statistics
 
     Parameters
     ----------
-    ctrl_dip_data: pd.DataFrame
-        Control DIP rates from :func:`dip_rates` or :func:`ctrl_dip_rates`
+    ctrl_dip_data: pd.DataFrame or None
+        Control DIP rates from :func:`dip_rates` or :func:`ctrl_dip_rates`.
+        Set to None to not use control data.
     expt_dip_data: pd.DataFrame
         Experiment (non-control) DIP rates from :func:`dip_rates` or
         :func:`expt_dip_rates`
@@ -350,21 +355,21 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
     ctrl_dose_fn: function
         Function to use to set an effective "dose" (non-zero) for controls.
         Takes the list of experiment doses as an argument.
-    custom_ic_concentrations: set
+    custom_ic_concentrations: set, optional
         Set of additional inhibitory concentrations to calculate. Integer 
-        values 0-100.
-    custom_ec_concentrations: set
+        values 0-100. Requires extra_stats=True.
+    custom_ec_concentrations: set, optional
         Set of additional effective concentrations to calculate. Integer
-        values 0-100.
-    custom_e_values: set
+        values 0-100. Requires extra_stats=True.
+    custom_e_values: set, optional
         Set of additional effect values to calculate. Integer
-        values 0-100.
-    custom_e_rel_values: set
+        values 0-100. Requires extra_stats=True.
+    custom_e_rel_values: set, optional
         Set of additional relative effect values to calculate. Integer
-        values 0-100.
-    include_dip_rates: bool
+        values 0-100. Requires extra_stats=True.
+    include_response_values: bool
         Include the supplied DIP rates in the return value if True
-    include_stats: bool
+    extra_stats: bool
         Include extra statistics such as IC50 and AUC if True (increases
         processing time)
 
@@ -407,6 +412,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             group_by = ['dataset'] + group_by
 
     fit_params = []
+
+    is_viability = 'viability' in expt_dip_data.columns
 
     for group_name, dip_grp in expt_dip_data.groupby(level=group_by):
         group_name_components = []
@@ -459,22 +466,30 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             dip_ctrl = []
             dip_ctrl_std_err = []
 
-        n_controls = len(dip_ctrl)
-
         doses_expt = dip_grp.index.get_level_values('dose').values
 
-        doses_ctrl = np.repeat(ctrl_dose_fn(doses_expt), n_controls)
-        doses = np.concatenate((doses_ctrl, doses_expt))
-        dip_expt = dip_grp['dip_rate'].values
-        dip_all = np.concatenate((dip_ctrl, dip_expt))
-        dip_std_errs = np.concatenate((
-            dip_ctrl_std_err,
-            dip_grp['dip_fit_std_err'].values))
+        if is_viability:
+            resp_expt = dip_grp['viability']
+            doses = doses_expt
+            popt, popt_rel, divisor = fit_drc(
+                doses_expt, resp_expt, response_std_errs=None,
+                hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
+            )
+        else:
+            n_controls = len(dip_ctrl)
 
-        popt, popt_rel, divisor = fit_drc(
-            doses, dip_all, dip_std_errs,
-            hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
-        )
+            doses_ctrl = np.repeat(ctrl_dose_fn(doses_expt), n_controls)
+            doses = np.concatenate((doses_ctrl, doses_expt))
+            resp_expt = dip_grp['dip_rate'].values
+            dip_all = np.concatenate((dip_ctrl, resp_expt))
+            dip_std_errs = np.concatenate((
+                dip_ctrl_std_err,
+                dip_grp['dip_fit_std_err'].values))
+
+            popt, popt_rel, divisor = fit_drc(
+                doses, dip_all, dip_std_errs,
+                hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
+            )
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
@@ -482,7 +497,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         if popt is not None:
             emax = hill_fn(max_dose_measured, *popt)
 
-        emax_obs = np.min(dip_expt)
+        emax_obs = np.min(resp_expt)
         emax_obs_rel = None
         if emax_obs and divisor is not None:
             emax_obs_rel = emax_obs / divisor
@@ -511,22 +526,40 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             hill=None if popt is None else popt[0]
         )
 
-        if include_dip_rates:
+        if include_response_values:
             if ctrl_dip_data_cl is not None:
                 ctrl_dip_data_cl['dose'] = doses_ctrl
                 ctrl_dip_data_cl.reset_index('well_id', inplace=True)
                 ctrl_dip_data_cl.set_index(['dose', 'well_id'], inplace=True)
                 fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
 
-            fit_data['dip_expt'] = pd.Series(
-                data=dip_grp['dip_rate'].values,
-                index=[doses_expt, dip_grp.index.get_level_values('well_id')]
-            )
-            fit_data['dip_expt'].index.rename(['dose', 'well_id'],
-                                              inplace=True)
+            if is_viability:
+                fit_data['viability'] = pd.Series(
+                    data=dip_grp['viability'].values,
+                    index=[doses_expt, dip_grp.index.get_level_values(
+                        'well_id')]
+                )
+                fit_data['viability'].index.rename(['dose', 'well_id'],
+                                                   inplace=True)
+            else:
+                fit_data['dip_expt'] = pd.Series(
+                    data=dip_grp['dip_rate'].values,
+                    index=[doses_expt, dip_grp.index.get_level_values('well_id')]
+                )
+                fit_data['dip_expt'].index.rename(['dose', 'well_id'],
+                                                  inplace=True)
 
         # Only calculate AUC and IC50 if needed
-        if include_stats:
+        if extra_stats:
+            if custom_ic_concentrations is None:
+                custom_ic_concentrations = set()
+            if custom_ec_concentrations is None:
+                custom_ec_concentrations = set()
+            if custom_e_values is None:
+                custom_e_values = set()
+            if custom_e_rel_values is None:
+                custom_e_rel_values = set()
+
             custom_ic_concentrations.add(50)
             for ic_num in custom_ic_concentrations:
                 if popt is None:
@@ -586,6 +619,11 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
     df_params = pd.DataFrame(fit_params)
     df_params.set_index(['dataset_id', 'cell_line', 'drug'], inplace=True)
+
+    df_params._drmetric = 'viability' if is_viability else 'dip'
+    if is_viability:
+        df_params._viability_time = expt_dip_data._viability_time
+        df_params._viability_assay = expt_dip_data._viability_assay
 
     return df_params
 

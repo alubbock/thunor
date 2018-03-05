@@ -54,7 +54,7 @@ def ll4_initials(x, y):
     return b_val, c_val, d_val, e_val
 
 
-def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
+def fit_drc(doses, responses, response_std_errs=None, hill_fn=ll4,
             curve_initial_guess_fn=ll4_initials,
             null_rejection_threshold=0.05):
     """
@@ -64,10 +64,10 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
     ----------
     doses: np.ndarray
         Array of dose values
-    dip_rates: np.ndarray
-        Array of DIP rates (response values)
-    dip_std_errs: np.ndarray, optional
-        Array of fit standard errors for the DIP rates
+    responses: np.ndarray
+        Array of response values, e.g. viability, DIP rates
+    response_std_errs: np.ndarray, optional
+        Array of fit standard errors for the response values
     hill_fn: function
         Function to use for fitting (default: 4 parameter log logistic
         "Hill" curve)
@@ -88,19 +88,19 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
           relative scale
 
     """
-    dip_rate_nans = np.isnan(dip_rates)
-    if np.any(dip_rate_nans):
-        doses = doses[~dip_rate_nans]
-        dip_rates = dip_rates[~dip_rate_nans]
-        if dip_std_errs is not None:
-            dip_std_errs = dip_std_errs[~dip_rate_nans]
-    curve_initial_guess = curve_initial_guess_fn(doses, dip_rates)
+    response_nans = np.isnan(responses)
+    if np.any(response_nans):
+        doses = doses[~response_nans]
+        responses = responses[~response_nans]
+        if response_std_errs is not None:
+            response_std_errs = response_std_errs[~response_nans]
+    curve_initial_guess = curve_initial_guess_fn(doses, responses)
     try:
         popt, pcov = scipy.optimize.curve_fit(hill_fn,
                                               doses,
-                                              dip_rates,
+                                              responses,
                                               p0=curve_initial_guess,
-                                              sigma=dip_std_errs
+                                              sigma=response_std_errs
                                               )
     except RuntimeError:
         # Some numerical issue with curve fitting
@@ -110,12 +110,11 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
         # Ditto
         return None, None, None
 
-    # DIP rate fit
-    dip_rate_fit_curve = hill_fn(doses, *popt)
+    response_curve = hill_fn(doses, *popt)
 
     # F test vs flat linear "no effect" fit
-    ssq_model = ((dip_rate_fit_curve - dip_rates) ** 2).sum()
-    ssq_null = ((np.mean(dip_rates) - dip_rates) ** 2).sum()
+    ssq_model = ((response_curve - responses) ** 2).sum()
+    ssq_null = ((np.mean(responses) - responses) ** 2).sum()
 
     df = len(doses) - 4
 
@@ -123,7 +122,7 @@ def fit_drc(doses, dip_rates, dip_std_errs=None, hill_fn=ll4,
     p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
 
     if p > null_rejection_threshold:
-        return None, None, np.mean(dip_rates)
+        return None, None, np.mean(responses)
 
     if popt[3] < np.min(doses):
         # Reject fit if EC50 less than min dose
