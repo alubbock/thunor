@@ -1,6 +1,24 @@
 Thunor Changelog
 ================
 
+## v0.1.8 - 2018-03-05
+
+### New features
+
+* Viability calculation and plots (end point or other single time)
+* Output to CSV format
+
+### Improvements
+
+* Curve fits now identify the failure mode (whether numerical, QC failure, or statistical rejection)
+* Updated documentation and tutorial
+* Thunor version saved in HDF5 files to aid reproducibility
+* More unit tests
+
+### Bugfixes
+
+* Fix DRC plot on dataset without controls
+
 ## v0.1.7 - 2018-02-15
 
 ### New features
