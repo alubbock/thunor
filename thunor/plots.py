@@ -181,7 +181,7 @@ def plot_drc(fit_params, is_absolute=False,
         yaxis_title = 'DIP rate'
     if is_absolute and not is_viability:
         yaxis_title += ' (h<sup>-1</sup>)'
-    else:
+    elif not is_absolute:
         yaxis_title = 'Relative ' + yaxis_title
 
     multi_dataset = len(datasets) > 1
