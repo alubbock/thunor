@@ -153,7 +153,8 @@ def plot_drc(fit_params, is_absolute=False,
         Fit parameters from :func:`thunor.dip.dip_fit_params` or
         :func:`thunor.viability.viability_fit_params`
     is_absolute: bool
-        Plot using absolute (True) or relative (False) scale
+        For DIP rate plots, use absolute (True) or relative (False)
+        y-axis scale. **Ignored for viability plots.**
     title: str, optional
         Title (or None to auto-generate)
     subtitle: str, optional
@@ -174,14 +175,18 @@ def plot_drc(fit_params, is_absolute=False,
     datasets = fit_params.index.get_level_values('dataset_id').unique()
 
     is_viability = 'viability' in fit_params.columns
+    if is_viability:
+        # Only "absolute" (non-transformed y-axis) makes sense for viability
+        is_absolute = True
 
     if is_viability:
         yaxis_title = '{:g} hr viability'.format(fit_params._viability_time)
     else:
         yaxis_title = 'DIP rate'
-    if is_absolute and not is_viability:
-        yaxis_title += ' (h<sup>-1</sup>)'
-    elif not is_absolute:
+    if is_absolute:
+        if not is_viability:
+            yaxis_title += ' (h<sup>-1</sup>)'
+    else:
         yaxis_title = 'Relative ' + yaxis_title
 
     multi_dataset = len(datasets) > 1
