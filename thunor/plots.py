@@ -2,9 +2,9 @@ import plotly.graph_objs as go
 import numpy as np
 import seaborn as sns
 from .helpers import format_dose
-from .curve_fit import ll4
 from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated, \
-    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL, DrugCombosNotImplementedError
+    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL
+from thunor.curve_fit import HillCurveNull
 import scipy.stats
 import re
 import pandas as pd
@@ -143,7 +143,7 @@ def _combine_title_subtitle(title, subtitle):
 
 
 def plot_drc(fit_params, is_absolute=False,
-             title=None, subtitle=None, hill_fn=ll4):
+             title=None, subtitle=None):
     """
     Plot dose response curve fits
 
@@ -159,8 +159,6 @@ def plot_drc(fit_params, is_absolute=False,
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
-    hill_fn: function
-        Curve fitting function to use (default: :func:`thunor.curve_fit.ll4`)
 
     Returns
     -------
@@ -209,8 +207,6 @@ def plot_drc(fit_params, is_absolute=False,
         this_colour = colours.pop()
         group_name_disp = fp.label
 
-        popt_plot = fp.popt if is_absolute else fp.popt_rel
-
         try:
             ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
         except AttributeError:
@@ -238,21 +234,24 @@ def plot_drc(fit_params, is_absolute=False,
 
         line_dash = 'solid'
         line_mode = 'lines'
-        if fp.divisor is None or np.isnan(fp.divisor):
+        if fp.fit_obj is None:
             # Curve fit numerical error or QC failure
             dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
                 group_name_disp)
-        elif popt_plot is None:
+        elif isinstance(fp.fit_obj, HillCurveNull):
             # No effect null hypothesis
-            dip_rate_fit = [1 if not is_absolute else fp.divisor] * \
+            dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * \
                             len(dose_x_range)
             line_dash = 5
         else:
             # Fit succeeded
-            dip_rate_fit = hill_fn(dose_x_range, *popt_plot)
+            if is_absolute:
+                dip_rate_fit = fp.fit_obj.fit(dose_x_range)
+            else:
+                dip_rate_fit = fp.fit_obj.fit_rel(dose_x_range)
 
         traces.append(go.Scatter(x=dose_x_range,
                                  y=dip_rate_fit,
@@ -274,7 +273,11 @@ def plot_drc(fit_params, is_absolute=False,
             except AttributeError:
                 dip_ctrl = None
             if not is_absolute:
-                divisor = fp.divisor if fp.divisor else np.mean(y_trace)
+                if fp.fit_obj is not None and \
+                        not isinstance(fp.fit_obj, HillCurveNull):
+                    divisor = fp.fit_obj.divisor
+                else:
+                    divisor = np.mean(y_trace)
                 y_trace /= divisor
                 if dip_ctrl is not None:
                     dip_ctrl /= divisor
@@ -342,7 +345,7 @@ def plot_drc(fit_params, is_absolute=False,
                 )
             if fp.emax is not None:
                 annotation_label += 'E<sub>max</sub>{}: {:.5g}'.format(
-                    '*' if fp.einf < fp.emax else '',
+                    '*' if fp.fit_obj.emax < fp.emax else '',
                     fp.emax)
             if annotation_label:
                 hovermsgs = []
@@ -994,15 +997,17 @@ def plot_time_course(hts_pandas,
 
     if df_controls is not None:
         if 'dataset' in df_controls.index.names:
-            dsets = df_controls.index.levels[df_controls.index.names.index(
-                                             'dataset')]
+            dsets = df_controls.index.get_level_values('dataset').unique()
             if len(dsets) > 1:
                 raise ValueError('Multiple control datasets present. '
                                  'Plotting a time course requires a single '
                                  'dataset.')
             df_controls = df_controls.loc[dsets[0]]
-
         df_controls = df_controls.loc[assay]
+
+        # Only use controls from the plates in the expt data
+        plates = df_doses['plate_id'].unique()
+        df_controls = df_controls.loc[(slice(None), plates), :]
     df_vals = df_vals.loc[assay]
 
     if len(hts_pandas.drugs) > 1 or len(hts_pandas.cell_lines) > 1:
@@ -1079,7 +1084,10 @@ def plot_time_course(hts_pandas,
         this_colour = colours.pop()
 
         for well_idx, well_id in enumerate(wells['well_id']):
-            timecourse = df_vals.loc[well_id]['value']
+            try:
+                timecourse = df_vals.loc[well_id]['value']
+            except KeyError:
+                continue
             t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)

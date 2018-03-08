@@ -1,6 +1,6 @@
 from datetime import timedelta
 from thunor.dip import dip_fit_params
-from thunor.curve_fit import ll4, ll4_initials
+from thunor.curve_fit import HillCurveLL3u
 
 
 def viability(df_data, time_hrs=72, assay_name=None):
@@ -86,12 +86,10 @@ def _get_closest_timepoint_for_each_well(dataframe, timediff):
 
 
 def viability_fit_params(viability_data,
-                         hill_fn=ll4,
-                         curve_initial_guess_fn=ll4_initials,
+                         fit_cls=HillCurveLL3u,
                          custom_ic_concentrations=None,
                          custom_ec_concentrations=None,
                          custom_e_values=None,
-                         custom_e_rel_values=None,
                          include_response_values=True, extra_stats=True):
     """
     Fit dose response curves to viability data and calculate statistics
@@ -100,11 +98,8 @@ def viability_fit_params(viability_data,
     ----------
     viability_data: pd.DataFrame
         Viability data from from :func:`viability`
-    hill_fn: function
-        Function to use for curve fitting (default: :func:`ll4`)
-    curve_initial_guess_fn: function
-        Function to use for initial guesses before curve fitting (default:
-        :func:`ll4_initials`)
+    fit_cls: Class
+        Class to use for curve fitting (default: :class:`HillCurveLL3u`)
     custom_ic_concentrations: set, optional
         Set of additional inhibitory concentrations to calculate. Integer
         values 0-100. Requires extra_stats=True.
@@ -113,9 +108,6 @@ def viability_fit_params(viability_data,
         values 0-100. Requires extra_stats=True.
     custom_e_values: set, optional
         Set of additional effect values to calculate. Integer
-        values 0-100. Requires extra_stats=True.
-    custom_e_rel_values: set, optional
-        Set of additional relative effect values to calculate. Integer
         values 0-100. Requires extra_stats=True.
     include_response_values: bool
         Include the supplied viability data in the return value if True
@@ -129,12 +121,11 @@ def viability_fit_params(viability_data,
         DataFrame containing DIP rate curve fits and parameters
     """
     return dip_fit_params(
-        ctrl_dip_data=None, expt_dip_data=viability_data, hill_fn=hill_fn,
-        curve_initial_guess_fn=curve_initial_guess_fn,
+        ctrl_dip_data=None, expt_dip_data=viability_data,
+        fit_cls=fit_cls,
         custom_ic_concentrations=custom_ic_concentrations,
         custom_ec_concentrations=custom_ec_concentrations,
         custom_e_values=custom_e_values,
-        custom_e_rel_values=custom_e_rel_values,
         include_response_values=include_response_values,
         extra_stats=extra_stats
     )

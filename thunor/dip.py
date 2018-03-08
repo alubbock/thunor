@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats
 import pandas as pd
-from .curve_fit import fit_drc, ll4, ll4_initials
+from .curve_fit import fit_drc, HillCurveLL4, HillCurveNull
 
 SECONDS_IN_HOUR = 3600.0
 PARAM_EQUAL_ATOL = 1e-16
@@ -213,123 +213,8 @@ def adjusted_r_squared(r, n, p):
     return 1 - (1 - r ** 2) * ((n - 1) / (n - p - 1))
 
 
-def find_icN(fit_params, ic_num=50):
-    """
-    Find the inhibitory concentration value (e.g. IC50)
-
-    Parameters
-    ----------
-    fit_params: Iterable
-        List of fit parameters: Hill slope, E0, Emax, EC50
-    ic_num: int
-        IC number between 0 and 100 (response level)
-
-    Returns
-    -------
-    float
-        Inhibitory concentration value for requested response value
-    """
-    hill_slope, e0, emax, ec50 = fit_params
-
-    if emax > e0:
-        emax, e0 = e0, emax
-
-    ic_frac = ic_num / 100.0
-
-    icN = ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (1 / hill_slope)
-
-    if np.isnan(icN):
-        icN = None
-
-    return icN
-
-
-def find_ecN(fit_params, ec_num=50):
-    """
-    Find the effective concentration value (e.g. IC50)
-
-    Parameters
-    ----------
-    fit_params: Iterable
-        List of fit parameters: Hill slope, E0, Emax, EC50
-    ec_num: int
-        EC number between 0 and 100 (response level)
-
-    Returns
-    -------
-    float
-        Effective concentration value for requested response value
-    """
-    hill_slope, e0, emax, ec50 = fit_params
-
-    if ec_num >= 100:
-        return None
-
-    ec_frac = ec_num / 100.0
-
-    return ec50 * (ec_frac / (1 - ec_frac)) ** (1 / hill_slope)
-
-
-def find_auc(fit_params, min_conc):
-    """
-    Find the area under the curve
-
-    Parameters
-    ----------
-    fit_params: Iterable
-        List of fit parameters: Hill slope, E0, Emax, EC50
-    min_conc: float
-        Minimum concentration to consider for fitting the curve
-
-    Returns
-    -------
-    float
-        Area under the curve (AUC) value
-    """
-    hill_slope, e0, emax, ec50 = fit_params
-
-    if emax > e0:
-        emax, e0 = e0, emax
-    min_conc_hill = min_conc ** hill_slope
-    return (np.log10((ec50 ** hill_slope + min_conc_hill) / min_conc_hill) /
-            hill_slope) * ((e0 - emax) / e0)
-
-
-def find_aa(fit_params, max_conc, emax_obs=None):
-    """
-    Find the activity area (area over the curve)
-
-    Parameters
-    ----------
-    fit_params: Iterable
-        List of fit parameters: Hill slope, E0, Emax, EC50
-    max_conc: float
-        Maximum concentration to consider for fitting the curve
-    emax_obs: float, optional
-        Observed Emax value
-
-    Returns
-    -------
-    float
-        Activity area value
-    """
-    hill_slope, e0, emax, ec50 = fit_params
-
-    if emax > e0:
-        emax, e0 = e0, emax
-
-    if emax_obs is not None:
-        emax = emax_obs
-
-    ec50_hill = ec50 ** hill_slope
-
-    return np.log10((ec50_hill + max_conc ** hill_slope) / ec50_hill) \
-        * ((e0 - emax) / e0) / hill_slope
-
-
 def dip_fit_params(ctrl_dip_data, expt_dip_data,
-                   hill_fn=ll4,
-                   curve_initial_guess_fn=ll4_initials,
+                   fit_cls=HillCurveLL4,
                    ctrl_dose_fn=lambda doses: np.min(doses) / 10.0,
                    custom_ic_concentrations=None,
                    custom_ec_concentrations=None,
@@ -347,11 +232,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
     expt_dip_data: pd.DataFrame
         Experiment (non-control) DIP rates from :func:`dip_rates` or
         :func:`expt_dip_rates`
-    hill_fn: function
-        Function to use for curve fitting (default: :func:`ll4`)
-    curve_initial_guess_fn: function
-        Function to use for initial guesses before curve fitting (default:
-        :func:`ll4_initials`)
+    fit_cls: Class
+        Class to use for curve fitting (default: :func:`HillCurveLL4`)
     ctrl_dose_fn: function
         Function to use to set an effective "dose" (non-zero) for controls.
         Takes the list of experiment doses as an argument.
@@ -459,6 +341,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
             else:
                 ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
+            # Only use controls from the same plates as the expt
+            plates = dip_grp.index.get_level_values('plate').unique().values
+            ctrl_dip_data_cl = ctrl_dip_data_cl.loc[plates]
+
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
         except (KeyError, AttributeError):
@@ -471,9 +357,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         if is_viability:
             resp_expt = dip_grp['viability']
             doses = doses_expt
-            popt, popt_rel, divisor = fit_drc(
+            fit_obj = fit_drc(
                 doses_expt, resp_expt, response_std_errs=None,
-                hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
+                fit_cls=fit_cls
             )
         else:
             n_controls = len(dip_ctrl)
@@ -486,16 +372,18 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 dip_ctrl_std_err,
                 dip_grp['dip_fit_std_err'].values))
 
-            popt, popt_rel, divisor = fit_drc(
+            fit_obj = fit_drc(
                 doses, dip_all, dip_std_errs,
-                hill_fn=hill_fn, curve_initial_guess_fn=curve_initial_guess_fn
+                fit_cls=fit_cls
             )
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
         emax = None
-        if popt is not None:
-            emax = hill_fn(max_dose_measured, *popt)
+        divisor = None
+        if fit_obj is not None and not isinstance(fit_obj, HillCurveNull):
+            emax = fit_obj.fit(max_dose_measured)
+            divisor = fit_obj.divisor
 
         emax_obs = np.min(resp_expt)
         emax_obs_rel = None
@@ -506,7 +394,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         if emax is not None and divisor is not None:
             emax_rel = emax / divisor
 
-        ec50 = None if popt is None else np.min((popt[3], max_dose_measured))
+        ec50 = None
+        if fit_obj is not None and not isinstance(fit_obj, HillCurveNull):
+            ec50 = np.min((fit_obj.ec50, max_dose_measured))
 
         fit_data = dict(
             label=group_name_disp,
@@ -514,16 +404,13 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             cell_line=cl_name,
             drug=dr_name,
             divisor=divisor,
-            popt=popt,
-            popt_rel=popt_rel,
-            einf=None if popt is None else popt[1],
+            fit_obj=fit_obj,
             emax=emax,
             emax_rel=emax_rel,
             emax_obs=emax_obs,
             emax_obs_rel=emax_obs_rel,
             ec50=ec50,
             max_dose_measured=max_dose_measured,
-            hill=None if popt is None else popt[0]
         )
 
         if include_response_values:
@@ -563,10 +450,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
             custom_ic_concentrations.add(50)
             for ic_num in custom_ic_concentrations:
-                if popt is None:
+                if fit_obj is None:
                     ic_n = None
                 else:
-                    ic_n = find_icN(popt, ic_num=ic_num)
+                    ic_n = fit_obj.ic(ic_num=ic_num)
 
                 if ic_n is not None:
                     fit_data['ic{:d}'.format(ic_num)] = \
@@ -581,10 +468,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 custom_e_rel_values)
 
             for ec_num in custom_ec_concentrations:
-                if popt is None:
+                if fit_obj is None:
                     ec_n = None
                 else:
-                    ec_n = find_ecN(popt, ec_num=ec_num)
+                    ec_n = fit_obj.ec(ec_num=ec_num)
 
                 if ec_n is not None:
                     fit_data['ec{:d}'.format(ec_num)] = \
@@ -594,28 +481,26 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
             for e_num in custom_e_values:
                 ec_val = fit_data['ec{:d}'.format(e_num)]
-                if popt is None or ec_val is None:
+                if fit_obj is None or ec_val is None:
                     fit_data['e{:d}'.format(e_num)] = None
                 else:
-                    fit_data['e{:d}'.format(e_num)] = hill_fn(ec_val, *popt)
+                    fit_data['e{:d}'.format(e_num)] = fit_obj.fit(ec_val)
 
             for e_num in custom_e_rel_values:
                 ec_val = fit_data['ec{:d}'.format(e_num)]
-                if popt_rel is None or ec_val is None:
+                if fit_obj is None or ec_val is None:
                     fit_data['e{:d}_rel'.format(e_num)] = None
                 else:
                     fit_data['e{:d}_rel'.format(e_num)] = \
-                        hill_fn(ec_val, *popt_rel)
+                        fit_obj.fit_rel(ec_val)
 
-            if popt is None or fit_data['ec50'] is None:
+            if fit_obj is None or fit_data['ec50'] is None:
                 fit_data['aa'] = None
                 fit_data['auc'] = None
             else:
-                fit_data['aa'] = find_aa(fit_params=popt,
-                                         max_conc=max_dose_measured,
-                                         emax_obs=emax)
-                fit_data['auc'] = find_auc(fit_params=popt,
-                                           min_conc=min_dose_measured)
+                fit_data['aa'] = fit_obj.aa(max_conc=max_dose_measured,
+                                            emax_obs=emax)
+                fit_data['auc'] = fit_obj.auc(min_conc=min_dose_measured)
         fit_params.append(fit_data)
 
     df_params = pd.DataFrame(fit_params)
