@@ -239,7 +239,7 @@ class HtsPandas(object):
             List of cell lines to filter on
         drugs: Iterable, optional
             List of drugs to filter on
-        plate_name: Iterable, optional
+        plate: Iterable, optional
 
         Returns
         -------
