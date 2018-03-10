@@ -4,32 +4,8 @@ import scipy.stats
 from abc import abstractclassmethod, abstractmethod
 
 
-def _response_transform(y, c_val, d_val):
-    return np.log((d_val - y) / (y - c_val))
-
-
-def _find_be_ll4(x, y, c_val, d_val, slope_scaling_factor=1,
-                 dose_transform=np.log,
-                 dose_inv_transform=np.exp):
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-        dose_transform(x),
-        _response_transform(y, c_val, d_val)
-    )
-    b_val = slope_scaling_factor * slope
-    e_val = dose_inv_transform(-intercept / (slope_scaling_factor * b_val))
-
-    return b_val, e_val
-
-
-def _find_cd_ll4(y, scale=0.001):
-    ymin = np.min(y)
-    ymax = np.max(y)
-    len_y_range = scale * (ymax - ymin)
-
-    return ymin - len_y_range, ymax + len_y_range
-
-
 class HillCurve(object):
+    """ Base class defining Hill/log-logistic curve functionality """
     def __init__(self, popt):
         self.popt = popt
 
@@ -332,9 +308,9 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     fit_cls: Class
         Class to use for fitting (default: 4 parameter log logistic
         "Hill" curve)
-    null_rejection_threshold: float
+    null_rejection_threshold: float, optional
         p-value for rejecting curve fit against no effect "flat" response
-        model by F-test (default: 0.05)
+        model by F-test (default: 0.05). Set to None to skip test.
 
     Returns
     -------
@@ -364,22 +340,49 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         return None
 
     fit_obj = fit_cls(popt)
-    response_curve = fit_obj.fit(doses)
 
-    # F test vs flat linear "no effect" fit
-    ssq_model = ((response_curve - responses) ** 2).sum()
-    ssq_null = ((np.mean(responses) - responses) ** 2).sum()
+    if null_rejection_threshold is not None:
+        response_curve = fit_obj.fit(doses)
 
-    df = len(doses) - 4
+        # F test vs flat linear "no effect" fit
+        ssq_model = ((response_curve - responses) ** 2).sum()
+        ssq_null = ((np.mean(responses) - responses) ** 2).sum()
 
-    f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
-    p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
+        df = len(doses) - 4
 
-    if p > null_rejection_threshold:
-        return HillCurveNull(np.mean(responses))
+        f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
+        p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
+
+        if p > null_rejection_threshold:
+            return HillCurveNull(np.mean(responses))
 
     if fit_obj.ec50 < np.min(doses):
         # Reject fit if EC50 less than min dose
         return None
 
     return fit_obj
+
+
+def _response_transform(y, c_val, d_val):
+    return np.log((d_val - y) / (y - c_val))
+
+
+def _find_be_ll4(x, y, c_val, d_val, slope_scaling_factor=1,
+                 dose_transform=np.log,
+                 dose_inv_transform=np.exp):
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+        dose_transform(x),
+        _response_transform(y, c_val, d_val)
+    )
+    b_val = slope_scaling_factor * slope
+    e_val = dose_inv_transform(-intercept / (slope_scaling_factor * b_val))
+
+    return b_val, e_val
+
+
+def _find_cd_ll4(y, scale=0.001):
+    ymin = np.min(y)
+    ymax = np.max(y)
+    len_y_range = scale * (ymax - ymin)
+
+    return ymin - len_y_range, ymax + len_y_range
