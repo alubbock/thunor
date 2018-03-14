@@ -343,9 +343,10 @@ def plot_drc(fit_params, is_absolute=False,
                     format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
-                annotation_label += 'E<sub>max</sub>{}: {:.5g}'.format(
+                annotation_label += 'E<sub>max{}</sub>{}: {:.5g}'.format(
+                    ' rel' if not is_absolute else '',
                     '*' if fp.fit_obj.emax < fp.emax else '',
-                    fp.emax)
+                    fp.emax if is_absolute else fp.emax_rel)
             if annotation_label:
                 hovermsgs = []
                 hovertext = None
