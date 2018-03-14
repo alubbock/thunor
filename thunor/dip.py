@@ -395,8 +395,10 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             emax_rel = emax / divisor
 
         ec50 = None
+        hill = None
         if fit_obj is not None and not isinstance(fit_obj, HillCurveNull):
             ec50 = np.min((fit_obj.ec50, max_dose_measured))
+            hill = fit_obj.hill_slope
 
         fit_data = dict(
             label=group_name_disp,
@@ -405,6 +407,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             drug=dr_name,
             divisor=divisor,
             fit_obj=fit_obj,
+            hill=hill,
             emax=emax,
             emax_rel=emax_rel,
             emax_obs=emax_obs,

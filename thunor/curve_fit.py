@@ -21,6 +21,10 @@ class HillCurve(object):
         pass
 
     @abstractmethod
+    def divisor(self):
+        pass
+
+    @abstractmethod
     def ec50(self):
         pass
 
@@ -30,6 +34,10 @@ class HillCurve(object):
 
     @abstractmethod
     def emax(self):
+        pass
+
+    @abstractmethod
+    def hill_slope(self):
         pass
 
 
