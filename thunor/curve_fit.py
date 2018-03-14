@@ -32,9 +32,101 @@ class HillCurve(object):
     def emax(self):
         pass
 
-    @abstractmethod
+
+class HillCurveNull(HillCurve):
+    @classmethod
+    def fit_fn(cls, x, ymean):
+        return ymean
+
+    @classmethod
+    def initial_guess(cls, x, y):
+        return np.mean(y)
+
+    @property
+    def divisor(self):
+        return self.popt
+
+    def ic(self, ic_num=50):
+        return None
+
+    def ec(self, ec_num=50):
+        return None
+
     def hill_slope(self):
-        pass
+        return None
+
+
+class HillCurveLL4(HillCurve):
+    def __init__(self, popt):
+        super(HillCurveLL4, self).__init__(popt)
+        self._popt_rel = None
+
+    @classmethod
+    def fit_fn(cls, x, b, c, d, e):
+        """
+        Four parameter log-logistic function ("Hill curve")
+
+        Parameters
+        ----------
+        x: np.ndarray
+            One-dimensional array of "x" values
+        b: float
+            Hill slope
+        c: float
+            Minimum response (lower plateau)
+        d: float
+            Maximum response (upper plateau)
+        e: float
+            EC50 value
+
+        Returns
+        -------
+        np.ndarray
+            Array of "y" values using the supplied curve fit parameters on "x"
+        """
+        return c + (d - c) / (1 + np.exp(b * (np.log(x) - np.log(e))))
+
+    @classmethod
+    def initial_guess(cls, x, y):
+        """
+        Heuristic function for initial fit values
+
+        Uses the approach followed by R's drc library:
+        https://cran.r-project.org/web/packages/drc/index.html
+
+        Parameters
+        ----------
+        x: np.ndarray
+            Array of "x" (dose) values
+        y: np.ndarray
+            Array of "y" (response) values
+
+        Returns
+        -------
+        list
+            Four-valued list corresponding to initial estimates of the
+            parameters defined in the :func:`ll4` function.
+        """
+        c_val, d_val = _find_cd_ll4(y)
+        b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
+
+        return b_val, c_val, d_val, e_val
+
+    @property
+    def ec50(self):
+        return self.popt[3]
+
+    @property
+    def e0(self):
+        return self.popt[2]
+
+    @property
+    def emax(self):
+        return self.popt[1]
+
+    @property
+    def hill_slope(self):
+        return self.popt[0]
 
     def ic(self, ic_num=50):
         """
@@ -143,93 +235,6 @@ class HillCurve(object):
 
         return np.log10((ec50_hill + max_conc ** self.hill_slope) /
                         ec50_hill) * ((e0 - emax) / e0) / self.hill_slope
-
-
-class HillCurveNull(HillCurve):
-    @classmethod
-    def fit_fn(cls, x, ymean):
-        return ymean
-
-    @classmethod
-    def initial_guess(cls, x, y):
-        return np.mean(y)
-
-    @property
-    def divisor(self):
-        return self.popt
-
-
-class HillCurveLL4(HillCurve):
-    def __init__(self, popt):
-        super(HillCurveLL4, self).__init__(popt)
-        self._popt_rel = None
-
-    @classmethod
-    def fit_fn(cls, x, b, c, d, e):
-        """
-        Four parameter log-logistic function ("Hill curve")
-
-        Parameters
-        ----------
-        x: np.ndarray
-            One-dimensional array of "x" values
-        b: float
-            Hill slope
-        c: float
-            Minimum response (lower plateau)
-        d: float
-            Maximum response (upper plateau)
-        e: float
-            EC50 value
-
-        Returns
-        -------
-        np.ndarray
-            Array of "y" values using the supplied curve fit parameters on "x"
-        """
-        return c + (d - c) / (1 + np.exp(b * (np.log(x) - np.log(e))))
-
-    @classmethod
-    def initial_guess(cls, x, y):
-        """
-        Heuristic function for initial fit values
-
-        Uses the approach followed by R's drc library:
-        https://cran.r-project.org/web/packages/drc/index.html
-
-        Parameters
-        ----------
-        x: np.ndarray
-            Array of "x" (dose) values
-        y: np.ndarray
-            Array of "y" (response) values
-
-        Returns
-        -------
-        list
-            Four-valued list corresponding to initial estimates of the
-            parameters defined in the :func:`ll4` function.
-        """
-        c_val, d_val = _find_cd_ll4(y)
-        b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
-
-        return b_val, c_val, d_val, e_val
-
-    @property
-    def ec50(self):
-        return self.popt[3]
-
-    @property
-    def e0(self):
-        return self.popt[2]
-
-    @property
-    def emax(self):
-        return self.popt[1]
-
-    @property
-    def hill_slope(self):
-        return self.popt[0]
 
     @property
     def divisor(self):
