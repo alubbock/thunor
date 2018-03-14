@@ -236,7 +236,6 @@ def plot_drc(fit_params, is_absolute=False,
         line_mode = 'lines'
         if fp.fit_obj is None:
             # Curve fit numerical error or QC failure
-            dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
