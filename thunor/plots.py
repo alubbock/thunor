@@ -747,8 +747,8 @@ def plot_drc_params(df_params, fit_param,
         layout['hovermode'] = 'closest'
         layout['showlegend'] = False
     elif not aggregate_cell_lines and not aggregate_drugs:
-        sort_by = [fit_param_sort, fit_param] if fit_param_sort is not None \
-                   else fit_param
+        sort_by = [fit_param_sort, 'label'] if fit_param_sort is not None \
+                   else [fit_param, 'label']
         df_params = df_params.sort_values(by=sort_by)
         groups = df_params['label']
         yvals = df_params[fit_param]
@@ -850,10 +850,10 @@ def plot_drc_params(df_params, fit_param,
         else:
             # Sort by fit_column_sort, with tie breakers determined by
             # fit_param
-            median_cols = yvals.loc[:, [fit_param_sort, fit_param]].groupby(
+            median_cols = yvals.loc[:, [fit_param_sort, 'label']].groupby(
                 level=aggregate_by).transform(np.nanmedian)
             median_cols.rename(columns={fit_param_sort: 'median',
-                                        fit_param: 'median2'},
+                                        'label': 'median2'},
                                inplace=True)
             yvals = pd.concat([yvals, median_cols], axis=1)
             yvals.set_index(['median', 'median2'], append=True, inplace=True)
