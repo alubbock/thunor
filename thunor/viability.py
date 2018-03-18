@@ -2,6 +2,8 @@ from datetime import timedelta
 from thunor.dip import dip_fit_params
 from thunor.curve_fit import HillCurveLL3u
 
+SECONDS_IN_HOUR = 3600
+
 
 def viability(df_data, time_hrs=72, assay_name=None):
     """
@@ -69,6 +71,11 @@ def viability(df_data, time_hrs=72, assay_name=None):
     df.set_index(final_idx_cols, inplace=True)
 
     df['viability'] = df['value'] / df['value_ctrl']
+
+    timepoints = df['timepoint'].unique()
+    if len(timepoints) == 1:
+        time_hrs = timepoints[0].astype('timedelta64[h]').item()\
+                       .total_seconds() / SECONDS_IN_HOUR
 
     df._viability_time = time_hrs
     df._viability_assay = assay_name
