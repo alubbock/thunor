@@ -690,6 +690,30 @@ def read_hdf(filename_or_buffer):
     HtsPandas
         Thunor HTS dataset
     """
+    hts_pandas = _read_hdf_unstacked(filename_or_buffer)
+
+    df_doses = hts_pandas.doses
+
+    # Aggregate multi-drugs into single column and drop the separates
+    df_doses.reset_index(inplace=True)
+    if 'drug' not in df_doses.columns:
+        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+    else:
+        df_doses['drug'] = df_doses['drug'].transform(lambda x: (x, ))
+    if 'dose' not in df_doses.columns:
+        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+    else:
+        df_doses['dose'] = df_doses['dose'].transform(lambda x: (x, ))
+    df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
+                  axis=1, inplace=True)
+    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
+
+    return hts_pandas
+
+
+def _read_hdf_unstacked(filename_or_buffer):
     hdf_kwargs = {'mode': 'r'}
     if isinstance(filename_or_buffer, str):
         hdf_kwargs['path'] = filename_or_buffer
@@ -707,21 +731,5 @@ def read_hdf(filename_or_buffer):
         except KeyError:
             df_controls = None
         df_doses = hdf['doses']
-
-    # Aggregate multi-drugs into single column and drop the separates
-    df_doses.reset_index(inplace=True)
-    if 'drug' not in df_doses.columns:
-        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
-            tuple, axis=1)
-    else:
-        df_doses['drug'] = df_doses['drug'].transform(lambda x: (x, ))
-    if 'dose' not in df_doses.columns:
-        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
-            tuple, axis=1)
-    else:
-        df_doses['dose'] = df_doses['dose'].transform(lambda x: (x, ))
-    df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
-                  axis=1, inplace=True)
-    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
 
     return HtsPandas(df_doses, df_assays, df_controls)
