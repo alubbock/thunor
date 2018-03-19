@@ -34,21 +34,28 @@ def viability(df_data, time_hrs=72, assay_name=None):
 
     time = timedelta(hours=time_hrs)
 
+    # Select assay per dataset
+    if 'dataset' in df_data.doses.index.names:
+        assays = df_data.assays.reset_index('assay')
+    else:
+        if assay_name is None:
+            assay_name = df_data.dip_assay_name
+        assays = df_data.assays.loc[assay_name]
+
     # Filter assays by nearest timepoint
-    if assay_name is None:
-        assay_name = df_data.dip_assay_name
-
-    assays = df_data.assays.loc[assay_name]
-
     assays = _get_closest_timepoint_for_each_well(assays, time)
     assays.reset_index('timepoint', inplace=True)
 
     # Merge counts with well annotations
     df = df_data.doses.merge(assays, left_on='well_id', right_index=True)
 
-    # Filter controls by nearest timepoint
-    if 'dataset' in df_data.controls.index.names:
-        controls = df_data.controls.loc[(slice(None), assay_name), :]
+    if 'dataset' in df_data.doses.index.names:
+        dataset_assays = df.groupby('dataset')['assay'].unique()
+        if not (dataset_assays.apply(len) == 1).all():
+            raise NotImplementedError('Cannot calculate viability across two '
+                                      'datasets when the datasets are '
+                                      'multi-assay')
+        controls = df_data.controls.reset_index('assay', drop=True)
     else:
         controls = df_data.controls.loc[assay_name]
     controls = _get_closest_timepoint_for_each_well(controls, time)
