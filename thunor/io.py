@@ -361,8 +361,10 @@ class HtsPandas(object):
 
             if ctrl_dip is not None:
                 # Need to re-merge in the well numbers in the control data
-                controls = new_dset.controls.loc[new_dset.dip_assay_name,
-                                                 'well_num']
+                controls = new_dset.controls
+                if 'dataset' in controls.index.names:
+                    controls = controls.reset_index('dataset', drop=True)
+                controls = controls.loc[new_dset.dip_assay_name, 'well_num']
                 controls.reset_index(['cell_line', 'plate', 'timepoint'],
                                      drop=True, inplace=True)
                 controls.drop_duplicates(inplace=True)
@@ -514,15 +516,13 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     if multi_drug:
         doses_cols += ["drug2", "drug2.conc"]
-
-    df_doses = df[doses_cols]
-    if multi_drug:
-        df_doses = df_doses[
-            np.logical_or(df_doses["drug1.conc"] > 0,
-                          df_doses["drug2.conc"] > 0)
-        ]
+        expt_rows = np.logical_or(df["drug1.conc"] > 0,
+                                  df["drug2.conc"] > 0)
     else:
-        df_doses = df_doses[df_doses["drug1.conc"] > 0]
+        expt_rows = df["drug1.conc"] > 0
+
+    df_doses = df[expt_rows]
+    df_doses = df_doses.loc[:, doses_cols]
     # Suppress warnings about altering a dataframe slice
     df_doses.is_copy = False
     df_doses.reset_index(inplace=True)
@@ -551,14 +551,11 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     df_doses.reset_index(level='well_id', inplace=True)
     df_doses.sort_index(inplace=True)
 
-    # df_controls
-    try:
-        df_controls = df[df['drug1.conc'] == 0.0]
-        if multi_drug:
-            df_controls = df_controls[df_controls['drug2.conc'] == 0.0]
-        df_controls = df_controls[["cell.line", "time", 'cell.count']]
-    except KeyError:
+    df_controls = df[np.logical_not(expt_rows)]
+    if df_controls.empty:
         df_controls = None
+    else:
+        df_controls = df_controls[["cell.line", "time", 'cell.count']]
 
     if df_controls is not None:
         df_controls.reset_index(inplace=True)
@@ -575,7 +572,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     # df_vals
     df_vals = df[['time', 'cell.count']]
-    df_vals = df_vals[df_vals.index.get_level_values(level='well') != 0]
+    df_vals = df_vals[expt_rows]
     df_vals.index = ["{}__{}".format(a_, b_) for a_, b_ in
                      df_vals.index.tolist()]
     df_vals.index.name = 'well_id'
@@ -610,11 +607,18 @@ def write_vanderbilt_hts(df_data, filename, plate_width=24,
     if sep is None:
         sep = _select_csv_separator(filename)
 
+    # Check the object contains only a single dataset
+    doses = df_data.doses_unstacked().reset_index()
+    if 'dataset' in doses.columns:
+        if len(doses['dataset'].unique()) != 1:
+            raise ValueError('Cannot save object containing more than one HTS '
+                             'dataset to this file format')
+        doses = doses.drop(columns='dataset')
+
     # Construct a unified dataframe
     assays = df_data.assays.loc[df_data.dip_assay_name].reset_index()
     assays.set_index('well_id', inplace=True)
 
-    doses = df_data.doses_unstacked().reset_index()
     doses.set_index('well_id', inplace=True)
     doses.rename({'plate_id': 'plate'}, axis='columns', inplace=True)
 
@@ -622,7 +626,14 @@ def write_vanderbilt_hts(df_data, filename, plate_width=24,
 
     # Add controls, if applicable
     if df_data.controls is not None:
-        controls = df_data.controls.loc[df_data.dip_assay_name].reset_index()
+        controls = df_data.controls
+        if 'dataset' in controls.index.names:
+            if len(controls.index.get_level_values('dataset').unique()) != 1:
+                raise ValueError('Cannot save object containing more than one '
+                                 'HTS dataset to this file format')
+            controls = controls.reset_index('dataset', drop=True)
+
+        controls = controls.loc[df_data.dip_assay_name].reset_index()
         controls.set_index('well_id', inplace=True)
         controls['drug1'] = 'control'
         controls['dose1'] = 0.0

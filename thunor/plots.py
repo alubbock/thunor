@@ -198,7 +198,7 @@ def plot_drc(fit_params, is_absolute=False,
     if title is None:
         title = _make_title('Dose response', fit_params)
     if subtitle is None:
-        subtitle = " &amp; ".join(datasets)
+        subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     annotations = []
@@ -234,12 +234,15 @@ def plot_drc(fit_params, is_absolute=False,
 
         line_dash = 'solid'
         line_mode = 'lines'
+        hoverinfo = 'all'
         if fp.fit_obj is None:
             # Curve fit numerical error or QC failure
+            doses = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
                 group_name_disp)
+            hoverinfo = 'none'
         elif isinstance(fp.fit_obj, HillCurveNull):
             # No effect null hypothesis
             dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * \
@@ -259,6 +262,7 @@ def plot_drc(fit_params, is_absolute=False,
                                        'color': this_colour,
                                        'dash': line_dash,
                                        'width': 3},
+                                 hoverinfo=hoverinfo,
                                  legendgroup=group_name_disp,
                                  showlegend=not show_replicates or
                                             multi_dataset,
@@ -415,7 +419,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         title = _make_title('Dose response parameters', df_params)
     if subtitle is None:
         datasets = df_params.index.get_level_values('dataset_id').unique()
-        subtitle = " &amp; ".join(datasets)
+        subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     df_params = df_params.loc[:, [fit_param, 'max_dose_measured']]
@@ -613,7 +617,7 @@ def plot_drc_params(df_params, fit_param,
         title = _make_title('Dose response parameters', df_params)
     if subtitle is None:
         datasets = df_params.index.get_level_values('dataset_id').unique()
-        subtitle = " &amp; ".join(datasets)
+        subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     yaxis_param_name = _get_param_name(fit_param)

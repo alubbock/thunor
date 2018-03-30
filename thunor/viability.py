@@ -55,6 +55,7 @@ def viability(df_data, time_hrs=72, assay_name=None):
             raise NotImplementedError('Cannot calculate viability across two '
                                       'datasets when the datasets are '
                                       'multi-assay')
+    if 'dataset' in df_data.controls.index.names:
         controls = df_data.controls.reset_index('assay', drop=True)
     else:
         controls = df_data.controls.loc[assay_name]

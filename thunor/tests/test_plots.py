@@ -13,7 +13,7 @@ class TestWithDataset(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.filename = pkg_resources.resource_filename('thunor',
-                                                       'testdata/VU001.h5')
+                                                       'testdata/hts007.h5')
         cls.dataset = thunor.io.read_hdf(cls.filename)
         ctrl_dip_data, expt_dip_data = thunor.dip.dip_rates(cls.dataset)
 
