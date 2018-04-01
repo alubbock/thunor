@@ -306,7 +306,7 @@ class HillCurveLL3u(HillCurveLL4):
 
 
 def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
-            null_rejection_threshold=0.05):
+            null_rejection_threshold=0.05, ctrl_dose=None):
     """
     Fit a dose response curve
 
@@ -324,6 +324,10 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     null_rejection_threshold: float, optional
         p-value for rejecting curve fit against no effect "flat" response
         model by F-test (default: 0.05). Set to None to skip test.
+    ctrl_dose: float, optional
+        Enter the dose used to represent control values, if you wish to reject
+        fits where E0 is not greater than a standard deviation higher than the
+        mean of the control response values. Leave as None to skip the test.
 
     Returns
     -------
@@ -372,6 +376,11 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     if fit_obj.ec50 < np.min(doses):
         # Reject fit if EC50 less than min dose
         return None
+
+    if ctrl_dose is not None:
+        controls = responses[np.equal(doses, ctrl_dose)]
+        if fit_obj.e0 > (np.mean(controls) + np.std(controls)):
+            return None
 
     return fit_obj
 

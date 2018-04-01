@@ -1010,7 +1010,7 @@ def plot_time_course(hts_pandas,
         df_controls = df_controls.loc[assay]
 
         # Only use controls from the plates in the expt data
-        plates = df_doses['plate_id'].unique()
+        plates = df_doses['plate'].unique()
         df_controls = df_controls.loc[(slice(None), plates), :]
     df_vals = df_vals.loc[assay]
 

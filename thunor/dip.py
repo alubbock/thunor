@@ -331,26 +331,34 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
         group_name_disp = "\n".join(group_name_components)
 
-        try:
-            if dataset is None and 'dataset' in ctrl_dip_data.index.names:
-                raise ValueError('Experimental data does not have "dataset" '
-                                 'in index, but control data does. Please '
-                                 'make sure "dataset" is in both dataframes, '
-                                 'or neither.')
+        if dataset is None and 'dataset' in ctrl_dip_data.index.names:
+            raise ValueError('Experimental data does not have "dataset" '
+                             'in index, but control data does. Please '
+                             'make sure "dataset" is in both dataframes, '
+                             'or neither.')
+
+        ctrl_dip_data_cl = None
+        dip_ctrl = []
+        dip_ctrl_std_err = []
+
+        if ctrl_dip_data is not None:
             if dataset is None:
                 ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
             else:
                 ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
+
+        if ctrl_dip_data_cl is not None:
             # Only use controls from the same plates as the expt
-            plates = dip_grp.index.get_level_values('plate').unique().values
+            if 'plate' in dip_grp.index.names:
+                plates = dip_grp.index.get_level_values('plate').unique().values
+            elif 'plate' in dip_grp.columns:
+                plates = dip_grp['plate'].unique()
+            else:
+                plates = []
             ctrl_dip_data_cl = ctrl_dip_data_cl.loc[plates]
 
             dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
             dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
-        except (KeyError, AttributeError):
-            ctrl_dip_data_cl = None
-            dip_ctrl = []
-            dip_ctrl_std_err = []
 
         doses_expt = dip_grp.index.get_level_values('dose').values
 
@@ -364,7 +372,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         else:
             n_controls = len(dip_ctrl)
 
-            doses_ctrl = np.repeat(ctrl_dose_fn(doses_expt), n_controls)
+            ctrl_dose_val = ctrl_dose_fn(doses_expt)
+            doses_ctrl = np.repeat(ctrl_dose_val, n_controls)
             doses = np.concatenate((doses_ctrl, doses_expt))
             resp_expt = dip_grp['dip_rate'].values
             dip_all = np.concatenate((dip_ctrl, resp_expt))

@@ -256,9 +256,12 @@ class HtsPandas(object):
         if plate is not None:
             if isinstance(plate, str):
                 plate = [plate, ]
-            doses = doses.loc[doses['plate_id'].isin(plate), :]
-            controls = controls.iloc[controls.index.isin(
-                plate, level='plate'), :]
+
+            if 'plate' in doses.columns:
+                doses.set_index('plate', append=True, inplace=True)
+
+            doses = doses[doses.index.isin(plate, level='plate')]
+            controls = controls[controls.index.isin(plate, level='plate')]
 
         if cell_lines is not None:
             doses = doses.iloc[doses.index.isin(
@@ -384,13 +387,25 @@ class HtsPandas(object):
                 # Merge ctrl_dip into expt_dip by well_num
                 expt_dip = pd.concat([ctrl_dip, expt_dip])
 
-            dip_values = list(expt_dip.reindex(range(plate_size)).values)
+            dip_values = expt_dip.reindex(range(plate_size))
+            dip_values = list(dip_values.where((pd.notnull(dip_values)), None))
 
         new_dset.doses.reset_index(inplace=True)
         new_dset.doses.set_index('well_num', inplace=True)
         doses = new_dset.doses.reindex(range(plate_size))
         # Replace NaN with None
         doses = doses.where((pd.notnull(doses)), None)
+
+        cell_lines = []
+        ctrls = new_dset.controls.reset_index().set_index('well_num')
+        for i in range(plate_size):
+            if doses.cell_line[i] is not None:
+                cell_lines.append(doses.cell_line[i])
+            else:
+                try:
+                    cell_lines.append(ctrls.loc[i]['cell_line'].iloc[0])
+                except KeyError:
+                    cell_lines.append(None)
 
         width, height = PlateMap.plate_size_from_num_wells(plate_size)
 
@@ -399,7 +414,7 @@ class HtsPandas(object):
             height=height,
             dataset_name=None,
             plate_name=plate_name,
-            cell_lines=list(doses.cell_line),
+            cell_lines=cell_lines,
             drugs=list(doses.drug),
             doses=list(doses.dose),
             dip_rates=dip_values
@@ -541,11 +556,11 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
             df_doses.transform({'drug1.conc': lambda x: (x, ),
                                 'drug1': lambda x: (x, )})
 
-    df_doses.columns = ('plate_id', 'well_id', 'dose', 'cell_line', 'drug',
+    df_doses.columns = ('plate', 'well_id', 'dose', 'cell_line', 'drug',
                         'well_num')
     df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'],
                        inplace=True)
-    # df_doses.drop('plate_id', axis=1, inplace=True)
+    # df_doses.drop('plate', axis=1, inplace=True)
 
     df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
     df_doses.reset_index(level='well_id', inplace=True)
@@ -620,7 +635,6 @@ def write_vanderbilt_hts(df_data, filename, plate_width=24,
     assays.set_index('well_id', inplace=True)
 
     doses.set_index('well_id', inplace=True)
-    doses.rename({'plate_id': 'plate'}, axis='columns', inplace=True)
 
     df = doses.merge(assays, how='outer', left_index=True, right_index=True)
 
@@ -704,6 +718,12 @@ def read_hdf(filename_or_buffer):
     hts_pandas = _read_hdf_unstacked(filename_or_buffer)
 
     df_doses = hts_pandas.doses
+
+    # Change from plate_id to plate
+    if 'plate_id' in df_doses.index.names:
+        df_doses.index.rename('plate', level='plate_id', inplace=True)
+    elif 'plate_id' in df_doses.columns:
+        df_doses.rename(columns={'plate_id': 'plate'}, inplace=True)
 
     # Aggregate multi-drugs into single column and drop the separates
     df_doses.reset_index(inplace=True)
