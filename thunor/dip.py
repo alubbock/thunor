@@ -342,10 +342,12 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         dip_ctrl_std_err = []
 
         if ctrl_dip_data is not None:
-            if dataset is None:
-                ctrl_dip_data_cl = ctrl_dip_data.loc[cl_name]
+            if dataset is not None and 'dataset' in ctrl_dip_data.index.names:
+                ctrl_dip_data_cl = ctrl_dip_data.loc[dataset]
             else:
-                ctrl_dip_data_cl = ctrl_dip_data.loc[dataset, cl_name]
+                ctrl_dip_data_cl = ctrl_dip_data
+
+            ctrl_dip_data_cl = ctrl_dip_data_cl.loc[cl_name]
 
         if ctrl_dip_data_cl is not None:
             # Only use controls from the same plates as the expt
