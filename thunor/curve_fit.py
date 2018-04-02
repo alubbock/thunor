@@ -334,12 +334,21 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     HillCurve
         A HillCurve object containing the fit parameters
     """
+    # Remove any NaNs
     response_nans = np.isnan(responses)
     if np.any(response_nans):
         doses = doses[~response_nans]
         responses = responses[~response_nans]
         if response_std_errs is not None:
             response_std_errs = response_std_errs[~response_nans]
+
+    # Sort the data - curve fit can be sensitive to order!
+    if response_std_errs is None:
+        doses, responses = zip(*sorted(zip(doses, responses)))
+    else:
+        doses, responses, response_std_errs = zip(*sorted(zip(
+            doses, responses, response_std_errs)))
+
     curve_initial_guess = fit_cls.initial_guess(doses, responses)
     try:
         popt, pcov = scipy.optimize.curve_fit(fit_cls.fit_fn,
