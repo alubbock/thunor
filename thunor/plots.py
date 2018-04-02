@@ -2,13 +2,16 @@ import plotly.graph_objs as go
 import numpy as np
 import seaborn as sns
 from .helpers import format_dose
-from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated, \
-    PARAM_EQUAL_ATOL, PARAM_EQUAL_RTOL
+from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated
 from thunor.curve_fit import HillCurveNull
 import scipy.stats
 import re
 import pandas as pd
 import collections
+
+
+class CannotPlotError(ValueError):
+    pass
 
 
 def _activity_area_units(**kwargs):
@@ -101,7 +104,7 @@ def _get_param_units(param_id):
 
 
 def _out_of_range_msg(param_id):
-    return '{} truncated to maximum measured concentration'.format(
+    return '{} truncated to limit of measured concentrations'.format(
         _get_param_name(param_id)
     )
 
@@ -200,6 +203,11 @@ def plot_drc(fit_params, is_absolute=False,
     if subtitle is None:
         subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
+
+    if show_annotations:
+        fit_params = fit_params.copy()
+        fit_params['ec50_truncated'] = is_param_truncated(fit_params, 'ec50')
+        fit_params['ic50_truncated'] = is_param_truncated(fit_params, 'ic50')
 
     annotations = []
     traces = []
@@ -328,22 +336,14 @@ def plot_drc(fit_params, is_absolute=False,
 
         if show_annotations:
             annotation_label = ''
-            ec50_truncated = False
-            ic50_truncated = False
             if fp.ec50 is not None:
-                ec50_truncated = np.allclose(fp.ec50, fp.max_dose_measured,
-                                             atol=PARAM_EQUAL_ATOL,
-                                             rtol=PARAM_EQUAL_RTOL)
                 annotation_label += 'EC<sub>50</sub>{}: {} '.format(
-                    '*' if ec50_truncated else '',
+                    '*' if fp.ec50_truncated else '',
                     format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
-                ic50_truncated = np.allclose(fp.ic50, fp.max_dose_measured,
-                                             atol=PARAM_EQUAL_ATOL,
-                                             rtol=PARAM_EQUAL_RTOL)
                 annotation_label += 'IC<sub>50</sub>{}: {} '.format(
-                    '*' if ic50_truncated else '',
+                    '*' if fp.ic50_truncated else '',
                     format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
@@ -354,9 +354,9 @@ def plot_drc(fit_params, is_absolute=False,
             if annotation_label:
                 hovermsgs = []
                 hovertext = None
-                if ec50_truncated:
+                if fp.ec50_truncated:
                     hovermsgs.append(_out_of_range_msg('ec50'))
-                if ic50_truncated:
+                if fp.ic50_truncated:
                     hovermsgs.append(_out_of_range_msg('ic50'))
                 if hovermsgs:
                     hovertext = '*' + '<br>'.join(hovermsgs)
@@ -422,7 +422,9 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
-    df_params = df_params.loc[:, [fit_param, 'max_dose_measured']]
+    df_params = df_params.loc[:, [fit_param,
+                                  'max_dose_measured',
+                                  'min_dose_measured']]
     df_params.dropna(subset=[fit_param], inplace=True)
     df_params.reset_index(inplace=True)
     df_params = df_params.pivot_table(index=['cell_line', 'drug'], columns=[
@@ -430,16 +432,16 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     df_params.dropna(inplace=True)
 
     if len(df_params.index) == 0:
-        raise ValueError('Dataset vs dataset scatter plot is empty. Check '
-                         'the cell lines and drugs in the two datasets '
-                         'overlap. If you want a bar plot instead, choose an '
-                         'ordering parameter.')
+        raise CannotPlotError(
+            'Dataset vs dataset scatter plot is empty. Check the cell lines '
+            'and drugs in the two datasets overlap. If you want a bar plot '
+            'instead, choose an ordering parameter.')
 
     if len(df_params.columns) < 4:
-        raise ValueError('The cell lines and/or drugs selected only have '
-                         'data in one of the two datasets, so a scatter plot '
-                         'cannot be created. If you want a bar plot instead, '
-                         'choose an ordering parameter.')
+        raise CannotPlotError(
+            'The cell lines and/or drugs selected only have data in one of '
+            'the two datasets, so a scatter plot cannot be created. If you '
+            'want a bar plot instead, choose an ordering parameter.')
 
     colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
@@ -517,11 +519,12 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         for i in (0, 1):
             tmp_df = pd.concat([
                 fit_param_data.iloc[:, i],
-                df_params.loc[:, 'max_dose_measured'].iloc[:, i]
-            ],
-            axis=1
-            )
-            tmp_df.columns = [fit_param, 'max_dose_measured']
+                df_params.loc[:, 'max_dose_measured'].iloc[:, i],
+                df_params.loc[:, 'min_dose_measured'].iloc[:, i]
+            ], axis=1)
+            tmp_df.columns = [fit_param,
+                              'max_dose_measured',
+                              'min_dose_measured']
             param_truncated = is_param_truncated(tmp_df, fit_param)
             addtxt = ['<br> {} {}'.format(dataset_names[i], msg) if x else
                       '' for x in param_truncated]
@@ -597,8 +600,9 @@ def plot_drc_params(df_params, fit_param,
         A plotly figure object containing the graph
     """
     if fit_param_compare and (aggregate_cell_lines or aggregate_drugs):
-        raise ValueError('Aggregation is not available when comparing two '
-                         'dose response parameters')
+        raise CannotPlotError(
+            'Aggregation is not available when comparing two dose response '
+            'parameters')
 
     if multi_dataset and fit_param_compare is None and \
             not aggregate_cell_lines and \
@@ -644,9 +648,10 @@ def plot_drc_params(df_params, fit_param,
         df_params.dropna(subset=[fit_param, fit_param_compare],
                          inplace=True)
         if df_params.empty:
-            raise ValueError('No data exists for this selection. This may be '
-                             'due to missing drug/cell line combinations, or '
-                             'undefined parameters for the selection.')
+            raise CannotPlotError(
+                'No data exists for this selection. This may be due to '
+                'missing drug/cell line combinations, or undefined parameters '
+                'for the selection.')
         if fit_param == fit_param_compare:
             xdat = df_params.loc[:, fit_param]
             ydat = xdat

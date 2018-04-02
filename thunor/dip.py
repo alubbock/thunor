@@ -385,7 +385,8 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
             fit_obj = fit_drc(
                 doses, dip_all, dip_std_errs,
-                fit_cls=fit_cls
+                fit_cls=fit_cls,
+                # ctrl_dose=ctrl_dose_val
             )
 
         max_dose_measured = np.max(doses)
@@ -409,6 +410,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
         hill = None
         if fit_obj is not None and not isinstance(fit_obj, HillCurveNull):
             ec50 = np.min((fit_obj.ec50, max_dose_measured))
+            ec50 = np.max((ec50, min_dose_measured))
             hill = fit_obj.hill_slope
 
         fit_data = dict(
@@ -424,6 +426,7 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
             emax_obs=emax_obs,
             emax_obs_rel=emax_obs_rel,
             ec50=ec50,
+            min_dose_measured=min_dose_measured,
             max_dose_measured=max_dose_measured,
         )
 
@@ -470,8 +473,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                     ic_n = fit_obj.ic(ic_num=ic_num)
 
                 if ic_n is not None:
-                    fit_data['ic{:d}'.format(ic_num)] = \
-                        np.min((ic_n, max_dose_measured))
+                    ic_n = np.min((ic_n, max_dose_measured))
+                    ic_n = np.max((ic_n, min_dose_measured))
+                    fit_data['ic{:d}'.format(ic_num)] = ic_n
                 else:
                     fit_data['ic{:d}'.format(ic_num)] = None
 
@@ -488,8 +492,9 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                     ec_n = fit_obj.ec(ec_num=ec_num)
 
                 if ec_n is not None:
-                    fit_data['ec{:d}'.format(ec_num)] = \
-                        np.min((ec_n, max_dose_measured))
+                    ec_n = np.min((ec_n, max_dose_measured))
+                    ec_n = np.max((ec_n, min_dose_measured))
+                    fit_data['ec{:d}'.format(ec_num)] = ec_n
                 else:
                     fit_data['ec{:d}'.format(ec_num)] = None
 
@@ -545,7 +550,10 @@ def is_param_truncated(df_params, param_name):
         Array of booleans showing whether each entry in the DataFrame is
         truncated
     """
-    return np.isclose(df_params[param_name].fillna(value=np.nan),
-                      df_params['max_dose_measured'],
-                      atol=PARAM_EQUAL_ATOL,
-                      rtol=PARAM_EQUAL_RTOL)
+    values = df_params[param_name].fillna(value=np.nan)
+    return np.isclose(
+        values, df_params['max_dose_measured'],
+        atol=PARAM_EQUAL_ATOL, rtol=PARAM_EQUAL_RTOL) | np.isclose(
+        values, df_params['min_dose_measured'],
+        atol=PARAM_EQUAL_ATOL, rtol=PARAM_EQUAL_RTOL
+    )
