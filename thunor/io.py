@@ -719,12 +719,6 @@ def read_hdf(filename_or_buffer):
 
     df_doses = hts_pandas.doses
 
-    # Change from plate_id to plate
-    if 'plate_id' in df_doses.index.names:
-        df_doses.index.rename('plate', level='plate_id', inplace=True)
-    elif 'plate_id' in df_doses.columns:
-        df_doses.rename(columns={'plate_id': 'plate'}, inplace=True)
-
     # Aggregate multi-drugs into single column and drop the separates
     df_doses.reset_index(inplace=True)
     if 'drug' not in df_doses.columns:
@@ -762,5 +756,11 @@ def _read_hdf_unstacked(filename_or_buffer):
         except KeyError:
             df_controls = None
         df_doses = hdf['doses']
+
+    # Change from plate_id to plate
+    if 'plate_id' in df_doses.index.names:
+        df_doses.index.rename('plate', level='plate_id', inplace=True)
+    elif 'plate_id' in df_doses.columns:
+        df_doses.rename(columns={'plate_id': 'plate'}, inplace=True)
 
     return HtsPandas(df_doses, df_assays, df_controls)
