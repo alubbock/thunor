@@ -9,3 +9,4 @@ Thunor Modules Reference
    curve_fit
    plots
    helpers
+   converters
