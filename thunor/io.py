@@ -9,6 +9,9 @@ from .dip import _choose_dip_assay, dip_rates
 SECONDS_IN_HOUR = 3600
 
 
+STANDARD_PLATE_SIZES = (96, 384, 1536)
+
+
 class PlateMap(object):
     """
     Representation of a High Throughput Screening plate
@@ -296,17 +299,26 @@ class HtsPandas(object):
     def doses_unstacked(self):
         """ Split multiple drugs/doses into separate columns """
         doses = self.doses.reset_index()
-        drug_cols = doses['drug'].apply(pd.Series)
-        dose_cols = doses['dose'].apply(pd.Series)
-        n_drugs = len(drug_cols.columns)
-        drug_cols.rename(columns={n: 'drug%d' % (n + 1) for n in range(
-            n_drugs)},
-                         inplace=True)
-        dose_cols.rename(columns={n: 'dose%d' % (n + 1) for n in range(
-            n_drugs)},
-                         inplace=True)
-        doses.drop(['drug', 'dose'], axis=1, inplace=True)
-        doses = pd.concat([doses, drug_cols, dose_cols], axis=1)
+
+        n_drugs = doses['drug'].apply(len).max()
+
+        if n_drugs == 1:
+            # Single drug dataset
+            doses['drug1'] = doses['drug'].apply(lambda x: x[0])
+            doses['dose1'] = doses['dose'].apply(lambda x: x[0])
+            doses.drop(['drug', 'dose'], axis=1, inplace=True)
+        else:
+            # Multi-drug dataset
+            drug_cols = doses['drug'].apply(pd.Series)
+            dose_cols = doses['dose'].apply(pd.Series)
+            drug_cols.rename(columns={n: 'drug%d' % (n + 1) for n in range(
+                n_drugs)},
+                             inplace=True)
+            dose_cols.rename(columns={n: 'dose%d' % (n + 1) for n in range(
+                n_drugs)},
+                             inplace=True)
+            doses.drop(['drug', 'dose'], axis=1, inplace=True)
+            doses = pd.concat([doses, drug_cols, dose_cols], axis=1)
         doses.set_index(['drug%d' % (n + 1) for n in range(n_drugs)]
                         + ['cell_line'] +
                         ['dose%d' % (n + 1) for n in range(n_drugs)],
