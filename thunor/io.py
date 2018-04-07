@@ -7,9 +7,14 @@ import itertools
 from .dip import _choose_dip_assay, dip_rates
 
 SECONDS_IN_HOUR = 3600
+ZERO_TIMEDELTA = timedelta(0)
 
 
 STANDARD_PLATE_SIZES = (96, 384, 1536)
+
+
+class PlateFileParseException(Exception):
+    pass
 
 
 class PlateMap(object):
@@ -433,8 +438,8 @@ class HtsPandas(object):
         )
 
 
-def read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
-                                  plate_height=16, sep='\t'):
+def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
+                                   plate_height=16, sep='\t'):
     """
     Read a Vanderbilt HTS format file as a single dataframe
 
@@ -501,7 +506,7 @@ def _select_csv_separator(file_or_buf):
 
 
 def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
-                        sep=None):
+                        sep=None, _unstacked=False):
     """
     Read a Vanderbilt HTS format file
 
@@ -526,30 +531,83 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     if sep is None:
         sep = _select_csv_separator(file_or_source)
 
-    df = read_vanderbilt_hts_single_df(file_or_source, plate_width,
-                                       plate_height, sep=sep)
+    df = _read_vanderbilt_hts_single_df(file_or_source, plate_width,
+                                        plate_height, sep=sep)
+
+    pm = PlateMap(width=plate_width, height=plate_height)
+
+    # Sanity checks
+    if (df['cell.count'] < 0).any():
+        raise PlateFileParseException('cell.count contains negative '
+                                      'values')
+
+    if (df['time'] < ZERO_TIMEDELTA).any():
+        raise PlateFileParseException('time contains negative value(s)')
+
+    drug_no = 1
+    drug_nums = []
+    while ('drug%d' % drug_no) in df.columns.values:
+        if (df['drug%d.conc' % drug_no] < 0).any():
+            raise PlateFileParseException('drug%d.conc contains negative '
+                                          'value(s)' % drug_no)
+        for du in df['drug%d.units' % drug_no].unique():
+            if not isinstance(du, str) and np.isnan(du):
+                continue
+
+            if du != 'M':
+                raise PlateFileParseException(
+                    'Only supported drug concentration unit is M (not {})'.
+                        format(du))
+        drug_nums.append(drug_no)
+        drug_no += 1
+
+    # Check for duplicate drugs in any row
+    if len(drug_nums) == 2:
+        # Ignore rows where both concentrations are zero
+        dup_drugs = df.loc[
+                    ((df['drug1.conc'] != 0) | (df['drug2.conc'] != 0)) &
+                    df['drug1'] == df['drug2'], :]
+        if not dup_drugs.empty:
+            ind_val = dup_drugs.index.tolist()[0]
+            well_name = pm.well_id_to_name(ind_val[1])
+            raise PlateFileParseException(
+                '{} entries have the same drug listed in the same well, '
+                'e.g. plate "{}", well {}'.format(
+                    len(dup_drugs),
+                    ind_val[0],
+                    well_name
+                )
+            )
+
+    # Check for duplicate time point definitions
+    dup_timepoints = df.set_index('time', append=True)
+    if dup_timepoints.index.duplicated().any():
+        dups = dup_timepoints.loc[dup_timepoints.index.duplicated(),
+               :].index.tolist()
+        n_dups = len(dups)
+        first_dup = dups[0]
+
+        raise PlateFileParseException(
+            'There are {} duplicate time points defined, e.g. plate "{}"'
+            ', well {}, time {}'.format(
+                n_dups,
+                first_dup[0],
+                pm.well_id_to_name(first_dup[1]),
+                first_dup[2]
+            )
+        )
 
     assay_name = 'Cell count'
 
-    multi_drug = False
-    if 'drug2' in df.columns:
-        multi_drug = True
+    doses_cols = ["cell.line"]
 
-    assert df["drug1.units"].unique() == 'M'
-    if multi_drug:
-        assert df["drug2.units"].unique() == 'M'
+    for n in drug_nums:
+        assert df["drug{}.units".format(n)].unique() == 'M'
+        doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
+    expt_rows = np.logical_or.reduce([df["drug{}.conc".format(n)] > 0
+                                     for n in drug_nums])
 
-    doses_cols = ["drug1.conc", "cell.line", "drug1"]
-
-    if multi_drug:
-        doses_cols += ["drug2", "drug2.conc"]
-        expt_rows = np.logical_or(df["drug1.conc"] > 0,
-                                  df["drug2.conc"] > 0)
-    else:
-        expt_rows = df["drug1.conc"] > 0
-
-    df_doses = df[expt_rows]
-    df_doses = df_doses.loc[:, doses_cols]
+    df_doses = df.loc[expt_rows, doses_cols]
     # Suppress warnings about altering a dataframe slice
     df_doses.is_copy = False
     df_doses.reset_index(inplace=True)
@@ -557,25 +615,24 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     df_doses = df_doses.assign(well=list(
         ["{}__{}".format(a_, b_) for a_, b_ in
          zip(df_doses["upid"], df_doses["well"])]))
+    df_doses = df_doses.drop_duplicates(subset='well')
+    col_renames = {'drug{}.conc'.format(n): 'dose{}'.format(n) for
+                             n in drug_nums}
+    col_renames.update({
+        'cell.line': 'cell_line',
+        'well': 'well_id',
+        'upid': 'plate'
+    })
+    df_doses.rename(columns=col_renames, inplace=True)
 
-    if multi_drug:
-        df_doses['drug1'] = df_doses[['drug1', 'drug2']].apply(tuple, axis=1)
-        df_doses['drug1.conc'] = df_doses[['drug1.conc', 'drug2.conc']].apply(
-            tuple, axis=1)
-        df_doses.drop(['drug2', 'drug2.conc'], axis=1, inplace=True)
+    if not _unstacked:
+        _stack_doses(df_doses, inplace=True)
     else:
-        df_doses[['drug1.conc', 'drug1']] = \
-            df_doses.transform({'drug1.conc': lambda x: (x, ),
-                                'drug1': lambda x: (x, )})
+        index_cols = ['drug{}'.format(n) for n in drug_nums]
+        index_cols += ['cell_line']
+        index_cols.extend(['dose{}'.format(n) for n in drug_nums])
+        df_doses.set_index(index_cols, inplace=True)
 
-    df_doses.columns = ('plate', 'well_id', 'dose', 'cell_line', 'drug',
-                        'well_num')
-    df_doses.set_index(['drug', 'cell_line', 'dose', 'well_id'],
-                       inplace=True)
-    # df_doses.drop('plate', axis=1, inplace=True)
-
-    df_doses = df_doses[~df_doses.index.duplicated(keep='first')]
-    df_doses.reset_index(level='well_id', inplace=True)
     df_doses.sort_index(inplace=True)
 
     df_controls = df[np.logical_not(expt_rows)]
@@ -713,6 +770,36 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
             hdf.put('controls', df_data.controls, format=dataset_format)
 
 
+def _stack_doses(df_doses, inplace=True):
+    if not inplace:
+        df_doses = df_doses.copy()
+
+    # Aggregate multi-drugs into single column and drop the separates
+    df_doses.reset_index(inplace=True)
+    drug_cols = df_doses.filter(regex='^drug[0-9]+$', axis=1)
+    dose_cols = df_doses.filter(regex='^dose[0-9]+$', axis=1)
+    n_drugs = len(drug_cols)
+    assert n_drugs == len(dose_cols)
+
+    if n_drugs > 1:
+        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
+            tuple, axis=1)
+    else:
+        lbl_drug = 'drug' if n_drugs == 0 else 'drug1'
+        df_doses[lbl_drug] = df_doses[lbl_drug].transform(lambda x: (x, ))
+        lbl_dose = 'dose' if n_drugs == 0 else 'dose1'
+        df_doses[lbl_dose] = df_doses[lbl_dose].transform(lambda x: (x, ))
+
+    df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
+                  axis=1, inplace=True)
+    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
+
+    if not inplace:
+        return df_doses
+
+
 def read_hdf(filename_or_buffer):
     """
     Read a HtsPandas dataset from Thunor HDF5 format file
@@ -728,24 +815,7 @@ def read_hdf(filename_or_buffer):
         Thunor HTS dataset
     """
     hts_pandas = _read_hdf_unstacked(filename_or_buffer)
-
-    df_doses = hts_pandas.doses
-
-    # Aggregate multi-drugs into single column and drop the separates
-    df_doses.reset_index(inplace=True)
-    if 'drug' not in df_doses.columns:
-        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
-            tuple, axis=1)
-    else:
-        df_doses['drug'] = df_doses['drug'].transform(lambda x: (x, ))
-    if 'dose' not in df_doses.columns:
-        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
-            tuple, axis=1)
-    else:
-        df_doses['dose'] = df_doses['dose'].transform(lambda x: (x, ))
-    df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
-                  axis=1, inplace=True)
-    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
+    _stack_doses(hts_pandas.doses, inplace=True)
 
     return hts_pandas
 
