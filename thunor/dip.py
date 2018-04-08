@@ -359,11 +359,17 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 plates = []
             ctrl_dip_data_cl = ctrl_dip_data_cl.loc[plates]
 
-            dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
-            dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
+            if is_viability:
+                dip_ctrl = ctrl_dip_data_cl.values
+            else:
+                dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
+                dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
 
         doses_expt = dip_grp.index.get_level_values('dose').values
 
+        n_controls = len(dip_ctrl)
+        ctrl_dose_val = ctrl_dose_fn(doses_expt)
+        doses_ctrl = np.repeat(ctrl_dose_val, n_controls)
         if is_viability:
             resp_expt = dip_grp['viability']
             doses = doses_expt
@@ -372,10 +378,6 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
                 fit_cls=fit_cls
             )
         else:
-            n_controls = len(dip_ctrl)
-
-            ctrl_dose_val = ctrl_dose_fn(doses_expt)
-            doses_ctrl = np.repeat(ctrl_dose_val, n_controls)
             doses = np.concatenate((doses_ctrl, doses_expt))
             resp_expt = dip_grp['dip_rate'].values
             dip_all = np.concatenate((dip_ctrl, resp_expt))
@@ -432,10 +434,15 @@ def dip_fit_params(ctrl_dip_data, expt_dip_data,
 
         if include_response_values:
             if ctrl_dip_data_cl is not None:
+                if is_viability:
+                    ctrl_dip_data_cl = ctrl_dip_data_cl.to_frame()
                 ctrl_dip_data_cl['dose'] = doses_ctrl
                 ctrl_dip_data_cl.reset_index('well_id', inplace=True)
                 ctrl_dip_data_cl.set_index(['dose', 'well_id'], inplace=True)
-                fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
+                if is_viability:
+                    fit_data['viability_ctrl'] = ctrl_dip_data_cl['value']
+                else:
+                    fit_data['dip_ctrl'] = ctrl_dip_data_cl['dip_rate']
 
             if is_viability:
                 fit_data['viability_time'] = dip_grp['timepoint'].values

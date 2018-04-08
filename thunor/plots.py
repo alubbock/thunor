@@ -216,7 +216,10 @@ def plot_drc(fit_params, is_absolute=False,
         group_name_disp = fp.label
 
         try:
-            ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
+            if is_viability:
+                ctrl_doses = fp.viability_ctrl.index.get_level_values('dose')
+            else:
+                ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
         except AttributeError:
             ctrl_doses = []
 
@@ -280,9 +283,9 @@ def plot_drc(fit_params, is_absolute=False,
         if show_replicates:
             y_trace = fp.viability if is_viability else fp.dip_expt
             try:
-                dip_ctrl = fp.dip_ctrl
+                ctrl_resp = fp.viability_ctrl if is_viability else fp.dip_ctrl
             except AttributeError:
-                dip_ctrl = None
+                ctrl_resp = None
             if not is_absolute:
                 if fp.fit_obj is not None and \
                         not isinstance(fp.fit_obj, HillCurveNull):
@@ -290,8 +293,8 @@ def plot_drc(fit_params, is_absolute=False,
                 else:
                     divisor = np.mean(y_trace)
                 y_trace /= divisor
-                if dip_ctrl is not None:
-                    dip_ctrl /= divisor
+                if ctrl_resp is not None:
+                    ctrl_resp /= divisor
 
             repl_name = 'Replicate'
             ctrl_name = 'Control'
@@ -320,9 +323,9 @@ def plot_drc(fit_params, is_absolute=False,
                                      showlegend=False,
                                      name=repl_name)
                           )
-            if dip_ctrl is not None:
+            if ctrl_resp is not None:
                 traces.append(go.Scatter(x=ctrl_doses,
-                                         y=dip_ctrl,
+                                         y=ctrl_resp,
                                          mode='markers',
                                          marker={'symbol': shape,
                                                  'color': 'black',

@@ -25,8 +25,9 @@ def viability(df_data, time_hrs=72, assay_name=None):
 
     Returns
     -------
-    pd.DataFrame
-        A pandas dataframe containing the viability results
+    pd.DataFrame, pd.Series
+        A DataFrame containing the viability results and a Series containing
+        the control values
     """
     if df_data.controls is None:
         raise ValueError('Control wells not found, and are needed for '
@@ -65,13 +66,17 @@ def viability(df_data, time_hrs=72, assay_name=None):
     idx_cols = ['plate', 'cell_line', 'timepoint']
     if 'dataset' in df.index.names:
         idx_cols = ['dataset'] + idx_cols
-    controls = controls['value'].groupby(level=idx_cols).mean()
+
+    controls_means = controls['value'].groupby(level=idx_cols).mean()
+
+    controls['value'] = controls['value'].groupby(level=idx_cols).apply(
+        lambda x: x / x.mean())
 
     df.reset_index(inplace=True)
     df.rename(columns={'plate_id': 'plate'}, inplace=True)
     df.set_index(idx_cols, inplace=True)
 
-    df = df.join(controls.to_frame(), rsuffix='_ctrl')
+    df = df.join(controls_means.to_frame(), rsuffix='_ctrl')
     df.reset_index(inplace=True)
     final_idx_cols = ['drug', 'cell_line', 'dose', 'well_id']
     if 'dataset' in df.columns:
@@ -88,7 +93,7 @@ def viability(df_data, time_hrs=72, assay_name=None):
     df._viability_time = time_hrs
     df._viability_assay = assay_name
 
-    return df
+    return df, controls['value']
 
 
 def _get_closest_timepoint_for_each_well(dataframe, timediff):
@@ -101,6 +106,7 @@ def _get_closest_timepoint_for_each_well(dataframe, timediff):
 
 
 def viability_fit_params(viability_data,
+                         ctrl_viability=None,
                          fit_cls=HillCurveLL3u,
                          custom_ic_concentrations=None,
                          custom_ec_concentrations=None,
@@ -113,6 +119,8 @@ def viability_fit_params(viability_data,
     ----------
     viability_data: pd.DataFrame
         Viability data from from :func:`viability`
+    ctrl_viability: pd.Series
+        Control viability values form :func:`viability`
     fit_cls: Class
         Class to use for curve fitting (default: :class:`HillCurveLL3u`)
     custom_ic_concentrations: set, optional
@@ -136,7 +144,8 @@ def viability_fit_params(viability_data,
         DataFrame containing DIP rate curve fits and parameters
     """
     return dip_fit_params(
-        ctrl_dip_data=None, expt_dip_data=viability_data,
+        ctrl_dip_data=ctrl_viability,
+        expt_dip_data=viability_data,
         fit_cls=fit_cls,
         custom_ic_concentrations=custom_ic_concentrations,
         custom_ec_concentrations=custom_ec_concentrations,
