@@ -5,7 +5,7 @@ from thunor.curve_fit import HillCurveLL3u
 SECONDS_IN_HOUR = 3600
 
 
-def viability(df_data, time_hrs=72, assay_name=None):
+def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
     """
     Calculate viability at the specified time point
 
@@ -22,12 +22,16 @@ def viability(df_data, time_hrs=72, assay_name=None):
     assay_name: str, optional
         The assay name to use for viability calculation, or None to use the
         default proliferation assay
+    include_controls: bool
+        Return the control values for reference as a the second entry in a
+        two-tuple, if True
 
     Returns
     -------
-    pd.DataFrame, pd.Series
+    pd.DataFrame, pd.Series or None
         A DataFrame containing the viability results and a Series containing
-        the control values
+        the control values, if requested (None is returned as the second
+        return value otherwise)
     """
     if df_data.controls is None:
         raise ValueError('Control wells not found, and are needed for '
@@ -69,8 +73,9 @@ def viability(df_data, time_hrs=72, assay_name=None):
 
     controls_means = controls['value'].groupby(level=idx_cols).mean()
 
-    controls['value'] = controls['value'].groupby(level=idx_cols).apply(
-        lambda x: x / x.mean())
+    if include_controls:
+        controls['value'] = controls['value'].groupby(level=idx_cols).apply(
+            lambda x: x / x.mean())
 
     df.reset_index(inplace=True)
     df.rename(columns={'plate_id': 'plate'}, inplace=True)
@@ -93,7 +98,10 @@ def viability(df_data, time_hrs=72, assay_name=None):
     df._viability_time = time_hrs
     df._viability_assay = assay_name
 
-    return df, controls['value']
+    if include_controls:
+        return df, controls['value']
+    else:
+        return df, None
 
 
 def _get_closest_timepoint_for_each_well(dataframe, timediff):
