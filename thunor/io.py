@@ -8,6 +8,8 @@ from .dip import _choose_dip_assay, dip_rates
 
 SECONDS_IN_HOUR = 3600
 ZERO_TIMEDELTA = timedelta(0)
+ASCII_A = 65
+ALPHABET_LENGTH = 26
 
 
 STANDARD_PLATE_SIZES = (96, 384, 1536)
@@ -34,9 +36,9 @@ class PlateMap(object):
             self.width = kwargs['width']
         if 'height' in kwargs:
             self.height = kwargs['height']
-            if self.height > 26:
-                # TODO: Fail for now - would need row names like AA, AB etc.
-                raise ValueError('Plates with height >26 are not yet '
+            if self.height > 676:
+                # TODO: Fail for now - would need row names like AAA, AAB etc.
+                raise ValueError('Plates with height >676 are not '
                                  'supported')
 
     @property
@@ -55,7 +57,12 @@ class PlateMap(object):
         Iterator of str
             Iterator over the row letters (A, B, C, etc.)
         """
-        return map(chr, range(65, 65 + self.height))
+        for i in range(min(self.height, ALPHABET_LENGTH)):
+            yield chr(ASCII_A + i % ALPHABET_LENGTH)
+
+        for i in range(ALPHABET_LENGTH, self.height):
+            yield chr(ASCII_A - 1 + i // ALPHABET_LENGTH) + \
+                chr(ASCII_A + i % ALPHABET_LENGTH)
 
     def col_iterator(self):
         """
