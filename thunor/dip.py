@@ -264,6 +264,7 @@ def fit_params_minimal(ctrl_data, expt_data,
     pd.DataFrame
         DataFrame containing DIP rate curve fits and parameters
     """
+    expt_data_orig = expt_data
 
     if 'dataset' in expt_data.index.names:
         datasets = expt_data.index.get_level_values('dataset').unique()
@@ -277,9 +278,9 @@ def fit_params_minimal(ctrl_data, expt_data,
         raise DrugCombosNotImplementedError()
     else:
         # TODO: Support drug combos
-        expt_data.reset_index(['drug', 'dose'], inplace=True)
-        expt_data['drug'] = expt_data['drug'].apply(pd.Series)
-        expt_data['dose'] = expt_data['dose'].apply(pd.Series)
+        expt_data = expt_data.reset_index(['drug', 'dose'])
+        expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
+        expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
         expt_data.set_index(['drug', 'dose'], append=True,
                             inplace=True)
         drugs = expt_data.index.get_level_values('drug').unique()
@@ -328,12 +329,6 @@ def fit_params_minimal(ctrl_data, expt_data,
         else:
             dr_name = drugs[0]
 
-        if dataset is None and 'dataset' in ctrl_data.index.names:
-            raise ValueError('Experimental data does not have "dataset" '
-                             'in index, but control data does. Please '
-                             'make sure "dataset" is in both dataframes, '
-                             'or neither.')
-
         doses_expt = dip_grp.index.get_level_values('dose').values
 
         if is_viability:
@@ -344,6 +339,13 @@ def fit_params_minimal(ctrl_data, expt_data,
                 fit_cls=fit_cls
             )
         else:
+            if dataset is None and ctrl_data is not None and \
+                    'dataset' in ctrl_data.index.names:
+                raise ValueError('Experimental data does not have "dataset" '
+                                 'in index, but control data does. Please '
+                                 'make sure "dataset" is in both dataframes, '
+                                 'or neither.')
+
             ctrl_dip_data_cl = \
                 _get_control_responses(ctrl_data, dataset, cl_name,
                                        dip_grp)
@@ -393,8 +395,8 @@ def fit_params_minimal(ctrl_data, expt_data,
 
     df_params._drmetric = 'viability' if is_viability else 'dip'
     if is_viability:
-        df_params._viability_time = expt_data._viability_time
-        df_params._viability_assay = expt_data._viability_assay
+        df_params._viability_time = expt_data_orig._viability_time
+        df_params._viability_assay = expt_data_orig._viability_assay
 
     return df_params
 
