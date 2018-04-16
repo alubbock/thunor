@@ -374,11 +374,12 @@ def plot_drc(fit_params, is_absolute=False,
                     'text': annotation_label
                 })
     data = go.Data(traces)
-    yaxis_range = None
     if not is_absolute:
         yaxis_range = (-0.2, 1.2)
     elif not is_viability:
         yaxis_range = (-0.02, 0.07)
+    else:
+        yaxis_range = (0, 1.1)
 
     layout = go.Layout(title=title,
                        hovermode='closest' if show_replicates
