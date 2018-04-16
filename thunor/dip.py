@@ -580,7 +580,9 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
     data_list = []
     for grp, dip_grp in expt_dip_data.groupby(
             ['dataset', 'cell_line', 'drug']):
-        doses_expt = dip_grp.index.get_level_values('dose').values
+        # Assumes drug combinations have been ruled out by fit_params_minimal
+        doses_expt = [d[0] for d in dip_grp.index.get_level_values(
+            'dose').values]
         fit_data = {}
         ctrl_dip_data_cl = \
             _get_control_responses(ctrl_dip_data, grp[0], grp[1],
