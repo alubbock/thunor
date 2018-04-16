@@ -21,7 +21,7 @@ class TestWithDataset(unittest.TestCase):
                                                    expt_dip_data)
 
         viability_data, _ = thunor.viability.viability(
-            cls.dataset)
+            cls.dataset, include_controls=False)
         cls.viability_params = thunor.viability.viability_fit_params(
             viability_data)
 

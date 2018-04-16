@@ -211,28 +211,35 @@ def plot_drc(fit_params, is_absolute=False,
 
     annotations = []
     traces = []
+    xaxis_min = 1
+    xaxis_max = 0
     for fp in fit_params.itertuples():
         this_colour = colours.pop()
         group_name_disp = fp.label
+
+        log_dose_min = int(np.floor(np.log10(fp.min_dose_measured)))
+        xaxis_min = min(xaxis_min, log_dose_min)
+        log_dose_max = int(np.ceil(np.log10(fp.max_dose_measured)))
+        xaxis_max = max(xaxis_max, log_dose_max)
 
         try:
             if is_viability:
                 ctrl_doses = fp.viability_ctrl.index.get_level_values('dose')
             else:
                 ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
+
+            log_dose_min = min(log_dose_min, int(np.floor(np.log10(np.min(
+                ctrl_doses.values)))))
         except AttributeError:
             ctrl_doses = []
 
-        if is_viability:
-            expt_doses = fp.viability.index.get_level_values('dose')
-        else:
-            expt_doses = fp.dip_expt.index.get_level_values('dose')
-
-        doses = np.concatenate((ctrl_doses, expt_doses))
-
-        # Calculate the dip rate fit
-        log_dose_min = int(np.floor(np.log10(min(doses))))
-        log_dose_max = int(np.ceil(np.log10(max(doses))))
+        try:
+            if is_viability:
+                expt_doses = fp.viability.index.get_level_values('dose')
+            else:
+                expt_doses = fp.dip_expt.index.get_level_values('dose')
+        except AttributeError:
+            expt_doses = []
 
         dose_x_range = np.concatenate(
             # [np.arange(2, 11) * 10 ** dose_mag
@@ -248,7 +255,6 @@ def plot_drc(fit_params, is_absolute=False,
         hoverinfo = 'all'
         if fp.fit_obj is None:
             # Curve fit numerical error or QC failure
-            doses = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
@@ -385,7 +391,7 @@ def plot_drc(fit_params, is_absolute=False,
                        hovermode='closest' if show_replicates
                                  or len(traces) > 50 else 'x',
                        xaxis={'title': 'Dose (M)',
-                              'range': np.log10((1e-12, 1e-5)),
+                              'range': (log_dose_min, log_dose_max),
                               'type': 'log'},
                        yaxis={'title': yaxis_title,
                               'range': yaxis_range
@@ -880,15 +886,19 @@ def plot_drc_params(df_params, fit_param,
         data = []
         aggregate_by.remove('dataset_id')
         aggregate_by = aggregate_by[0]
-        group_by = ['dataset_id', 'drug'] \
-                    if aggregate_by == 'cell_line' \
-                    else ['dataset_id', 'cell_line']
+
+        datasets = yvals.index.get_level_values('dataset_id').unique()
+
+        group_by = ['dataset_id'] if len(datasets) > 1 else []
+        group_by += ['drug'] if aggregate_by == 'cell_line' else ['cell_line']
+
         for grp_name, grp in yvals.groupby(level=group_by):
             if len(groups) > 1:
-                group_name = "<br>".join(str(g) for g in grp_name)
+                group_name = grp_name if isinstance(grp_name, str) else \
+                    "<br>".join(str(g) for g in grp_name)
             else:
                 # If there's only one drug/cell line group, just need dataset
-                group_name = grp_name[0]
+                group_name = grp_name[0] if grp_name else None
             data.append(go.Box(x=grp.index.get_level_values(aggregate_by),
                                y=grp,
                                name=group_name

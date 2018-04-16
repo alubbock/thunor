@@ -431,7 +431,7 @@ def _attach_extra_params(base_params,
 
     extra_params = []
 
-    for group_name, dip_grp in base_params.groupby(level=group_by):
+    for group_name, dip_grp in base_params.groupby(level=group_by, sort=False):
         group_name_components = []
 
         if 'dataset_id' in group_by:
@@ -579,7 +579,7 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
     is_viability = df_params._drmetric == 'viability'
     data_list = []
     for grp, dip_grp in expt_dip_data.groupby(
-            ['dataset', 'cell_line', 'drug']):
+            ['dataset', 'cell_line', 'drug'], sort=False):
         # Assumes drug combinations have been ruled out by fit_params_minimal
         doses_expt = [d[0] for d in dip_grp.index.get_level_values(
             'dose').values]
