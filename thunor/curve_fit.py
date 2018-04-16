@@ -305,6 +305,52 @@ class HillCurveLL3u(HillCurveLL4):
         return self._popt_rel
 
 
+class HillCurveLL2(HillCurveLL3u):
+    @classmethod
+    def fit_fn(cls, x, b, e):
+        """
+        Two parameter log-logistic function ("Hill curve")
+
+        Parameters
+        ----------
+        x: np.ndarray
+            One-dimensional array of "x" values
+        b: float
+            Hill slope
+        e: float
+            EC50 value
+
+        Returns
+        -------
+        np.ndarray
+            Array of "y" values using the supplied curve fit parameters on "x"
+        """
+        return super(HillCurveLL3u, cls).fit_fn(x, b, 0.0, 1.0, e)
+
+    @classmethod
+    def initial_guess(cls, x, y):
+        b, _, _, e = super(HillCurveLL3u, cls).initial_guess(x, y)
+        return b, e
+
+    @property
+    def ec50(self):
+        return self.popt[1]
+
+    @property
+    def e0(self):
+        return 1.0
+
+    @property
+    def emax(self):
+        return 0.0
+
+    @property
+    def popt_rel(self):
+        if self._popt_rel is None:
+            self._popt_rel = self.popt.copy()
+        return self._popt_rel
+
+
 def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
             null_rejection_threshold=0.05, ctrl_dose=None):
     """
