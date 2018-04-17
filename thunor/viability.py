@@ -163,28 +163,3 @@ def viability_fit_params(viability_data,
         include_response_values=include_response_values,
         extra_stats=extra_stats
     )
-
-
-def viability_fit_params_from_base(
-        base_params,
-        ctrl_resp_data=None, expt_resp_data=None,
-        ctrl_dose_fn=lambda doses: np.min(doses) / 10.0,
-        custom_ic_concentrations=None,
-        custom_ec_concentrations=None,
-        custom_e_values=None,
-        custom_e_rel_values=None,
-        include_response_values=True,
-        extra_stats=True):
-    """
-    Fit dose response curves to DIP rates and calculate statistics
-    """
-    df_params = _attach_extra_params(base_params, custom_ic_concentrations,
-                                     custom_ec_concentrations,
-                                     custom_e_values, custom_e_rel_values,
-                                     extra_stats)
-
-    if include_response_values:
-        df_params = _attach_response_values(df_params, ctrl_resp_data,
-                                            expt_resp_data, ctrl_dose_fn)
-
-    return df_params
