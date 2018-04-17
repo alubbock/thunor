@@ -439,6 +439,11 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         subtitle = " &amp; ".join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
+    if df_params._drmetric == 'dip':
+        dr_metric = 'DIP'
+    else:
+        dr_metric = '{:g} hr viability'.format(df_params._viability_time)
+
     df_params = df_params.loc[:, [fit_param,
                                   'max_dose_measured',
                                   'min_dose_measured']]
@@ -472,6 +477,8 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         axis_title = '{} ({})'.format(param_name, param_units)
     else:
         axis_title = param_name
+
+    axis_title = '{} {}'.format(dr_metric, axis_title)
 
     fit_param_data = df_params.loc[:, fit_param]
     xdat = fit_param_data.iloc[:, 0]
