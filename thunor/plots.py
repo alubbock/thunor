@@ -175,7 +175,8 @@ def plot_drc(fit_params, is_absolute=False,
 
     datasets = fit_params.index.get_level_values('dataset_id').unique()
 
-    is_viability = 'viability' in fit_params.columns
+    is_viability = 'viability' in fit_params.columns or fit_params._drmetric\
+                   == 'viability'
     if is_viability:
         # Only "absolute" (non-transformed y-axis) makes sense for viability
         is_absolute = True
@@ -211,16 +212,14 @@ def plot_drc(fit_params, is_absolute=False,
 
     annotations = []
     traces = []
-    xaxis_min = 1
-    xaxis_max = 0
+    xaxis_min = np.Inf
+    xaxis_max = np.NINF
     for fp in fit_params.itertuples():
         this_colour = colours.pop()
         group_name_disp = fp.label
 
         log_dose_min = int(np.floor(np.log10(fp.min_dose_measured)))
-        xaxis_min = min(xaxis_min, log_dose_min)
         log_dose_max = int(np.ceil(np.log10(fp.max_dose_measured)))
-        xaxis_max = max(xaxis_max, log_dose_max)
 
         try:
             if is_viability:
@@ -232,6 +231,9 @@ def plot_drc(fit_params, is_absolute=False,
                 ctrl_doses.values)))))
         except AttributeError:
             ctrl_doses = []
+
+        xaxis_max = max(xaxis_max, log_dose_max)
+        xaxis_min = min(xaxis_min, log_dose_min)
 
         try:
             if is_viability:
@@ -253,13 +255,16 @@ def plot_drc(fit_params, is_absolute=False,
         line_dash = 'solid'
         line_mode = 'lines'
         hoverinfo = 'all'
+        visible = True
         if fp.fit_obj is None:
             # Curve fit numerical error or QC failure
+            dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
             group_name_disp = '<i>{}</i>'.format(
                 group_name_disp)
             hoverinfo = 'none'
+            visible = 'legendonly'
         elif isinstance(fp.fit_obj, HillCurveNull):
             # No effect null hypothesis
             dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * \
@@ -283,6 +288,7 @@ def plot_drc(fit_params, is_absolute=False,
                                  legendgroup=group_name_disp,
                                  showlegend=not show_replicates or
                                             multi_dataset,
+                                 visible=visible,
                                  name=group_name_disp)
                       )
 
@@ -380,21 +386,22 @@ def plot_drc(fit_params, is_absolute=False,
                     'text': annotation_label
                 })
     data = go.Data(traces)
+    yaxis_range = None
+    yaxis_rangemode = 'tozero' if is_viability else 'normal'
     if not is_absolute:
         yaxis_range = (-0.2, 1.2)
     elif not is_viability:
         yaxis_range = (-0.02, 0.07)
-    else:
-        yaxis_range = (0, 1.1)
 
     layout = go.Layout(title=title,
                        hovermode='closest' if show_replicates
                                  or len(traces) > 50 else 'x',
                        xaxis={'title': 'Dose (M)',
-                              'range': (log_dose_min, log_dose_max),
+                              'range': (xaxis_min, xaxis_max),
                               'type': 'log'},
                        yaxis={'title': yaxis_title,
-                              'range': yaxis_range
+                              'range': yaxis_range,
+                              'rangemode': yaxis_rangemode
                               },
                        annotations=annotations,
                        )
