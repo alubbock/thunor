@@ -276,13 +276,15 @@ class HtsPandas(object):
                 doses.set_index('plate', append=True, inplace=True)
 
             doses = doses[doses.index.isin(plate, level='plate')]
-            controls = controls[controls.index.isin(plate, level='plate')]
+            if controls is not None:
+                controls = controls[controls.index.isin(plate, level='plate')]
 
         if cell_lines is not None:
             doses = doses.iloc[doses.index.isin(
                 cell_lines, level='cell_line'), :]
-            controls = controls.iloc[controls.index.isin(
-                cell_lines, level='cell_line'), :]
+            if controls is not None:
+                controls = controls.iloc[controls.index.isin(
+                    cell_lines, level='cell_line'), :]
 
         if drugs is not None:
             doses = doses.iloc[doses.index.isin(
@@ -290,7 +292,8 @@ class HtsPandas(object):
             ), :]
 
         doses.index = doses.index.remove_unused_levels()
-        controls.index = controls.index.remove_unused_levels()
+        if controls is not None:
+            controls.index = controls.index.remove_unused_levels()
 
         assays = self.assays.copy()
         assays = assays.iloc[assays.index.isin(doses['well_id'].unique(),
