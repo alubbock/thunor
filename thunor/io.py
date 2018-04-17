@@ -267,7 +267,7 @@ class HtsPandas(object):
                      for drug in drugs]
 
         doses = self.doses.copy()
-        controls = self.controls.copy()
+        controls = self.controls.copy() if self.controls is not None else None
         if plate is not None:
             if isinstance(plate, str):
                 plate = [plate, ]

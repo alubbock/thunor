@@ -389,11 +389,15 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
             response_std_errs = response_std_errs[~response_nans]
 
     # Sort the data - curve fit can be sensitive to order!
-    if response_std_errs is None:
-        doses, responses = zip(*sorted(zip(doses, responses)))
-    else:
-        doses, responses, response_std_errs = zip(*sorted(zip(
-            doses, responses, response_std_errs)))
+    try:
+        if response_std_errs is None:
+            doses, responses = zip(*sorted(zip(doses, responses)))
+        else:
+            doses, responses, response_std_errs = zip(*sorted(zip(
+                doses, responses, response_std_errs)))
+    except ValueError:
+        # Occurs when doses/responses is empty
+        return None
 
     curve_initial_guess = fit_cls.initial_guess(doses, responses)
     try:
