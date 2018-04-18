@@ -1,8 +1,4 @@
 from datetime import timedelta
-from thunor.dip import dip_fit_params, _attach_response_values,\
-    _attach_extra_params
-from thunor.curve_fit import HillCurveLL3u
-import numpy as np
 
 SECONDS_IN_HOUR = 3600
 
@@ -113,53 +109,3 @@ def _get_closest_timepoint_for_each_well(dataframe, timediff):
         'timediff'].idxmin()]
 
     return dataframe
-
-
-def viability_fit_params(viability_data,
-                         ctrl_viability=None,
-                         fit_cls=HillCurveLL3u,
-                         custom_ic_concentrations=None,
-                         custom_ec_concentrations=None,
-                         custom_e_values=None,
-                         include_response_values=True, extra_stats=True):
-    """
-    Fit dose response curves to viability data and calculate statistics
-
-    Parameters
-    ----------
-    viability_data: pd.DataFrame
-        Viability data from from :func:`viability`
-    ctrl_viability: pd.Series
-        Control viability values form :func:`viability`
-    fit_cls: Class
-        Class to use for curve fitting (default: :class:`HillCurveLL3u`)
-    custom_ic_concentrations: set, optional
-        Set of additional inhibitory concentrations to calculate. Integer
-        values 0-100. Requires extra_stats=True.
-    custom_ec_concentrations: set, optional
-        Set of additional effective concentrations to calculate. Integer
-        values 0-100. Requires extra_stats=True.
-    custom_e_values: set, optional
-        Set of additional effect values to calculate. Integer
-        values 0-100. Requires extra_stats=True.
-    include_response_values: bool
-        Include the supplied viability data in the return value if True
-    extra_stats: bool
-        Include extra statistics such as IC50 and AUC if True (increases
-        processing time)
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing DIP rate curve fits and parameters
-    """
-    return dip_fit_params(
-        ctrl_dip_data=ctrl_viability,
-        expt_dip_data=viability_data,
-        fit_cls=fit_cls,
-        custom_ic_concentrations=custom_ic_concentrations,
-        custom_ec_concentrations=custom_ec_concentrations,
-        custom_e_values=custom_e_values,
-        include_response_values=include_response_values,
-        extra_stats=extra_stats
-    )

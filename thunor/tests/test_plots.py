@@ -3,6 +3,7 @@ import pkg_resources
 import thunor.io
 import thunor.dip
 import thunor.viability
+import thunor.curve_fit
 from thunor.plots import plot_time_course, plot_drc, plot_drc_params, \
     plot_plate_map
 from thunor.helpers import plotly_to_dataframe
@@ -17,13 +18,13 @@ class TestWithDataset(unittest.TestCase):
         cls.dataset = thunor.io.read_hdf(cls.filename)
         ctrl_dip_data, expt_dip_data = thunor.dip.dip_rates(cls.dataset)
 
-        cls.fit_params = thunor.dip.dip_fit_params(ctrl_dip_data,
-                                                   expt_dip_data)
+        cls.fit_params = thunor.curve_fit.fit_params(ctrl_dip_data,
+                                                     expt_dip_data)
 
         viability_data, _ = thunor.viability.viability(
             cls.dataset, include_controls=False)
-        cls.viability_params = thunor.viability.viability_fit_params(
-            viability_data)
+        cls.viability_params = thunor.curve_fit.fit_params(
+            ctrl_data=None, expt_data=viability_data)
 
     def test_plot_viability_curves(self):
         assert isinstance(plotly_to_dataframe(plot_drc(
@@ -43,6 +44,8 @@ class TestWithDataset(unittest.TestCase):
         df2.index.set_levels(['two'], level='dataset_id', inplace=True)
 
         df = pd.concat([df1, df2])
+
+        df._drmetric = self.fit_params._drmetric
 
         plot_drc_params(df, fit_param='auc', multi_dataset=True)
 

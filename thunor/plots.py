@@ -2,8 +2,8 @@ import plotly.graph_objs as go
 import numpy as np
 import seaborn as sns
 from .helpers import format_dose
-from .dip import ctrl_dip_rates, expt_dip_rates, is_param_truncated
-from thunor.curve_fit import HillCurveNull
+from .dip import ctrl_dip_rates, expt_dip_rates
+from thunor.curve_fit import HillCurveNull, is_param_truncated
 import scipy.stats
 import re
 import pandas as pd
@@ -153,8 +153,7 @@ def plot_drc(fit_params, is_absolute=False,
     Parameters
     ----------
     fit_params: pd.DataFrame
-        Fit parameters from :func:`thunor.dip.dip_fit_params` or
-        :func:`thunor.viability.viability_fit_params`
+        Fit parameters from :func:`thunor.curve_fit.fit_params`
     is_absolute: bool
         For DIP rate plots, use absolute (True) or relative (False)
         y-axis scale. **Ignored for viability plots.**
@@ -175,8 +174,12 @@ def plot_drc(fit_params, is_absolute=False,
 
     datasets = fit_params.index.get_level_values('dataset_id').unique()
 
-    is_viability = 'viability' in fit_params.columns or fit_params._drmetric\
-                   == 'viability'
+    try:
+        is_viability = 'viability' in fit_params.columns or \
+                       fit_params._drmetric == 'viability'
+    except AttributeError:
+        is_viability = False
+
     if is_viability:
         # Only "absolute" (non-transformed y-axis) makes sense for viability
         is_absolute = True
