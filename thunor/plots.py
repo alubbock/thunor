@@ -856,6 +856,11 @@ def plot_drc_params(df_params, fit_param,
                                       fit_param_sort]]
             yvals.dropna(subset=[fit_param], inplace=True)
 
+        if yvals.empty:
+            raise CannotPlotError(
+                'The selected cell line/drug combinations have no data '
+                'available for the selected parameter(s)')
+
         if aggregate_cell_lines:
             yvals = _aggregate_by_cell_line(yvals, aggregate_cell_lines,
                                             replace_index=True)
