@@ -722,7 +722,7 @@ def _calc_aa(row):
         return None
 
     return row.fit_obj.aa(max_conc=row.max_dose_measured,
-                          emax_obs=row.emax)
+                          emax_obs=row.emax_obs)
 
 
 def _calc_auc(row):
