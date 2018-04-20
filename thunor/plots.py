@@ -613,7 +613,7 @@ def plot_drc_params(df_params, fit_param,
     aggregate_cell_lines: bool or list, optional
         Aggregate all cell lines (if True), or aggregate by the specified
         groups (dict of cell line names as values, with group labels as keys)
-    aggregate_drugs, bool or list, optional
+    aggregate_drugs: bool or list, optional
         Aggregate all drugs (if True), or aggregate by the specified
         groups (dict of drug names as values, with group labels as keys)
     multi_dataset: bool

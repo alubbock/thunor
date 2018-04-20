@@ -771,19 +771,21 @@ def _attach_extra_params(base_params,
         else:
             group_by = ['dataset_id'] + group_by
 
+    index_names = base_params.index.names
+
     def _generate_label(index):
         group_name_components = []
 
         if 'dataset_id' in group_by:
-            dataset = index[group_by.index('dataset_id')]
+            dataset = index[index_names.index('dataset_id')]
             group_name_components.append(str(dataset))
 
         if 'cell_line' in group_by:
-            cl_name = index[group_by.index('cell_line')]
+            cl_name = index[index_names.index('cell_line')]
             group_name_components.append(str(cl_name))
 
         if 'drug' in group_by:
-            dr_name = index[group_by.index('drug')]
+            dr_name = index[index_names.index('drug')]
             group_name_components.append(str(dr_name))
 
         return "\n".join(group_name_components)
