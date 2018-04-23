@@ -27,6 +27,9 @@ class DrugCombosNotImplementedError(NotImplementedError):
 
 class HillCurve(object):
     """ Base class defining Hill/log-logistic curve functionality """
+    fit_bounds = (np.NINF, np.PINF)
+    null_response_fn = np.mean
+
     def __init__(self, popt):
         self.popt = popt
 
@@ -102,9 +105,9 @@ class HillCurveLL4(HillCurve):
         b: float
             Hill slope
         c: float
-            Minimum response (lower plateau)
+            Maximum response (lower plateau)
         d: float
-            Maximum response (upper plateau)
+            Minimum response (upper plateau)
         e: float
             EC50 value
 
@@ -282,6 +285,17 @@ class HillCurveLL4(HillCurve):
 
 
 class HillCurveLL3u(HillCurveLL4):
+    """ Three parameter log logistic curve, for viability data """
+    # Constrain 0<=emax<=1
+    fit_bounds = (
+        (np.NINF, 0.0, np.NINF),
+        (np.PINF, 1.0, np.PINF)
+    )
+
+    @staticmethod
+    def null_response_fn(_):
+        return np.float64(1.0)
+
     @classmethod
     def fit_fn(cls, x, b, c, e):
         """
@@ -294,7 +308,7 @@ class HillCurveLL3u(HillCurveLL4):
         b: float
             Hill slope
         c: float
-            Minimum response (lower plateau)
+            Maximum response (lower plateau)
         e: float
             EC50 value
 
@@ -307,8 +321,12 @@ class HillCurveLL3u(HillCurveLL4):
 
     @classmethod
     def initial_guess(cls, x, y):
-        b, c, _, e = super(HillCurveLL3u, cls).initial_guess(x, y)
-        return b, c, e
+        hill, emax, _, ec50 = super().initial_guess(x, y)
+        if emax < 0.0:
+            emax = 0.0
+        elif emax > 1.0:
+            emax = 1.0
+        return hill, emax, ec50
 
     @property
     def ec50(self):
@@ -373,7 +391,8 @@ class HillCurveLL2(HillCurveLL3u):
 
 
 def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
-            null_rejection_threshold=0.05, ctrl_dose=None):
+            null_rejection_threshold=0.05,
+            ctrl_dose=None):
     """
     Fit a dose response curve
 
@@ -425,11 +444,14 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         popt, pcov = scipy.optimize.curve_fit(fit_cls.fit_fn,
                                               doses,
                                               responses,
+                                              bounds=fit_cls.fit_bounds,
                                               p0=curve_initial_guess,
                                               sigma=response_std_errs
                                               )
     except RuntimeError:
         # Some numerical issue with curve fitting
+        return None
+    except ValueError:
         return None
 
     if any(np.isnan(popt)):
@@ -439,11 +461,12 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     fit_obj = fit_cls(popt)
 
     if null_rejection_threshold is not None:
+        null_response_value = fit_cls.null_response_fn(responses)
         response_curve = fit_obj.fit(doses)
 
         # F test vs flat linear "no effect" fit
         ssq_model = ((response_curve - responses) ** 2).sum()
-        ssq_null = ((np.mean(responses) - responses) ** 2).sum()
+        ssq_null = ((null_response_value - responses) ** 2).sum()
 
         df = len(doses) - 4
 
@@ -451,7 +474,7 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
 
         if p > null_rejection_threshold:
-            return HillCurveNull(np.mean(responses))
+            return HillCurveNull(null_response_value)
 
     if fit_obj.ec50 < np.min(doses):
         # Reject fit if EC50 less than min dose
