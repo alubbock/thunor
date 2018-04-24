@@ -1127,8 +1127,10 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
     label_type_tag = label_type + '_tag'
 
     for tag_name, names in aggregate_items.items():
-        yvals_tmp = yvals.iloc[yvals.index.isin(names,
-                                                level=label_type), :]
+        yvals_tmp = yvals.loc[yvals.index.isin(names, level=label_type), :]
+        # Avoid warning about setting on copy, since we're using the copy to
+        # build a new dataframe
+        yvals_tmp.is_copy = None
 
         # Add counts to the tag names
         if add_counts:
