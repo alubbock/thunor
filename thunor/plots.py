@@ -74,6 +74,14 @@ def _param_is_log(param_id):
     return IC_REGEX.match(param_id) or EC_REGEX.match(param_id)
 
 
+def _param_na_first(param_id):
+    """ NAs go in the position corresponding to no effect """
+    # Which is first for E, Emax, Erel, AA and Hill
+    return param_id in ('hill', 'aa', 'emax', 'emax_rel', 'einf') \
+           or E_REGEX.match(param_id) \
+           or E_REL_REGEX.match(param_id)
+
+
 def _get_param_name(param_id):
     try:
         return PARAM_NAMES[param_id]
@@ -906,7 +914,9 @@ def plot_drc_params(df_params, fit_param,
     elif not aggregate_cell_lines and not aggregate_drugs:
         sort_by = [fit_param_sort, 'label'] if fit_param_sort is not None \
                    else [fit_param, 'label']
-        df_params = df_params.sort_values(by=sort_by)
+        df_params = df_params.sort_values(
+            by=sort_by, na_position='first' if _param_na_first(fit_param)
+            else 'last')
         groups = df_params['label']
         yvals = df_params[fit_param]
 
