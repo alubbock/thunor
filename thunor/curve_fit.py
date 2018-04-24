@@ -70,6 +70,9 @@ class HillCurveNull(HillCurve):
     def fit_fn(cls, x, ymean):
         return ymean
 
+    def fit(self, x):
+        return self.fit_fn(x, self.popt)
+
     @classmethod
     def initial_guess(cls, x, y):
         return np.mean(y)
@@ -772,7 +775,8 @@ def _attach_extra_params(base_params,
                          include_aa=False,
                          include_auc=False,
                          include_hill=False,
-                         include_emax=False
+                         include_emax=False,
+                         include_einf=False
                          ):
     datasets = base_params.index.get_level_values('dataset_id').unique()
     if len(datasets) == 1 and datasets[0] == '':
@@ -828,6 +832,13 @@ def _attach_extra_params(base_params,
                 row.fit_obj, HillCurveNull) else row.fit_obj.fit(
                 row.max_dose_measured),
             axis=1)
+
+    if include_einf:
+        base_params['einf'] = base_params.apply(
+            lambda row: None if not row.fit_obj or isinstance(
+                row.fit_obj, HillCurveNull) else row.fit_obj.emax,
+            axis=1
+        )
 
     is_viability = base_params._drmetric == 'viability'
 
@@ -973,6 +984,7 @@ def fit_params(ctrl_data, expt_data,
         include_aa=True,
         include_hill=True,
         include_emax=True,
+        include_einf=True,
         include_response_values=True
     )
 
@@ -989,6 +1001,7 @@ def fit_params_from_base(
         include_auc=False,
         include_hill=False,
         include_emax=False,
+        include_einf=False,
         include_response_values=True):
     """
     Attach additional parameters to basic set of fit parameters
@@ -997,7 +1010,7 @@ def fit_params_from_base(
                                      custom_ec_concentrations,
                                      custom_e_values, custom_e_rel_values,
                                      include_aa, include_auc, include_hill,
-                                     include_emax)
+                                     include_emax, include_einf)
 
     if include_response_values:
         df_params = _attach_response_values(df_params, ctrl_resp_data,
