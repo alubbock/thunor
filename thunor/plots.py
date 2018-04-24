@@ -1111,7 +1111,7 @@ def _aggregate_by_cell_line(yvals, aggregate_cell_lines,
 
 
 def _aggregate_by_tag(yvals, aggregate_items, label_type,
-                      replace_index=True):
+                      replace_index=True, add_counts=True):
     if aggregate_items in (None, False):
         return yvals
 
@@ -1129,7 +1129,11 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
     for tag_name, names in aggregate_items.items():
         yvals_tmp = yvals.iloc[yvals.index.isin(names,
                                                 level=label_type), :]
-        yvals_tmp.is_copy = False  # suppress warning about assigning to copy
+
+        # Add counts to the tag names
+        if add_counts:
+            tag_name = '{} ({})'.format(tag_name, len(
+                yvals_tmp.index.get_level_values(label_type).unique()))
 
         yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
         new = new.append(yvals_tmp)
