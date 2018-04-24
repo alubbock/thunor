@@ -145,7 +145,7 @@ def _combine_title_subtitle(title, subtitle):
     return title
 
 
-def plot_drc(fit_params, is_absolute=False,
+def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
              title=None, subtitle=None):
     """
     Plot dose response curve fits
@@ -157,6 +157,12 @@ def plot_drc(fit_params, is_absolute=False,
     is_absolute: bool
         For DIP rate plots, use absolute (True) or relative (False)
         y-axis scale. **Ignored for viability plots.**
+    color_by: str or None
+        Color the traces by cell lines if 'cl', drugs if 'dr',
+        or arbitrarily if None (default)
+    color_groups: dict or None
+        If using color_by, provide a dictionary containing the color groups,
+        where the values are cell line or drug names
     title: str, optional
         Title (or None to auto-generate)
     subtitle: str, optional
@@ -168,7 +174,16 @@ def plot_drc(fit_params, is_absolute=False,
         A plotly figure object containing the graph
     """
 
-    colours = _sns_to_rgb(sns.color_palette("husl", len(fit_params)))
+    colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups if
+                                                        color_by else
+                                                        fit_params)))
+    color_index_col = None
+    if color_by == 'cl':
+        color_index_col = fit_params.index.names.index('cell_line')
+    elif color_by == 'dr':
+        color_index_col = fit_params.index.names.index('drug')
+    elif color_by is not None:
+        raise ValueError('color_by must be "cl", "dr" or None')
     # Shapes used for replicate markers
     shapes = ['circle', 'circle-open']
 
@@ -215,10 +230,34 @@ def plot_drc(fit_params, is_absolute=False,
 
     annotations = []
     traces = []
+    if color_by:
+        for idx, name in enumerate(color_groups):
+            traces.append(go.Scatter(mode='none', x=[0], y=[0],
+                                     legendgroup=name,
+                                     showlegend=True,
+                                     name='<b>{}</b>'.format(name))
+                          )
     xaxis_min = np.Inf
     xaxis_max = np.NINF
     for fp in fit_params.itertuples():
-        this_colour = colours.pop()
+        if color_by:
+            grp = fp.Index[color_index_col]
+            this_colour = None
+            legend_grp = None
+            for idx, color_group in enumerate(color_groups.items()):
+                grp_label, grp_entries = color_group
+                # Not an efficient lookup, but for reasonable number of
+                # traces it's fine
+                if grp in grp_entries:
+                    legend_grp = grp_label
+                    this_colour = colours[idx]
+                    break
+            if this_colour is None:
+                raise ValueError('"{}" is not in the color_groups'.format(grp))
+        else:
+            this_colour = colours.pop()
+            legend_grp = fp.label
+
         group_name_disp = fp.label
 
         log_dose_min = int(np.floor(np.log10(fp.min_dose_measured)))
@@ -288,7 +327,7 @@ def plot_drc(fit_params, is_absolute=False,
                                        'dash': line_dash,
                                        'width': 3},
                                  hoverinfo=hoverinfo,
-                                 legendgroup=group_name_disp,
+                                 legendgroup=legend_grp,
                                  showlegend=not show_replicates or
                                             multi_dataset,
                                  visible=visible,
@@ -412,8 +451,33 @@ def plot_drc(fit_params, is_absolute=False,
     return go.Figure(data=data, layout=layout)
 
 
+def _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
+                                           fit_param, dataset_names):
+    symbols = ['circle'] * len(df_params.index)
+    hovertext = [" ".join(l) for l in df_params.index.values]
+    for param in range_bounded_params:
+        msg = _out_of_range_msg(param)
+        for i in (0, 1):
+            tmp_df = pd.concat([
+                df_params.loc[:, fit_param].iloc[:, i],
+                df_params.loc[:, 'max_dose_measured'].iloc[:, i],
+                df_params.loc[:, 'min_dose_measured'].iloc[:, i]
+            ], axis=1)
+            tmp_df.columns = [fit_param,
+                              'max_dose_measured',
+                              'min_dose_measured']
+            param_truncated = is_param_truncated(tmp_df, fit_param)
+            addtxt = ['<br> {} {}'.format(dataset_names[i], msg) if x else
+                      '' for x in param_truncated]
+            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+            symbols = ['cross' if x else old for x, old in
+                       zip(param_truncated, symbols)]
+
+    return symbols, hovertext
+
+
 def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
-                                   **kwargs):
+                                   color_by, color_groups, **kwargs):
     """
     Plot a parameter comparison across two datasets
 
@@ -468,7 +532,10 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
             'the two datasets, so a scatter plot cannot be created. If you '
             'want a bar plot instead, choose an ordering parameter.')
 
-    colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
+    if color_by:
+        colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups)))
+    else:
+        colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     param_name = _get_param_name(fit_param)
     param_units = _get_param_units(fit_param)
@@ -515,7 +582,8 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
             ),
             name='{} vs {} {} Linear Fit'.format(dataset_names[0],
                                       dataset_names[1],
-                                      param_name)
+                                      param_name),
+            showlegend=False
         ))
         layout['annotations'] = [{
             'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
@@ -524,8 +592,6 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                     'p-value: {:0.4g} '.format(r_value ** 2, p_value)
         }]
 
-    hovertext = [" ".join(l) for l in fit_param_data.index.values]
-    symbols = ['circle'] * len(fit_param_data.index)
     range_bounded_params = set()
 
     match = IC_REGEX.match(fit_param)
@@ -541,46 +607,71 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     if match:
         range_bounded_params.add('ec' + match.groups(0)[0])
 
-    for param in range_bounded_params:
-        msg = _out_of_range_msg(param)
-        for i in (0, 1):
-            tmp_df = pd.concat([
-                fit_param_data.iloc[:, i],
-                df_params.loc[:, 'max_dose_measured'].iloc[:, i],
-                df_params.loc[:, 'min_dose_measured'].iloc[:, i]
-            ], axis=1)
-            tmp_df.columns = [fit_param,
-                              'max_dose_measured',
-                              'min_dose_measured']
-            param_truncated = is_param_truncated(tmp_df, fit_param)
-            addtxt = ['<br> {} {}'.format(dataset_names[i], msg) if x else
-                      '' for x in param_truncated]
-            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else old for x, old in
-                       zip(param_truncated, symbols)]
+    if color_by:
+        for idx, tag_name in enumerate(color_groups):
+            dat = df_params[df_params.index.get_level_values(
+                'cell_line' if color_by == 'cl' else 'drug').isin(
+                color_groups[tag_name])]
+            symbols, hovertext = _symbols_hovertext_two_dataset_scatter(dat, range_bounded_params,
+                                                                        fit_param, dataset_names)
 
-    data.append(go.Scatter(
-        x=xdat,
-        y=ydat,
-        hovertext=hovertext,
-        hoverinfo="text+x+y",
-        mode='markers',
-        marker={'symbol': symbols,
-                'color': [colours[1] if s == 'circle' else
-                          'crimson' for s in symbols]},
-        name='{} vs {} {}'.format(dataset_names[0],
-                                  dataset_names[1],
-                                  param_name)
-    ))
+            fit_param_data = dat.loc[:, fit_param]
+            xdat = fit_param_data.iloc[:, 0]
+            ydat = fit_param_data.iloc[:, 1]
+
+            data.append(go.Scatter(
+                x=xdat,
+                y=ydat,
+                hovertext=hovertext,
+                hoverinfo="text+x+y",
+                mode='markers',
+                marker={'symbol': symbols,
+                        'color': colours[idx]},
+                name=tag_name
+            ))
+    else:
+        symbols, hovertext = _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
+                                                                    fit_param, dataset_names)
+        colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
+                       symbols]
+
+        data.append(go.Scatter(
+            x=xdat,
+            y=ydat,
+            hovertext=hovertext,
+            hoverinfo="text+x+y",
+            mode='markers',
+            marker={'symbol': symbols,
+                    'color': colour_list},
+            name='{} vs {} {}'.format(dataset_names[0],
+                                      dataset_names[1],
+                                      param_name)
+        ))
 
     layout['xaxis'] = {'title': '{} {}'.format(dataset_names[0], axis_title),
                        'type': 'log' if _param_is_log(fit_param) else None}
     layout['yaxis'] = {'title': '{} {}'.format(dataset_names[1], axis_title),
                        'type': 'log' if _param_is_log(fit_param) else None}
     layout['hovermode'] = 'closest'
-    layout['showlegend'] = False
+    layout['showlegend'] = color_by is not None
 
     return go.Figure(layout=layout, data=data)
+
+
+def _symbols_hovertext_two_param_scatter(df_params,
+                                         range_bounded_params,
+                                         fit_param):
+    hovertext = df_params['label']
+    symbols = ['circle'] * len(df_params)
+    for param in range_bounded_params:
+        msg = _out_of_range_msg(param)
+        param_truncated = is_param_truncated(df_params, param)
+        addtxt = ['<br> ' + msg if x else '' for x in
+                  param_truncated]
+        hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
+        symbols = ['cross' if x else old for x, old in
+                   zip(param_truncated, symbols)]
+    return symbols, hovertext
 
 
 def plot_drc_params(df_params, fit_param,
@@ -591,6 +682,8 @@ def plot_drc_params(df_params, fit_param,
                     aggregate_cell_lines=False,
                     aggregate_drugs=False,
                     multi_dataset=False,
+                    color_by=None,
+                    color_groups=None,
                     **kwargs):
     """
     Box, bar, or scatter plots of DIP rate fit parameters
@@ -610,14 +703,19 @@ def plot_drc_params(df_params, fit_param,
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
-    aggregate_cell_lines: bool or list, optional
+    aggregate_cell_lines: bool or dict, optional
         Aggregate all cell lines (if True), or aggregate by the specified
         groups (dict of cell line names as values, with group labels as keys)
-    aggregate_drugs: bool or list, optional
+    aggregate_drugs: bool or dict, optional
         Aggregate all drugs (if True), or aggregate by the specified
         groups (dict of drug names as values, with group labels as keys)
     multi_dataset: bool
         Set to true to compare two datasets contained in fit_params
+    color_by: str or None
+        Color by cell lines if "cl", drugs if "dr", or arbitrarily if None
+        (default)
+    color_groups: dict or None
+        Groups of cell lines of drugs to color by
     kwargs: dict, optional
         Additional keyword arguments
 
@@ -639,10 +737,15 @@ def plot_drc_params(df_params, fit_param,
             fit_param,
             title,
             subtitle,
+            color_by,
+            color_groups,
             **kwargs
         )
 
-    colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
+    if color_by:
+        colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups)))
+    else:
+        colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
 
     if title is None:
         title = _make_title('Dose response parameters', df_params)
@@ -728,7 +831,8 @@ def plot_drc_params(df_params, fit_param,
                         color="darkorange"
                     ),
                     name='{} vs {} Linear Fit'.format(xaxis_param_name,
-                                                      yaxis_param_name)
+                                                      yaxis_param_name),
+                    showlegend=False
                 ))
                 layout['annotations'] = [{
                     'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
@@ -737,8 +841,6 @@ def plot_drc_params(df_params, fit_param,
                             'p-value: {:0.4g} '.format(r_value ** 2, p_value)
                 }]
 
-        hovertext = df_params['label']
-        symbols = ['circle'] * len(df_params)
         range_bounded_params = set()
 
         for param in (fit_param, fit_param_compare):
@@ -755,33 +857,52 @@ def plot_drc_params(df_params, fit_param,
             if match:
                 range_bounded_params.add('ec' + match.groups(0)[0])
 
-        for param in range_bounded_params:
-            msg = _out_of_range_msg(param)
-            param_truncated = is_param_truncated(df_params, param)
-            addtxt = ['<br> ' + msg if x else '' for x in
-                      param_truncated]
-            hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else old for x, old in
-                       zip(param_truncated, symbols)]
+        if color_by:
+            for idx, tag_name in enumerate(color_groups):
+                location = df_params.index.get_level_values(
+                    'cell_line' if color_by == 'cl' else 'drug').isin(
+                    color_groups[tag_name])
+                dat = df_params[location]
+                symbols, hovertext = _symbols_hovertext_two_param_scatter(
+                    dat, range_bounded_params,
+                    fit_param)
 
-        data.append(go.Scatter(
-            x=xdat,
-            y=ydat,
-            hovertext=hovertext,
-            hoverinfo="text+x+y",
-            mode='markers',
-            marker={'symbol': symbols,
-                    'color': [colours[1] if s == 'circle' else
-                              'crimson' for s in symbols]},
-            name='{} vs {}'.format(xaxis_param_name,
-                                   yaxis_param_name)
-        ))
+                xdat = dat.loc[:, fit_param_compare]
+                ydat = dat.loc[:, fit_param]
+
+                data.append(go.Scatter(
+                    x=xdat,
+                    y=ydat,
+                    hovertext=hovertext,
+                    hoverinfo="text+x+y",
+                    mode='markers',
+                    marker={'symbol': symbols,
+                            'color': colours[idx]},
+                    name=tag_name
+                ))
+        else:
+            symbols, hovertext = _symbols_hovertext_two_param_scatter(
+                df_params, range_bounded_params, fit_param)
+            colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
+                           symbols]
+
+            data.append(go.Scatter(
+                x=xdat,
+                y=ydat,
+                hovertext=hovertext,
+                hoverinfo="text+x+y",
+                mode='markers',
+                marker={'symbol': symbols,
+                        'color': colour_list},
+                name='{} vs {}'.format(xaxis_param_name,
+                                       yaxis_param_name)
+            ))
 
         layout['xaxis'] = {'title': xaxis_title,
                            'type': 'log' if _param_is_log(fit_param_compare)
                            else None}
         layout['hovermode'] = 'closest'
-        layout['showlegend'] = False
+        layout['showlegend'] = color_by is not None
     elif not aggregate_cell_lines and not aggregate_drugs:
         sort_by = [fit_param_sort, 'label'] if fit_param_sort is not None \
                    else [fit_param, 'label']
@@ -790,7 +911,6 @@ def plot_drc_params(df_params, fit_param,
         yvals = df_params[fit_param]
 
         text = None
-        marker_cols = colours[1]
 
         ec_match = None
         for regex in (EC_REGEX, E_REGEX, E_REL_REGEX):
@@ -799,21 +919,38 @@ def plot_drc_params(df_params, fit_param,
                 ec_match = 'ec' + match.groups(0)[0]
                 break
 
+        marker_cols = None
+        if not color_by:
+            marker_cols = colours[1]
+
         if ec_match:
             msg = _out_of_range_msg(ec_match)
             if not fit_param.startswith('ec'):
                 msg = 'Based on ' + msg
             ec_truncated = is_param_truncated(df_params, ec_match)
             text = [msg if x else '' for x in ec_truncated]
-            marker_cols = [colours[0] if est else colours[1] for
-                           est in ec_truncated]
+            if not color_by:
+                marker_cols = [colours[0] if est else colours[1] for
+                               est in ec_truncated]
         elif IC_REGEX.match(fit_param):
             msg = _out_of_range_msg(fit_param)
             ic_truncated = is_param_truncated(df_params, fit_param)
             text = [msg if x else '' for x in ic_truncated]
-            marker_cols = [colours[0] if est else colours[1] for
-                           est in ic_truncated]
+            if not color_by:
+                marker_cols = [colours[0] if est else colours[1] for
+                               est in ic_truncated]
 
+        if color_by:
+            color_ent = df_params.index.get_level_values('cell_line' if
+                                                         color_by == 'cl'
+                                                         else 'drug')
+
+            marker_cols = []
+            for c in color_ent:
+                for idx, tag_name in enumerate(color_groups):
+                    if c in color_groups[tag_name]:
+                        marker_cols.append(colours[idx])
+                        break
         if fit_param_sort is not None:
             na_list = df_params[fit_param_sort].isnull()
             if text is None:
@@ -829,10 +966,26 @@ def plot_drc_params(df_params, fit_param,
 
         data = [go.Bar(x=groups,
                        y=yvals,
-                       name=fit_param,
                        text=text,
+                       name='',
+                       showlegend=False,
                        marker={'color': marker_cols}
                        )]
+        if color_by:
+            # Nasty cludge to get legend to show, by stacking dummy traces
+            # with zero height (Plotly doesn't support legend by colour at
+            # this time)
+            for idx, tag_name in enumerate(color_groups):
+                data.append(go.Bar(
+                    x=groups,
+                    y=[0] * len(groups),
+                    text=tag_name,
+                    name=tag_name,
+                    hoverinfo='none',
+                    showlegend=True,
+                    marker={'color': colours[idx]}
+                ))
+
         layout['annotations'] = [
             {'x': x, 'y': 0, 'text': '<em>N/A</em>',
              'textangle': 90,
@@ -842,9 +995,16 @@ def plot_drc_params(df_params, fit_param,
              'font': {'color': 'rgba(150, 150, 150, 1)'}}
             for x in groups[yvals.isnull().values]]
         layout.setdefault('xaxis', {})['type'] = 'category'
-        layout['barmode'] = 'group'
+        layout['barmode'] = 'stack'
+        layout['showlegend'] = color_by is not None
     else:
         layout['boxmode'] = 'group'
+
+        if color_by:
+            raise CannotPlotError(
+                'Custom color schemes are not currently supported with box '
+                'plots. Either disable the coloring, or turn off aggregation.'
+            )
 
         if fit_param_sort == fit_param:
             fit_param_sort = None
