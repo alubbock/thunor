@@ -915,7 +915,7 @@ def plot_drc_params(df_params, fit_param,
         sort_by = [fit_param_sort, 'label'] if fit_param_sort is not None \
                    else [fit_param, 'label']
         df_params = df_params.sort_values(
-            by=sort_by, na_position='first' if _param_na_first(fit_param)
+            by=sort_by, na_position='first' if _param_na_first(sort_by[0])
             else 'last')
         groups = df_params['label']
         yvals = df_params[fit_param]
