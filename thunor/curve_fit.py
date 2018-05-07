@@ -33,14 +33,16 @@ class HillCurve(object):
     def __init__(self, popt):
         self.popt = popt
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def fit_fn(cls, x, *params):
         pass
 
     def fit(self, x):
         return self.fit_fn(x, *self.popt)
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def initial_guess(cls, x, y):
         pass
 
@@ -87,8 +89,27 @@ class HillCurveNull(HillCurve):
     def ec(self, ec_num=50):
         return None
 
+    @property
+    def ec50(self):
+        return None
+
+    @property
+    def e0(self):
+        return self.popt
+
+    @property
+    def emax(self):
+        return self.popt
+
+    @property
     def hill_slope(self):
         return None
+
+    def auc(self, *args, **kwargs):
+        return 0.0
+
+    def aa(self, *args, **kwargs):
+        return 0.0
 
 
 class HillCurveLL4(HillCurve):
@@ -744,7 +765,7 @@ def _calc_e(row, ec_lbl, relative=False):
 
 
 def _calc_aa(row):
-    if not row.fit_obj or isinstance(row.fit_obj, HillCurveNull):
+    if not row.fit_obj:
         return None
 
     return row.fit_obj.aa(max_conc=row.max_dose_measured,
@@ -752,14 +773,14 @@ def _calc_aa(row):
 
 
 def _calc_auc(row):
-    if not row.fit_obj or isinstance(row.fit_obj, HillCurveNull):
+    if not row.fit_obj:
         return None
 
     return row.fit_obj.auc(min_conc=row.min_dose_measured)
 
 
 def _calc_ec50(row):
-    if not row.fit_obj or isinstance(row.fit_obj, HillCurveNull):
+    if not row.fit_obj or row.fit_obj.ec50 is None:
         return None
 
     ec50 = np.min((row.fit_obj.ec50, row.max_dose_measured))
@@ -828,15 +849,13 @@ def _attach_extra_params(base_params,
 
     if include_emax:
         base_params['emax'] = base_params.apply(
-            lambda row: None if not row.fit_obj or isinstance(
-                row.fit_obj, HillCurveNull) else row.fit_obj.fit(
+            lambda row: None if not row.fit_obj else row.fit_obj.fit(
                 row.max_dose_measured),
             axis=1)
 
     if include_einf:
         base_params['einf'] = base_params.apply(
-            lambda row: None if not row.fit_obj or isinstance(
-                row.fit_obj, HillCurveNull) else row.fit_obj.emax,
+            lambda row: None if not row.fit_obj else row.fit_obj.emax,
             axis=1
         )
 
@@ -856,8 +875,7 @@ def _attach_extra_params(base_params,
 
     if include_hill:
         base_params['hill'] = base_params['fit_obj'].apply(
-            lambda fo: fo.hill_slope if fo and not isinstance(
-                fo, HillCurveNull) else None)
+            lambda fo: fo.hill_slope if fo else None)
 
     custom_ec_concentrations = set(custom_ec_concentrations)
     custom_ec_concentrations.discard(50)
