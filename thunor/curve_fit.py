@@ -662,6 +662,7 @@ def fit_params_minimal(ctrl_data, expt_data,
             doses = doses_expt
             fit_obj = fit_drc(
                 doses_expt, resp_expt, response_std_errs=None,
+                null_rejection_threshold=None,
                 fit_cls=fit_cls
             )
         else:
