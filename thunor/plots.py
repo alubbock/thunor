@@ -1096,13 +1096,26 @@ def plot_drc_params(df_params, fit_param,
                                name=group_name
                                ))
 
+        layout['annotations'] = []
         if len(groups) == 1:
             annotation_label = str(groups[0])
-            layout['annotations'] = [{'x': 0.5, 'y': 1.0, 'xref': 'paper',
-                                      'yanchor': 'bottom', 'yref': 'paper',
-                                      'showarrow': False,
-                                      'text': annotation_label
-                                      }]
+            layout['annotations'].append({
+                'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
+                'yref': 'paper', 'showarrow': False, 'text': annotation_label
+            })
+
+        # One way anova test
+        anova_f, anova_p = scipy.stats.f_oneway(
+            *[x[1].values for x in yvals.groupby(level=aggregate_by)]
+        )
+        if not np.isnan(anova_f):
+            layout['annotations'].append({
+                'x': 0.5, 'y': 0.95, 'xref': 'paper',
+                'yanchor': 'bottom',
+                'yref': 'paper', 'showarrow': False,
+                'text': 'One-way ANOVA F: {:.4g} p-value: {:.4g}'.format(
+                    anova_f, anova_p)
+            })
 
     layout = go.Layout(layout)
 
