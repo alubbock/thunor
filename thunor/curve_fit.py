@@ -255,7 +255,9 @@ class HillCurveLL4(HillCurve):
             return None
         e0 = self.e0
         if emax > e0:
-            emax, e0 = e0, emax
+            # TODO: Calculate AUC for ascending curves
+            return None
+
         min_conc_hill = min_conc ** self.hill_slope
         return (np.log10(
             (self.ec50 ** self.hill_slope + min_conc_hill) / min_conc_hill) /
@@ -282,7 +284,8 @@ class HillCurveLL4(HillCurve):
             return None
         e0 = self.e0
         if emax > e0:
-            emax, e0 = e0, emax
+            # TODO: Calculate AA for ascending curves
+            return None
 
         if emax_obs is not None:
             emax = emax_obs
@@ -310,9 +313,9 @@ class HillCurveLL4(HillCurve):
 
 class HillCurveLL3u(HillCurveLL4):
     """ Three parameter log logistic curve, for viability data """
-    # Constrain 0<=emax<=1
+    # Constrain 0<=emax<=1, Hill slope +ve
     fit_bounds = (
-        (np.NINF, 0.0, np.NINF),
+        (0.0, 0.0, np.NINF),
         (np.PINF, 1.0, np.PINF)
     )
 
