@@ -66,29 +66,6 @@ class HillCurve(object):
     def hill_slope(self):
         pass
 
-    def aa_obs(self, responses, doses=None):
-        """
-        Activity Area (observed)
-
-        Parameters
-        ----------
-        responses: np.array or pd.Series
-            Response values, with dose values in the Index if a Series is
-            supplied
-        doses: np.array or None
-            Dose values - only required if responses is not a pd.Series
-
-        Returns
-        -------
-        float
-            Activity area (observed)
-        """
-        if doses is None:
-            responses = responses.groupby('dose').agg('mean')
-            doses = responses.index.get_level_values('dose')
-        responses_shifted = 1.0 - np.minimum(responses, 1.0)
-        return np.trapz(responses_shifted, doses)
-
 
 class HillCurveNull(HillCurve):
     @classmethod
@@ -321,11 +298,15 @@ class HillCurveLL4(HillCurve):
         return np.log10((ec50_hill + max_conc ** self.hill_slope) /
                         ec50_hill) * ((e0 - emax) / e0) / self.hill_slope
 
+        # return ((np.log10(ec50_hill + max_conc ** self.hill_slope)
+        #     - np.log10(ec50_hill + min_conc ** self.hill_slope)) /
+        #     self.hill_slope) * ((e0 - emax) / e0)
+
     def aa_numerical(self, dose_min, dose_max, num_points=50):
         doses = np.exp(np.linspace(np.log(dose_min), np.log(dose_max),
                                    num_points))
         responses = self.fit_rel(doses)
-        return self.aa_obs(responses, doses)
+        return aa_obs(responses, doses)
 
     @property
     def divisor(self):
@@ -399,7 +380,7 @@ class HillCurveLL3u(HillCurveLL4):
         doses = np.exp(np.linspace(np.log(dose_min), np.log(dose_max),
                                    num_points))
         responses = self.fit(doses)
-        return self.aa_obs(responses, doses)
+        return aa_obs(responses, doses)
 
     @property
     def popt_rel(self):
@@ -600,7 +581,30 @@ def _get_control_responses(ctrl_dip_data, dataset, cl_name, dip_grp):
 
     return ctrl_dip_data_cl
 
+
 # Parameter fitting section #
+def aa_obs(responses, doses=None):
+    """
+    Activity Area (observed)
+
+    Parameters
+    ----------
+    responses: np.array or pd.Series
+        Response values, with dose values in the Index if a Series is
+        supplied
+    doses: np.array or None
+        Dose values - only required if responses is not a pd.Series
+
+    Returns
+    -------
+    float
+        Activity area (observed)
+    """
+    if doses is None:
+        responses = responses.groupby('dose').agg('mean')
+        doses = responses.index.get_level_values('dose')
+    responses_shifted = 1.0 - np.minimum(responses, 1.0)
+    return np.trapz(responses_shifted, doses)
 
 
 def fit_params_minimal(ctrl_data, expt_data,
@@ -812,6 +816,18 @@ def _calc_aa(row):
 
     return row.fit_obj.aa(max_conc=row.max_dose_measured,
                           emax_obs=row.emax_obs)
+
+
+def _calc_aa_obs(row, is_viability):
+    if is_viability:
+        return aa_obs(row.viability)
+
+    if not row.fit_obj and row.dip_ctrl is None:
+        return None
+
+    divisor = row.fit_obj.divisor if row.fit_obj else np.mean(row.dip_ctrl)
+
+    return aa_obs(row.dip_expt / divisor)
 
 
 def _calc_auc(row):
@@ -1094,13 +1110,7 @@ def fit_params_from_base(
     if include_aa_obs:
         is_viability = base_params._drmetric == 'viability'
         df_params['aa_obs'] = df_params.apply(
-            lambda row: None if not row.fit_obj else
-            row.fit_obj.aa_obs(
-                row.viability if is_viability else row.dip_expt /
-                                                   row.fit_obj.divisor
-            ),
-            axis=1
-        )
+            _calc_aa_obs, args=(is_viability, ), axis=1)
 
     return df_params
 
