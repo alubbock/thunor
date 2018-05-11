@@ -38,6 +38,8 @@ PARAM_UNITS = {'auc': _activity_area_units,
                'emax': 'h<sup>-1</sup>',
                'emax_obs': 'h<sup>-1</sup>'}
 PARAM_NAMES = {'aa': 'Activity area',
+               'aa_obs': 'Activity area (observed)',
+               'aa_num': 'Activity area (numerical integration)',
                'auc': 'Area under curve',
                'einf': 'E<sub>inf</sub>',
                'emax': 'E<sub>max</sub>',

@@ -66,6 +66,29 @@ class HillCurve(object):
     def hill_slope(self):
         pass
 
+    def aa_obs(self, responses, doses=None):
+        """
+        Activity Area (observed)
+
+        Parameters
+        ----------
+        responses: np.array or pd.Series
+            Response values, with dose values in the Index if a Series is
+            supplied
+        doses: np.array or None
+            Dose values - only required if responses is not a pd.Series
+
+        Returns
+        -------
+        float
+            Activity area (observed)
+        """
+        if doses is None:
+            responses = responses.groupby('dose').agg('mean')
+            doses = responses.index.get_level_values('dose')
+        responses_shifted = 1.0 - np.minimum(responses, 1.0)
+        return np.trapz(responses_shifted, doses)
+
 
 class HillCurveNull(HillCurve):
     @classmethod
@@ -109,6 +132,9 @@ class HillCurveNull(HillCurve):
         return 0.0
 
     def aa(self, *args, **kwargs):
+        return 0.0
+
+    def aa_numerical(self, *args, **kwargs):
         return 0.0
 
 
@@ -295,6 +321,12 @@ class HillCurveLL4(HillCurve):
         return np.log10((ec50_hill + max_conc ** self.hill_slope) /
                         ec50_hill) * ((e0 - emax) / e0) / self.hill_slope
 
+    def aa_numerical(self, dose_min, dose_max, num_points=50):
+        doses = np.exp(np.linspace(np.log(dose_min), np.log(dose_max),
+                                   num_points))
+        responses = self.fit_rel(doses)
+        return self.aa_obs(responses, doses)
+
     @property
     def divisor(self):
         return max(self.emax, self.e0)
@@ -362,6 +394,12 @@ class HillCurveLL3u(HillCurveLL4):
     @property
     def e0(self):
         return 1.0
+
+    def aa_numerical(self, dose_min, dose_max, num_points=50):
+        doses = np.exp(np.linspace(np.log(dose_min), np.log(dose_max),
+                                   num_points))
+        responses = self.fit(doses)
+        return self.aa_obs(responses, doses)
 
     @property
     def popt_rel(self):
@@ -798,6 +836,7 @@ def _attach_extra_params(base_params,
                          custom_e_values=frozenset(),
                          custom_e_rel_values=frozenset(),
                          include_aa=False,
+                         include_aa_numerical=False,
                          include_auc=False,
                          include_hill=False,
                          include_emax=False,
@@ -874,6 +913,14 @@ def _attach_extra_params(base_params,
     if include_aa:
         base_params['aa'] = base_params.apply(_calc_aa, axis=1)
 
+    if include_aa_numerical:
+        base_params['aa_num'] = base_params.apply(
+            lambda row: None if not row.fit_obj else
+            row.fit_obj.aa_numerical(row.min_dose_measured,
+                                     row.max_dose_measured),
+            axis=1
+        )
+
     if include_auc:
         base_params['auc'] = base_params.apply(_calc_auc, axis=1)
 
@@ -914,7 +961,9 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
         # Assumes drug combinations have been ruled out by fit_params_minimal
         doses_expt = [d[0] for d in dip_grp.index.get_level_values(
             'dose').values]
-        fit_data = {}
+        fit_data = {'dataset_id': grp[0], 'cell_line': grp[1], 'drug': grp[
+            2][0]}
+
         ctrl_dip_data_cl = \
             _get_control_responses(ctrl_dip_data, grp[0], grp[1],
                                    dip_grp)
@@ -953,7 +1002,7 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
         data_list.append(fit_data)
 
     df = pd.DataFrame(data_list)
-    df.index = df_params.index
+    df.set_index(['dataset_id', 'cell_line', 'drug'], inplace=True)
     df_params_old = df_params
     df_params = pd.concat([df, df_params], axis=1)
 
@@ -1020,6 +1069,8 @@ def fit_params_from_base(
         custom_e_values=frozenset(),
         custom_e_rel_values=frozenset(),
         include_aa=False,
+        include_aa_obs=False,
+        include_aa_numerical=False,
         include_auc=False,
         include_hill=False,
         include_emax=False,
@@ -1031,12 +1082,25 @@ def fit_params_from_base(
     df_params = _attach_extra_params(base_params, custom_ic_concentrations,
                                      custom_ec_concentrations,
                                      custom_e_values, custom_e_rel_values,
-                                     include_aa, include_auc, include_hill,
+                                     include_aa,
+                                     include_aa_numerical, include_auc,
+                                     include_hill,
                                      include_emax, include_einf)
 
-    if include_response_values:
+    if include_response_values or include_aa_obs:
         df_params = _attach_response_values(df_params, ctrl_resp_data,
                                             expt_resp_data, ctrl_dose_fn)
+
+    if include_aa_obs:
+        is_viability = base_params._drmetric == 'viability'
+        df_params['aa_obs'] = df_params.apply(
+            lambda row: None if not row.fit_obj else
+            row.fit_obj.aa_obs(
+                row.viability if is_viability else row.dip_expt /
+                                                   row.fit_obj.divisor
+            ),
+            axis=1
+        )
 
     return df_params
 
