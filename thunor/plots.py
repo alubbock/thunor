@@ -669,8 +669,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
 
 
 def _symbols_hovertext_two_param_scatter(df_params,
-                                         range_bounded_params,
-                                         fit_param):
+                                         range_bounded_params):
     hovertext = df_params['label']
     symbols = ['circle'] * len(df_params)
     for param in range_bounded_params:
@@ -874,8 +873,7 @@ def plot_drc_params(df_params, fit_param,
                     color_groups[tag_name])
                 dat = df_params[location]
                 symbols, hovertext = _symbols_hovertext_two_param_scatter(
-                    dat, range_bounded_params,
-                    fit_param)
+                    dat, range_bounded_params)
 
                 xdat = dat.loc[:, fit_param_compare]
                 ydat = dat.loc[:, fit_param]
@@ -892,7 +890,7 @@ def plot_drc_params(df_params, fit_param,
                 ))
         else:
             symbols, hovertext = _symbols_hovertext_two_param_scatter(
-                df_params, range_bounded_params, fit_param)
+                df_params, range_bounded_params)
             colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
                            symbols]
 
@@ -990,7 +988,7 @@ def plot_drc_params(df_params, fit_param,
             for idx, tag_name in enumerate(color_groups):
                 data.append(go.Bar(
                     x=groups,
-                    y=[0] * len(groups),
+                    y=color_ent == tag_name,
                     text=tag_name,
                     name=tag_name,
                     hoverinfo='none',
