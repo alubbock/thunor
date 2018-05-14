@@ -992,10 +992,12 @@ def plot_drc_params(df_params, fit_param,
             # Nasty cludge to get legend to show, by stacking dummy traces
             # with zero height (Plotly doesn't support legend by colour at
             # this time)
-            for idx, tag_name in enumerate(color_groups):
+            for idx, tag in enumerate(color_groups.items()):
+                tag_name, tag_targets = tag
+                tag_targets = set(tag_targets)
                 data.append(go.Bar(
                     x=groups,
-                    y=color_ent == tag_name,
+                    y=[c in tag_targets for c in color_ent],
                     text=tag_name,
                     name=tag_name,
                     hoverinfo='none',
