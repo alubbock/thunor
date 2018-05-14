@@ -1,8 +1,9 @@
 import numpy as np
 import scipy.optimize
 import scipy.stats
-from abc import abstractclassmethod, abstractmethod
+from abc import abstractmethod
 import pandas as pd
+from decimal import Decimal
 
 PARAM_EQUAL_ATOL = 1e-16
 PARAM_EQUAL_RTOL = 1e-12
@@ -287,11 +288,14 @@ class HillCurveLL4(HillCurve):
             # TODO: Calculate AA for ascending curves
             return None
 
-        ec50_hill = self.ec50 ** self.hill_slope
+        hill = Decimal(self.hill_slope)
+        ec50_hill = Decimal(self.ec50) ** hill
+        min_conc = Decimal(min_conc)
+        max_conc = Decimal(max_conc)
 
-        return ((np.log10(ec50_hill + max_conc ** self.hill_slope)
-                - np.log10(ec50_hill + min_conc ** self.hill_slope)) /
-                self.hill_slope) * ((e0 - emax) / e0)
+        return np.float64(((ec50_hill + max_conc ** hill).log10()
+                           - (ec50_hill + min_conc ** hill).log10())
+                          / hill) * ((e0 - emax) / e0)
 
     @property
     def divisor(self):
