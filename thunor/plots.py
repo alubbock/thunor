@@ -821,34 +821,41 @@ def plot_drc_params(df_params, fit_param,
 
         data = []
 
-        if len(xdat_fit) > 0 and len(ydat_fit) > 0:
+        if len(xdat_fit) > 0:
+            # Remove any infinite or NaN values from best fit line data
+            fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
+                           ~np.isnan(ydat_fit) & np.isfinite(ydat_fit))
+            xdat_fit = xdat_fit[fitdat_mask].values
+            ydat_fit = ydat_fit[fitdat_mask].values
+
+        if len(xdat_fit) > 0:
             slope, intercept, r_value, p_value, std_err = \
                 scipy.stats.linregress(xdat_fit, ydat_fit)
-            if not np.isnan(slope):
-                xfit = (min(xdat_fit), max(xdat_fit))
-                yfit = [x * slope + intercept for x in xfit]
-                if _param_is_log(fit_param_compare):
-                    xfit = np.power(10, xfit)
-                if _param_is_log(fit_param):
-                    yfit = np.power(10, yfit)
-                data.append(go.Scatter(
-                    x=xfit,
-                    y=yfit,
-                    mode='lines',
-                    hoverinfo="none",
-                    line=dict(
-                        color="darkorange"
-                    ),
-                    name='{} vs {} Linear Fit'.format(xaxis_param_name,
-                                                      yaxis_param_name),
-                    showlegend=False
-                ))
-                layout['annotations'] = [{
-                    'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
-                    'yref': 'paper', 'showarrow': False,
-                    'text': 'R<sup>2</sup>: {:0.4g} '
-                            'p-value: {:0.4g} '.format(r_value ** 2, p_value)
-                }]
+
+            xfit = (min(xdat_fit), max(xdat_fit))
+            yfit = [x * slope + intercept for x in xfit]
+            if _param_is_log(fit_param_compare):
+                xfit = np.power(10, xfit)
+            if _param_is_log(fit_param):
+                yfit = np.power(10, yfit)
+            data.append(go.Scatter(
+                x=xfit,
+                y=yfit,
+                mode='lines',
+                hoverinfo="none",
+                line=dict(
+                    color="darkorange"
+                ),
+                name='{} vs {} Linear Fit'.format(xaxis_param_name,
+                                                  yaxis_param_name),
+                showlegend=False
+            ))
+            layout['annotations'] = [{
+                'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
+                'yref': 'paper', 'showarrow': False,
+                'text': 'R<sup>2</sup>: {:0.4g} '
+                        'p-value: {:0.4g} '.format(r_value ** 2, p_value)
+            }]
 
         range_bounded_params = set()
 
