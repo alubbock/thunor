@@ -968,6 +968,9 @@ def plot_drc_params(df_params, fit_param,
                     if c in color_groups[tag_name]:
                         marker_cols.append(colours[idx])
                         break
+                else:
+                    raise ValueError('Entity not found: {}'.format(c))
+
         if fit_param_sort is not None:
             na_list = df_params[fit_param_sort].isnull()
             if text is None:
@@ -988,6 +991,9 @@ def plot_drc_params(df_params, fit_param,
                        showlegend=False,
                        marker={'color': marker_cols}
                        )]
+
+        layout['annotations'] = []
+
         if color_by:
             # Nasty cludge to get legend to show, by stacking dummy traces
             # with zero height (Plotly doesn't support legend by colour at
@@ -1005,14 +1011,36 @@ def plot_drc_params(df_params, fit_param,
                     marker={'color': colours[idx]}
                 ))
 
-        layout['annotations'] = [
+            # Mann Whitney U test w/ cont. correction, two-sided
+            if len(color_groups) == 2 and fit_param_sort is None:
+                group1 = yvals[(y == colours[0] for y in marker_cols)]
+                group2 = yvals[(y != colours[0] for y in marker_cols)]
+                # Need more than 20 entries in each group, as per scipy docs
+                if len(group1) > 20 and len(group2) > 20:
+                    mw_u, mw_p = scipy.stats.mannwhitneyu(
+                        group1,
+                        group2,
+                        use_continuity=True,
+                        alternative='two-sided'
+                    )
+                    if not np.isnan(mw_u):
+                        layout['annotations'].append({
+                            'x': 0.5, 'y': 0.95, 'xref': 'paper',
+                            'yanchor': 'bottom',
+                            'yref': 'paper', 'showarrow': False,
+                            'text': 'Two-sided Mann-Whitney U: {:.4g} '
+                                    'p-value: {:.4g}'.format(
+                                mw_u, mw_p)
+                        })
+
+        layout['annotations'].extend([
             {'x': x, 'y': 0, 'text': '<em>N/A</em>',
              'textangle': 90,
              'xanchor': 'center', 'yanchor': 'bottom',
              'yref': 'paper',
              'showarrow': False,
              'font': {'color': 'rgba(150, 150, 150, 1)'}}
-            for x in groups[yvals.isnull().values]]
+            for x in groups[yvals.isnull().values]])
         layout.setdefault('xaxis', {})['type'] = 'category'
         layout['barmode'] = 'stack'
         layout['showlegend'] = color_by is not None
