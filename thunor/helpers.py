@@ -3,6 +3,7 @@ import collections
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
 from functools import reduce
+from django.utils.html import strip_tags
 
 
 _SI_PREFIXES = collections.OrderedDict([
@@ -55,6 +56,30 @@ def format_dose(num, sig_digits=12, array_as_string=None):
         num/multiplier, _SI_PREFIXES[multiplier])
 
 
+def _plotly_scatter_to_dataframe(plot_fig):
+    rows = []
+    try:
+        xaxis_name = strip_tags(plot_fig['layout']['xaxis']['title'])
+    except KeyError:
+        xaxis_name = 'x'
+    try:
+        yaxis_name = strip_tags(plot_fig['layout']['yaxis']['title'])
+    except KeyError:
+        yaxis_name = 'y'
+    for trace in plot_fig['data']:
+        trace_name = strip_tags(trace['name'])
+        for i in range(len(trace['x'])):
+            rows.append({
+                'trace_name': trace_name,
+                xaxis_name: trace['x'][i],
+                yaxis_name: trace['y'][i],
+                'point_label': strip_tags(trace['hovertext'][i].replace(
+                    '<br>', '\n')) if trace['hovertext'] else None
+            })
+
+    return pd.DataFrame(rows)
+
+
 def plotly_to_dataframe(plot_fig):
     """
     Extract data from a plotly figure into a pandas DataFrame
@@ -69,6 +94,9 @@ def plotly_to_dataframe(plot_fig):
     pd.DataFrame
         A pandas DataFrame containing the extracted traces from the figure
     """
+    if all(trace['type'] == 'scatter' for trace in plot_fig['data']):
+        return _plotly_scatter_to_dataframe(plot_fig)
+
     series = []
     for trace in plot_fig['data']:
         try:
