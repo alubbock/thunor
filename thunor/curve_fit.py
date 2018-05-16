@@ -693,6 +693,7 @@ def fit_params_minimal(ctrl_data, expt_data,
                 null_rejection_threshold=None,
                 fit_cls=fit_cls
             )
+            aa_obs_val = aa_obs(resp_expt, doses_expt)
         else:
             if dataset is None and ctrl_data is not None and \
                     'dataset' in ctrl_data.index.names:
@@ -707,12 +708,9 @@ def fit_params_minimal(ctrl_data, expt_data,
             dip_ctrl = []
             dip_ctrl_std_err = []
             if ctrl_dip_data_cl is not None:
-                if is_viability:
-                    dip_ctrl = ctrl_dip_data_cl.values
-                else:
-                    dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
-                    dip_ctrl_std_err = ctrl_dip_data_cl[
-                        'dip_fit_std_err'].values
+                dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
+                dip_ctrl_std_err = ctrl_dip_data_cl[
+                    'dip_fit_std_err'].values
 
             n_controls = len(dip_ctrl)
             ctrl_dose_val = ctrl_dose_fn(doses_expt)
@@ -726,9 +724,17 @@ def fit_params_minimal(ctrl_data, expt_data,
 
             fit_obj = fit_drc(
                 doses, dip_all, dip_std_errs,
-                fit_cls=fit_cls,
-                # ctrl_dose=ctrl_dose_val
+                fit_cls=fit_cls
             )
+
+            if fit_obj is not None:
+                aa_obs_val = aa_obs(resp_expt / fit_obj.divisor, doses_expt)
+            elif len(dip_ctrl) > 0:
+                # If no fit, use average ctrl response to put DIP values
+                # on relative scale
+                aa_obs_val = aa_obs(resp_expt / np.mean(dip_ctrl), doses_expt)
+            else:
+                aa_obs_val = None
 
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
@@ -740,7 +746,8 @@ def fit_params_minimal(ctrl_data, expt_data,
             fit_obj=fit_obj,
             min_dose_measured=min_dose_measured,
             max_dose_measured=max_dose_measured,
-            emax_obs=np.min(resp_expt)
+            emax_obs=np.min(resp_expt),
+            aa_obs=aa_obs_val
         )
 
         fit_params.append(fit_data)
@@ -799,18 +806,6 @@ def _calc_aa(row):
 
     return row.fit_obj.aa(min_conc=row.min_dose_measured,
                           max_conc=row.max_dose_measured)
-
-
-def _calc_aa_obs(row, is_viability):
-    if is_viability:
-        return aa_obs(row.viability)
-
-    if not row.fit_obj and row.dip_ctrl is None:
-        return None
-
-    divisor = row.fit_obj.divisor if row.fit_obj else np.mean(row.dip_ctrl)
-
-    return aa_obs(row.dip_expt / divisor)
 
 
 def _calc_auc(row):
@@ -1059,7 +1054,6 @@ def fit_params_from_base(
         custom_e_values=frozenset(),
         custom_e_rel_values=frozenset(),
         include_aa=False,
-        include_aa_obs=False,
         include_auc=False,
         include_hill=False,
         include_emax=False,
@@ -1076,14 +1070,9 @@ def fit_params_from_base(
                                      include_hill,
                                      include_emax, include_einf)
 
-    if include_response_values or include_aa_obs:
+    if include_response_values:
         df_params = _attach_response_values(df_params, ctrl_resp_data,
                                             expt_resp_data, ctrl_dose_fn)
-
-    if include_aa_obs:
-        is_viability = base_params._drmetric == 'viability'
-        df_params['aa_obs'] = df_params.apply(
-            _calc_aa_obs, args=(is_viability, ), axis=1)
 
     return df_params
 
