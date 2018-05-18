@@ -560,7 +560,9 @@ def _get_control_responses(ctrl_dip_data, dataset, cl_name, dip_grp):
         plates = dip_grp['plate'].unique()
     else:
         plates = []
-    ctrl_dip_data_cl = ctrl_dip_data_cl.loc[plates]
+
+    ctrl_dip_data_cl = ctrl_dip_data_cl.loc[ctrl_dip_data_cl.index.isin(
+        plates, level='plate')]
 
     return ctrl_dip_data_cl
 
