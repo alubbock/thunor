@@ -448,6 +448,15 @@ class HtsPandas(object):
         )
 
 
+def _time_parser(t):
+    try:
+        t = float(t)
+    except ValueError:
+        raise PlateFileParseException(
+            'Error parsing time value: "{}"'.format(t))
+    return timedelta(hours=t)
+
+
 def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                                    plate_height=16, sep='\t'):
     """
@@ -473,30 +482,42 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     """
     pm = PlateMap(width=plate_width, height=plate_height)
 
-    df = pd.read_csv(file_or_source,
-                     encoding='utf8',
-                     dtype={
-                         'expt.id': str,
-                         'upid': str,
-                         'cell.line': str,
-                         'drug1': str,
-                         'drug1.conc': np.float64,
-                         'drug1.units': str,
-                         'drug2': str,
-                         'drug2.conc': np.float64,
-                         'drug2.units': str,
-                         'cell.count': np.int64,
-                     },
-                     converters={
-                         'time': lambda t: timedelta(
-                             hours=float(t)),
-                         'well': lambda w: pm.well_name_to_id(w),
-                         'expt.date': lambda
-                             d: datetime.strptime(
-                             d, '%Y-%m-%d').date()
-                     },
-                     sep=sep
-                     )
+    try:
+        df = pd.read_csv(file_or_source,
+                         encoding='utf8',
+                         dtype={
+                             'expt.id': str,
+                             'upid': str,
+                             'cell.line': str,
+                             'drug1': str,
+                             'drug1.conc': np.float64,
+                             'drug1.units': str,
+                             'drug2': str,
+                             'drug2.conc': np.float64,
+                             'drug2.units': str,
+                             'cell.count': np.int64,
+                         },
+                         converters={
+                             'time': _time_parser,
+                             'well': lambda w: pm.well_name_to_id(w),
+                             'expt.date': lambda
+                                 d: datetime.strptime(
+                                 d, '%Y-%m-%d').date()
+                         },
+                         sep=sep
+                         )
+    except ValueError as ve:
+        errstr = str(ve)
+        if errstr.startswith('Invalid well name'):
+            raise PlateFileParseException(ve)
+        elif errstr.startswith('could not convert string to float'):
+            raise PlateFileParseException(
+                'Invalid value for drug concentration ({})'.format(errstr))
+        elif errstr.startswith('invalid literal for int() with base 10'):
+            raise PlateFileParseException(
+                'Invalid value for cell count ({})'.format(errstr))
+        else:
+            raise
 
     df.set_index(['upid', 'well'], inplace=True)
 
@@ -547,19 +568,46 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     pm = PlateMap(width=plate_width, height=plate_height)
 
     # Sanity checks
-    if (df['cell.count'] < 0).any():
-        raise PlateFileParseException('cell.count contains negative '
-                                      'values')
+    try:
+        if (df['cell.count'] < 0).any():
+            raise PlateFileParseException('cell.count contains negative '
+                                          'values')
+    except KeyError:
+        raise PlateFileParseException('Check for "cell.count" column header')
 
-    if (df['time'] < ZERO_TIMEDELTA).any():
-        raise PlateFileParseException('time contains negative value(s)')
+    try:
+        if (df['time'] < ZERO_TIMEDELTA).any():
+            raise PlateFileParseException('time contains negative value(s)')
+    except KeyError:
+        raise PlateFileParseException('Check for "time" column header')
 
     drug_no = 1
     drug_nums = []
     while ('drug%d' % drug_no) in df.columns.values:
-        if (df['drug%d.conc' % drug_no] < 0).any():
-            raise PlateFileParseException('drug%d.conc contains negative '
-                                          'value(s)' % drug_no)
+        try:
+            if (df['drug%d.conc' % drug_no] < 0).any():
+                raise PlateFileParseException('drug%d.conc contains negative '
+                                              'value(s)' % drug_no)
+        except KeyError:
+            raise PlateFileParseException(
+                'Check for "drug{}.conc" column header'.format(drug_no))
+
+        null_drug_names = df['drug%d' % drug_no].isnull()
+        null_dose_positions = df['drug%d.conc' % drug_no].loc[null_drug_names]
+        if (~null_dose_positions.isnull() & null_dose_positions != 0.0).any():
+            raise PlateFileParseException(
+                'Check that blank drug{} entries have blank or zero '
+                'concentration also'.format(drug_no))
+
+        if 'drug%d.units' % drug_no not in df.columns:
+            raise PlateFileParseException(
+                'Check for "drug{}.units" column header'.format(drug_no))
+
+        if null_drug_names.all() and drug_no == 2 and 'drug3' not in \
+                df.columns:
+            df.drop(columns=['drug2', 'drug2.conc', 'drug2.units'])
+            break
+
         for du in df['drug%d.units' % drug_no].unique():
             if not isinstance(du, str) and np.isnan(du):
                 continue
@@ -612,9 +660,6 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     doses_cols = ["cell.line"]
 
     for n in drug_nums:
-        if any(df["drug{}.units".format(n)] != 'M'):
-            raise PlateFileParseException(
-                'Please ensure all drug concentration units are "M"')
         doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
     expt_rows = np.logical_or.reduce([df["drug{}.conc".format(n)] > 0
                                      for n in drug_nums])
@@ -790,8 +835,8 @@ def _stack_doses(df_doses, inplace=True):
     df_doses.reset_index(inplace=True)
     drug_cols = df_doses.filter(regex='^drug[0-9]+$', axis=1)
     dose_cols = df_doses.filter(regex='^dose[0-9]+$', axis=1)
-    n_drugs = len(drug_cols)
-    assert n_drugs == len(dose_cols)
+    n_drugs = len(drug_cols.columns)
+    assert n_drugs == len(dose_cols.columns)
 
     if n_drugs > 1:
         df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
@@ -800,9 +845,9 @@ def _stack_doses(df_doses, inplace=True):
             tuple, axis=1)
     else:
         lbl_drug = 'drug' if n_drugs == 0 else 'drug1'
-        df_doses[lbl_drug] = df_doses[lbl_drug].transform(lambda x: (x, ))
+        df_doses['drug'] = df_doses[lbl_drug].transform(lambda x: (x, ))
         lbl_dose = 'dose' if n_drugs == 0 else 'dose1'
-        df_doses[lbl_dose] = df_doses[lbl_dose].transform(lambda x: (x, ))
+        df_doses['dose'] = df_doses[lbl_dose].transform(lambda x: (x, ))
 
     df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
                   axis=1, inplace=True)

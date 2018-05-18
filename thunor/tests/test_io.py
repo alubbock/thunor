@@ -2,6 +2,11 @@ import thunor.io
 import unittest
 import pkg_resources
 import tempfile
+import io
+import pytest
+
+
+CSV_HEADER = 'cell.line,drug1.conc,drug1,upid,time,cell.count,well,drug1.units'
 
 
 def _assert_datasets_equal(d1, d2):
@@ -10,6 +15,12 @@ def _assert_datasets_equal(d1, d2):
     assert d1.doses.shape[0] == d2.doses.shape[0]
     assert d1.controls.shape[0] == d2.controls.shape[0]
     assert d1.assays.shape[0] == d2.assays.shape[0]
+
+
+def _check_csv(csv_data):
+    newdf = thunor.io.read_vanderbilt_hts(io.StringIO(csv_data), sep=',')
+    assert isinstance(newdf, thunor.io.HtsPandas)
+    return newdf
 
 
 class TestWithDataset(unittest.TestCase):
@@ -34,3 +45,51 @@ class TestWithDataset(unittest.TestCase):
             newdf = thunor.io.read_vanderbilt_hts(tf.name)
 
             _assert_datasets_equal(self.hts007, newdf)
+
+
+class TestCSV(unittest.TestCase):
+    def test_csv_valid(self):
+        _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,1234,A1,M')
+
+    def test_csv_non_molar_unit(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,1234,A1,mM')
+
+    def test_csv_well_out_of_range(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,1234,A99,M')
+
+    def test_csv_non_numerical_dose(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + '\ncl1,dose,drug1,plate1,12,1234,A1,M')
+
+    def test_csv_non_numerical_time(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,t,1234,A99,M')
+
+    def test_csv_non_numerical_cell_count(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,X,A1,M')
+
+
+class TestCSVTwoDrugs(unittest.TestCase):
+    def test_csv_two_drugs(self):
+        _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+                   '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M,0.00010')
+
+    def test_csv_two_drugs_drug_conc_missing(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + ',drug2,drug2.units'
+                       '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M')
+
+    def test_csv_two_drugs_drug2_blank_conc_specified(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+                       '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0.00010')
+
+    def test_csv_two_drugs_drug2_blank(self):
+        csv = _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+                         '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,')
+        # Second drug should get dropped, since it's empty
+        assert len(csv.doses.index.get_level_values('drug')[0]) == 1
+        assert len(csv.doses.index.get_level_values('dose')[0]) == 1
