@@ -71,6 +71,9 @@ class TestCSV(unittest.TestCase):
         with pytest.raises(thunor.io.PlateFileParseException):
             _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,X,A1,M')
 
+    def test_csv_only_control_well(self):
+        _check_csv(CSV_HEADER + '\ncl1,0,,plate1,12,1234,A1,M')
+
 
 class TestCSVTwoDrugs(unittest.TestCase):
     def test_csv_two_drugs(self):

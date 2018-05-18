@@ -605,7 +605,6 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
         if null_drug_names.all() and drug_no == 2 and 'drug3' not in \
                 df.columns:
-            df.drop(columns=['drug2', 'drug2.conc', 'drug2.units'])
             break
 
         for du in df['drug%d.units' % drug_no].unique():
