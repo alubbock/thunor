@@ -612,7 +612,9 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     doses_cols = ["cell.line"]
 
     for n in drug_nums:
-        assert df["drug{}.units".format(n)].unique() == 'M'
+        if any(df["drug{}.units".format(n)] != 'M'):
+            raise PlateFileParseException(
+                'Please ensure all drug concentration units are "M"')
         doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
     expt_rows = np.logical_or.reduce([df["drug{}.conc".format(n)] > 0
                                      for n in drug_nums])
