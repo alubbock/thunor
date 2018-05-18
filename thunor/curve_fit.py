@@ -564,6 +564,9 @@ def _get_control_responses(ctrl_dip_data, dataset, cl_name, dip_grp):
     ctrl_dip_data_cl = ctrl_dip_data_cl.loc[ctrl_dip_data_cl.index.isin(
         plates, level='plate')]
 
+    if ctrl_dip_data_cl.empty:
+        return None
+
     return ctrl_dip_data_cl
 
 

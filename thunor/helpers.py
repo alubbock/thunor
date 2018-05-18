@@ -68,6 +68,8 @@ def _plotly_scatter_to_dataframe(plot_fig):
         yaxis_name = 'y'
     for trace in plot_fig['data']:
         trace_name = strip_tags(trace['name'])
+        if trace['x'] is None:
+            continue
         for i in range(len(trace['x'])):
             rows.append({
                 'trace_name': trace_name,
