@@ -873,6 +873,9 @@ def read_hdf(filename_or_buffer):
     hts_pandas = _read_hdf_unstacked(filename_or_buffer)
     _stack_doses(hts_pandas.doses, inplace=True)
 
+    if 'dataset' in hts_pandas.doses.columns:
+        hts_pandas.doses.set_index('dataset', append=True, inplace=True)
+
     return hts_pandas
 
 
