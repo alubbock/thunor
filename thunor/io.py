@@ -618,6 +618,16 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
         drug_nums.append(drug_no)
         drug_no += 1
 
+    has_annotation = True
+    if not drug_nums:
+        if 'cell.line' in df.columns:
+            raise PlateFileParseException(
+                'drug and/or dose columns not present, but cell.line is '
+                'present. Annotation information (cell.line, drug, '
+                'drug concentrations) must either all be present or all be '
+                'absent.')
+        has_annotation = False
+
     # Check for duplicate drugs in any row
     if len(drug_nums) == 2:
         # Ignore rows where both concentrations are zero
@@ -656,48 +666,53 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     assay_name = 'Cell count'
 
-    doses_cols = ["cell.line"]
+    if has_annotation:
+        doses_cols = ["cell.line"]
 
-    for n in drug_nums:
-        doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
-    expt_rows = np.logical_or.reduce([df["drug{}.conc".format(n)] > 0
-                                     for n in drug_nums])
+        for n in drug_nums:
+            doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
+        expt_rows = np.logical_or.reduce([df["drug{}.conc".format(n)] > 0
+                                         for n in drug_nums])
 
-    df_doses = df.loc[expt_rows, doses_cols]
-    # Suppress warnings about altering a dataframe slice
-    df_doses.is_copy = False
-    df_doses.reset_index(inplace=True)
-    df_doses['well_num'] = df_doses['well']
-    df_doses = df_doses.assign(well=list(
-        ["{}__{}".format(a_, b_) for a_, b_ in
-         zip(df_doses["upid"], df_doses["well"])]))
-    df_doses = df_doses.drop_duplicates(subset='well')
-    col_renames = {'drug{}.conc'.format(n): 'dose{}'.format(n) for
-                             n in drug_nums}
-    col_renames.update({
-        'cell.line': 'cell_line',
-        'well': 'well_id',
-        'upid': 'plate'
-    })
-    df_doses.rename(columns=col_renames, inplace=True)
+        df_doses = df.loc[expt_rows, doses_cols]
+        # Suppress warnings about altering a dataframe slice
+        df_doses.is_copy = False
+        df_doses.reset_index(inplace=True)
+        df_doses['well_num'] = df_doses['well']
+        df_doses = df_doses.assign(well=list(
+            ["{}__{}".format(a_, b_) for a_, b_ in
+             zip(df_doses["upid"], df_doses["well"])]))
+        df_doses = df_doses.drop_duplicates(subset='well')
+        col_renames = {'drug{}.conc'.format(n): 'dose{}'.format(n) for
+                                 n in drug_nums}
+        col_renames.update({
+            'cell.line': 'cell_line',
+            'well': 'well_id',
+            'upid': 'plate'
+        })
+        df_doses.rename(columns=col_renames, inplace=True)
 
-    if not _unstacked:
-        _stack_doses(df_doses, inplace=True)
+        if not _unstacked:
+            _stack_doses(df_doses, inplace=True)
+        else:
+            index_cols = ['drug{}'.format(n) for n in drug_nums]
+            index_cols += ['cell_line']
+            index_cols.extend(['dose{}'.format(n) for n in drug_nums])
+            df_doses.set_index(index_cols, inplace=True)
+
+        df_doses.sort_index(inplace=True)
     else:
-        index_cols = ['drug{}'.format(n) for n in drug_nums]
-        index_cols += ['cell_line']
-        index_cols.extend(['dose{}'.format(n) for n in drug_nums])
-        df_doses.set_index(index_cols, inplace=True)
-
-    df_doses.sort_index(inplace=True)
+        df_doses = None
+        df['cell.line'] = None
+        expt_rows = [False] * len(df.index)
 
     df_controls = df[np.logical_not(expt_rows)]
+
     if df_controls.empty:
         df_controls = None
-    else:
-        df_controls = df_controls[["cell.line", "time", 'cell.count']]
 
     if df_controls is not None:
+        df_controls = df_controls[["cell.line", "time", 'cell.count']]
         df_controls.reset_index(inplace=True)
         df_controls['well_num'] = df_controls['well']
         df_controls = df_controls.assign(well=list(

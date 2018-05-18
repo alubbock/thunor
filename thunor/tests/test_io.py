@@ -74,6 +74,9 @@ class TestCSV(unittest.TestCase):
     def test_csv_only_control_well(self):
         _check_csv(CSV_HEADER + '\ncl1,0,,plate1,12,1234,A1,M')
 
+    def test_csv_only_layout_data(self):
+        _check_csv('upid,well,time,cell.count\nplate1,A01,0,123')
+
 
 class TestCSVTwoDrugs(unittest.TestCase):
     def test_csv_two_drugs(self):
