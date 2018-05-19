@@ -1092,7 +1092,7 @@ def plot_drc_params(df_params, fit_param,
             yvals['median'] = yvals[fit_param].groupby(
                 level=aggregate_by).transform(np.nanmedian)
             yvals.set_index('median', append=True, inplace=True)
-            yvals.sort_index(level=['median'] + aggregate_by, ascending=False,
+            yvals.sort_index(level=['median'] + aggregate_by, ascending=True,
                              inplace=True)
             yvals.reset_index('median', drop=True, inplace=True)
         else:
@@ -1106,7 +1106,7 @@ def plot_drc_params(df_params, fit_param,
             yvals = pd.concat([yvals, median_cols], axis=1)
             yvals.set_index(['median', 'median2'], append=True, inplace=True)
             yvals.sort_index(level=['median', 'median2'] + aggregate_by,
-                             ascending=False, inplace=True)
+                             ascending=True, inplace=True)
             yvals.reset_index(['median', 'median2'], drop=True, inplace=True)
 
         # Convert yvals to a series
