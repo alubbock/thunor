@@ -30,6 +30,7 @@ class HillCurve(object):
     """ Base class defining Hill/log-logistic curve functionality """
     fit_bounds = (np.NINF, np.PINF)
     null_response_fn = np.mean
+    max_fit_evals = None
 
     def __init__(self, popt):
         self.popt = popt
@@ -41,11 +42,6 @@ class HillCurve(object):
 
     def fit(self, x):
         return self.fit_fn(x, *self.popt)
-
-    @property
-    def max_fit_evals(self):
-        """ Max number of fit_fn evaluations during fitting """
-        return None
 
     @classmethod
     @abstractmethod
@@ -119,6 +115,8 @@ class HillCurveNull(HillCurve):
 
 
 class HillCurveLL4(HillCurve):
+    max_fit_evals = 10_000
+
     def __init__(self, popt):
         super(HillCurveLL4, self).__init__(popt)
         self._popt_rel = None
@@ -173,10 +171,6 @@ class HillCurveLL4(HillCurve):
         b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
 
         return b_val, c_val, d_val, e_val
-
-    @property
-    def max_fit_evals(self):
-        return 10_000
 
     @property
     def ec50(self):
@@ -329,6 +323,7 @@ class HillCurveLL3u(HillCurveLL4):
         (0.0, 0.0, np.NINF),
         (np.PINF, 1.0, np.PINF)
     )
+    max_fit_evals = None
 
     @staticmethod
     def null_response_fn(_):
