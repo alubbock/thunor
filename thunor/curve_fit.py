@@ -42,6 +42,11 @@ class HillCurve(object):
     def fit(self, x):
         return self.fit_fn(x, *self.popt)
 
+    @property
+    def max_fit_evals(self):
+        """ Max number of fit_fn evaluations during fitting """
+        return None
+
     @classmethod
     @abstractmethod
     def initial_guess(cls, x, y):
@@ -168,6 +173,10 @@ class HillCurveLL4(HillCurve):
         b_val, e_val = _find_be_ll4(x, y, c_val, d_val)
 
         return b_val, c_val, d_val, e_val
+
+    @property
+    def max_fit_evals(self):
+        return 10_000
 
     @property
     def ec50(self):
@@ -358,6 +367,10 @@ class HillCurveLL3u(HillCurveLL4):
         return hill, emax, ec50
 
     @property
+    def max_fit_evals(self):
+        return None
+
+    @property
     def ec50(self):
         return self.popt[2]
 
@@ -475,7 +488,8 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
                                               responses,
                                               bounds=fit_cls.fit_bounds,
                                               p0=curve_initial_guess,
-                                              sigma=response_std_errs
+                                              sigma=response_std_errs,
+                                              maxfev=fit_cls.max_fit_evals
                                               )
     except RuntimeError:
         # Some numerical issue with curve fitting
@@ -497,7 +511,7 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         ssq_model = ((response_curve - responses) ** 2).sum()
         ssq_null = ((null_response_value - responses) ** 2).sum()
 
-        df = len(doses) - 4
+        df = len(doses) - len(popt)
 
         f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
         p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
