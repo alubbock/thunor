@@ -362,10 +362,6 @@ class HillCurveLL3u(HillCurveLL4):
         return hill, emax, ec50
 
     @property
-    def max_fit_evals(self):
-        return None
-
-    @property
     def ec50(self):
         return self.popt[2]
 
