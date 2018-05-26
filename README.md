@@ -1,23 +1,27 @@
 # Thunor
 
-Thunor is a Python package for managing and viewing multi-timepoint high
-throughput screen data. It utilizes the drug-induced proliferation rate (DIP
-rate) metric, which is a dynamic measure of drug response.
+**Thunor** (pronounced THOO-nor) is a free software platform for managing,
+visualizing, and analyzing high throughput screen (HTS) data, which measure
+the dose-dependent response of cells to one or more drug(s).
+Thunor has a web interface for drag-and-drop upload of cell count data, 
+automatic calculation of dose response curves, and an interactive
+multi-panelled plot system.
+
+This repository, Thunor Core, is a Python package which can be used for
+standalone analysis or integration into computational pipelines.
+
+Also available is [Thunor Web](https://github.com/alubbock/thunor-web),
+which builds on Thunor Core. Thunor Web is a
+[Django](https://www.djangoproject.com/)-based web application which
+stores datasets in a database, provides group-based access control,
+a tagging system for cell lines and drugs, and an interactive plot
+interface.
 
 ## Implementation
 
-Thunor makes extensive use of [pandas](http://pandas.pydata.org/) and 
-[plotly](http://plot.ly/python/), so familiarity with those libraries is 
-recommended.
-
-## Requirements
-
- * **numpy**
- * **scipy**
- * **pandas**
- * **plotly**
- * **pytables** for HDF5 format read/write
- * **seaborn** for colour palette selection
+Thunor is written in pure Python and is compatible with Python 3 only.
+It makes extensive use of [pandas](http://pandas.pydata.org/) and 
+[plotly](http://plot.ly/python/).
 
 ## Examples
 

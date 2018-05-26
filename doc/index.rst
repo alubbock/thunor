@@ -1,9 +1,10 @@
-Welcome to Thunor's documentation!
-==================================
+Welcome to Thunor Core's documentation!
+=======================================
 
-Thunor is a Python package for managing and viewing multi-timepoint high
-throughput screen data. It utilizes the drug-induced proliferation rate (DIP
-rate) metric, which is a dynamic measure of drug response.
+Thunor Core is a Python package for managing and viewing high
+throughput screen data. It can calculate and visualize both single-timepoint
+viability calculations, and the multi-timepoint drug-induced proliferation
+rate (DIP rate) metric, which is a dynamic measure of drug response.
 
 Contents:
 
@@ -19,5 +20,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`
-

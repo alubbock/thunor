@@ -54,7 +54,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Thunor'
+project = u'Thunor Core'
 copyright = u'2018, Alex Lubbock'
 author = u'Alex Lubbock'
 
@@ -265,7 +265,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'Thunor.tex', u'Thunor Documentation',
+    (master_doc, 'Thunor.tex', u'Thunor Core Documentation',
      u'Alex Lubbock', 'manual'),
 ]
 
@@ -307,7 +307,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'thunor', u'Thunor Documentation',
+    (master_doc, 'thunor', u'Thunor Core Documentation',
      [author], 1)
 ]
 
@@ -322,7 +322,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Thunor', u'Thunor Documentation',
+    (master_doc, 'Thunor', u'Thunor Core Documentation',
      author, 'Thunor', 'Drug response calculations using the DIP rate',
      'Miscellaneous'),
 ]
