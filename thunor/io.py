@@ -519,7 +519,10 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
         else:
             raise
 
-    df.set_index(['upid', 'well'], inplace=True)
+    try:
+        df.set_index(['upid', 'well'], inplace=True)
+    except KeyError:
+        raise PlateFileParseException('Please ensure columns "upid" and "well" are present')
 
     return df
 
