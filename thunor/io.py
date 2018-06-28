@@ -516,6 +516,9 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
         elif errstr.startswith('invalid literal for int() with base 10'):
             raise PlateFileParseException(
                 'Invalid value for cell count ({})'.format(errstr))
+        elif errstr.startswith('time data') and 'does not match format' in errstr:
+            raise PlateFileParseException(
+                'Date format should be YYYY-MM-DD ({})'.format(errstr))
         else:
             raise
 
