@@ -183,21 +183,29 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     plotly.graph_objs.Figure
         A plotly figure object containing the graph
     """
+    datasets = fit_params.index.get_level_values('dataset_id').unique()
+    if color_by:
+        num_colors = len(color_groups)
+    elif len(datasets) == 2:
+        num_colors = 2
+    else:
+        num_colors = len(fit_params)
 
-    colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups if
-                                                        color_by else
-                                                        fit_params)))
+    colours = _sns_to_rgb(sns.color_palette("husl", num_colors))
     color_index_col = None
     if color_by == 'cl':
         color_index_col = fit_params.index.names.index('cell_line')
     elif color_by == 'dr':
         color_index_col = fit_params.index.names.index('drug')
-    elif color_by is not None:
+    elif color_by is None:
+        if len(datasets) == 2:
+            color_by = 'dataset'
+            color_index_col = fit_params.index.names.index('dataset_id')
+            color_groups = {dataset: [dataset] for dataset in datasets}
+    else:
         raise ValueError('color_by must be "cl", "dr" or None')
     # Shapes used for replicate markers
     shapes = ['circle', 'circle-open']
-
-    datasets = fit_params.index.get_level_values('dataset_id').unique()
 
     try:
         is_viability = 'viability' in fit_params.columns or \
@@ -751,7 +759,14 @@ def plot_drc_params(df_params, fit_param,
             **kwargs
         )
 
-    if color_by:
+    color_by_col = None
+    if multi_dataset and not color_by:
+        color_by_col = 'dataset_id'
+        color_by = 'dataset'
+        color_groups = {dataset: [dataset] for dataset in df_params.index.get_level_values('dataset_id').unique()}
+        colours = _sns_to_rgb(sns.color_palette("husl", 2))
+    elif color_by:
+        color_by_col = 'cell_line' if color_by == 'cl' else 'drug'
         colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups)))
     else:
         colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
@@ -875,9 +890,7 @@ def plot_drc_params(df_params, fit_param,
 
         if color_by:
             for idx, tag_name in enumerate(color_groups):
-                location = df_params.index.get_level_values(
-                    'cell_line' if color_by == 'cl' else 'drug').isin(
-                    color_groups[tag_name])
+                location = df_params.index.get_level_values(color_by_col).isin(color_groups[tag_name])
                 dat = df_params[location]
                 symbols, hovertext = _symbols_hovertext_two_param_scatter(
                     dat, range_bounded_params)
@@ -958,9 +971,7 @@ def plot_drc_params(df_params, fit_param,
                                est in ic_truncated]
 
         if color_by:
-            color_ent = df_params.index.get_level_values('cell_line' if
-                                                         color_by == 'cl'
-                                                         else 'drug')
+            color_ent = df_params.index.get_level_values(color_by_col)
 
             marker_cols = []
             for c in color_ent:
@@ -1047,7 +1058,7 @@ def plot_drc_params(df_params, fit_param,
     else:
         layout['boxmode'] = 'group'
 
-        if color_by:
+        if color_by and color_by != 'dataset':
             raise CannotPlotError(
                 'Custom color schemes are not currently supported with box '
                 'plots. Either disable the coloring, or turn off aggregation.'
