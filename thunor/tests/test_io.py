@@ -99,3 +99,31 @@ class TestCSVTwoDrugs(unittest.TestCase):
         # Second drug should get dropped, since it's empty
         assert len(csv.doses.index.get_level_values('drug')[0]) == 1
         assert len(csv.doses.index.get_level_values('dose')[0]) == 1
+
+
+def test_read_incucyte():
+    filename = pkg_resources.resource_filename(
+        'thunor', 'testdata/test_incucyte_minimal.txt')
+    thunor.io.read_incucyte(filename)
+
+
+class TestPlateMap(unittest.TestCase):
+    def _plate_map(self, expected_width, expected_height):
+        pm = thunor.io.PlateMap(
+            width=expected_width,
+            height=expected_height
+        )
+        assert pm.width == expected_width
+        assert pm.height == expected_height
+        assert pm.num_wells == (expected_width * expected_height)
+        for i in range(pm.num_wells):
+            assert pm.well_name_to_id(pm.well_id_to_name(i)) == i
+
+    def test_plate_map_96(self):
+        self._plate_map(12, 8)
+
+    def test_plate_map_384(self):
+        self._plate_map(24, 18)
+
+    def test_plate_map_1536(self):
+        self._plate_map(48, 32)

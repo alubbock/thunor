@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime
 import itertools
+import io
+import re
 from .dip import _choose_dip_assay, dip_rates
 
 SECONDS_IN_HOUR = 3600
@@ -112,18 +114,31 @@ class PlateMap(object):
             Well ID for this well. See also :func:`well_id_to_name`
         """
         try:
-            row_num = ord(well_name[0]) - 65  # zero-based
+            if len(well_name) < 2:
+                raise ValueError('Well name too short')
+
+            if len(well_name) > 2 and well_name[1].isalpha():
+                row_num_mult = ord(well_name[0]) - 64 # one-based
+                if row_num_mult < 0 or row_num_mult > 25:
+                    raise ValueError('First letter is not capital alphanumeric')
+                row_num = ord(well_name[1]) - 65  # zero-based
+                row_num += (row_num_mult * 26)
+                col_num_start = 2
+            else:
+                row_num = ord(well_name[0]) - 65  # zero-based
+                col_num_start = 1
+
             if row_num < 0 or row_num > (self.height - 1):
                 raise ValueError('Unable to parse well name {} for plate with '
                                  '{} rows'.format(well_name, self.height))
 
-            col_num = int(well_name[1:]) - 1
+            col_num = int(well_name[col_num_start:]) - 1
             if col_num < 0 or col_num > (self.width - 1):
                 raise ValueError('Unable to parse well name {} for plate with '
                                  '{} cols'.format(well_name, self.width))
 
             return row_num * self.width + col_num
-        except ValueError as e:
+        except ValueError:
             if raise_error:
                 raise ValueError('Invalid well name: {}'.format(well_name))
             else:
@@ -302,6 +317,9 @@ class HtsPandas(object):
         return self.__class__(doses, assays, controls)
 
     def __repr__(self):
+        if self.doses is None:
+            return "Unannotated HTS Dataset"
+
         num_cell_lines = len(self.doses.index.get_level_values(
                              "cell_line").unique())
         num_drugs = len(self.doses.index.get_level_values("drug").unique())
@@ -565,11 +583,14 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     HtsPandas
         HTS Dataset containing the data read from the CSV
     """
-    if sep is None:
-        sep = _select_csv_separator(file_or_source)
+    if isinstance(file_or_source, pd.DataFrame):
+        df = file_or_source
+    else:
+        if sep is None:
+            sep = _select_csv_separator(file_or_source)
 
-    df = _read_vanderbilt_hts_single_df(file_or_source, plate_width,
-                                        plate_height, sep=sep)
+        df = _read_vanderbilt_hts_single_df(file_or_source, plate_width,
+                                            plate_height, sep=sep)
 
     pm = PlateMap(width=plate_width, height=plate_height)
 
@@ -926,3 +947,71 @@ def _read_hdf_unstacked(filename_or_buffer):
         df_doses.rename(columns={'plate_id': 'plate'}, inplace=True)
 
     return HtsPandas(df_doses, df_assays, df_controls)
+
+
+def read_incucyte(filename_or_buffer, plate_width=24, plate_height=16):
+    LABEL_STR = 'Label: '
+    CELL_TYPE_STR = 'Cell Type: '
+    TSV_START_STR = 'Date Time\tElapsed\t'
+
+    plate_name = 'Unnamed plate'
+    cell_type = None
+    if isinstance(filename_or_buffer, str):
+        plate_name = filename_or_buffer
+    elif hasattr(filename_or_buffer, 'name'):
+        plate_name = filename_or_buffer.name
+
+    def _incucyte_header(filedat):
+        for line_no, line in enumerate(filedat):
+            if line.startswith(LABEL_STR):
+                new_plate_name = line[len(LABEL_STR):].strip()
+                if new_plate_name:
+                    plate_name = new_plate_name
+            elif line.startswith(CELL_TYPE_STR):
+                cell_type = line[len(CELL_TYPE_STR):].strip()
+            elif line.startswith(TSV_START_STR):
+                return line_no
+        return None
+
+    if isinstance(filename_or_buffer, io.BytesIO):
+        filedat = io.TextIOWrapper(filename_or_buffer,
+                                   encoding='utf-8')
+        line_no = _incucyte_header(filedat)
+        filedat.detach()
+        filename_or_buffer.seek(0)
+    else:
+        with open(filename_or_buffer, 'r') as f:
+            line_no = _incucyte_header(f)
+
+    if line_no is None:
+        raise PlateFileParseException('Does not appear to be an Incucyte '
+                                      'Zoom generated file')
+
+    dat = pd.read_csv(filename_or_buffer, skiprows=line_no, sep='\t')
+
+    dat = dat.drop(dat.columns[0], axis=1)
+    dat = dat.set_index(['Elapsed'])
+    # Aggregate columns representing the same well
+    dat = dat.rename(columns=lambda x: re.sub(',.*$', '', x))
+    dat = dat.groupby(by=dat.columns, axis=1).agg(np.sum)
+
+    dat = dat.stack()
+    dat = dat.reset_index()
+    dat.columns = ['time', 'well', 'cell.count']
+
+    dat['time'] = pd.to_timedelta(dat['time'], unit='H')
+
+    pm = PlateMap(width=plate_width, height=plate_height)
+
+    try:
+        dat['well'] = dat['well'].apply(pm.well_name_to_id)
+    except ValueError as e:
+        raise PlateFileParseException(e)
+
+    if cell_type:
+        dat['cell.line'] = cell_type
+
+    dat['upid'] = plate_name
+    dat.set_index(['upid', 'well'], inplace=True)
+
+    return read_vanderbilt_hts(dat)
