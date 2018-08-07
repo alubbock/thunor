@@ -1,2 +1,7 @@
 sphinx_rtd_theme
 nbsphinx
+jupyter_client
+notebook
+numpy
+scipy
+plotly==2.0.10

@@ -332,7 +332,7 @@ def setup(app):
 
 import mock
 
-for mod_name in ('plotly', 'plotly.graph_objs'):
+for mod_name in ('plotly', 'plotly.graph_objs', 'tables'):
     sys.modules[mod_name] = mock.MagicMock()
 
 # Documents to append as an appendix to all manuals.
