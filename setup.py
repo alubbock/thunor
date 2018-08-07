@@ -11,8 +11,8 @@ def main():
     setup(
         name='thunor',
         version=versioneer.get_version(),
-        description='Dose response curves and drug induced proliferation '
-                    '(DIP) rates in Python',
+        description='Dose response curve and drug induced proliferation '
+                    '(DIP) rate fits and visualisation',
         long_description=long_description,
         long_description_content_type='text/markdown',
         author='Alex Lubbock',

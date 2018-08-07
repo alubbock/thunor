@@ -1,11 +1,18 @@
 language: python
 python:
-  - "3.6"
+- '3.6'
 before_install:
-  - pip install pytest nbval django coveralls pytest-cov
+- pip install pytest nbval django coveralls pytest-cov
 install:
-  - python setup.py install
+- python setup.py install
 script:
-  - pytest --nbval --cov=thunor
+- pytest --nbval --cov=thunor
 after_success:
-  - coveralls
+- coveralls
+deploy:
+  provider: pypi
+  username: alubbock
+  password:
+    secure: IKhC+57fcwDcJlfrMVKqODEV4l9YNCsgIBSHI6IRT3oo4HCJisCLSnbPx6KF7CH1O+/Fk7w1YmKzff7pKuvImuMd3zU1xjHVCXsFUCOWwSbS3BSCFY92f+ttrya/XZlx2LClJnDrtyDk5pJTOpUkWCqpGDnVQNIfbzzGBd/vunSyYjmYubhNgXpXDfKs/QGZ/nF8mvBnyJ9q/bkSAqaTQSXTCxJFc3OfygIuYlT/ZjL5NxP6gcebp9P3sJ7v6BpzuVVpus35doKV8OBfx1d3SG6ezXZAwaKWwTzGQXaSqZBN1LeOrn4MKvTtZGSYt9qmZRk81kBgiRq2svjOZBpLuFCZweFaofu9IukbAjhaLqPCE01ixsCG9YLxML6ah2weO/0uzv5x6Mkx0m50xC4mZBZhIaeLQ/+9VoK4BQNnsDt6S6aDZXuepAk76Vitb6jfO950EyV1e3n5Vcocpcx1HWAUcbcAUStsLUcC90rXGl+bfHQ/i9euRsxMzutF2I+evs0COSXK1WSV4Zj+1CaRi/5PKmy6RhHPKKYPphy6N15jjdp8HSeyDzI/CdpPh1PT9EMFByYMQyG3ESIWirYJqi6jyYVLixnFNCvaJ8Oc4zimuGQeUbJ8dOO+bqHqhenW2GC3VXBsnIdbKor/z4wqltWyA/zP7aLSwojq13thUsk=
+  on:
+    tags: true

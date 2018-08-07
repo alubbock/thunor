@@ -16,9 +16,17 @@ Thunor is written in pure Python and is compatible with Python 3 only.
 It makes extensive use of [pandas](http://pandas.pydata.org/) and 
 [plotly](http://plot.ly/python/).
 
-## Examples
+## Installation
 
-See the Jupyter notebook `tutorial.ipynb` for worked examples.
+Install using `pip`:
+
+```
+pip install thunor
+```
+
+## Examples and documentation
+
+See [Thunor Core documentation](https://core.thunor.net).
 
 ## Further help and resources
 
