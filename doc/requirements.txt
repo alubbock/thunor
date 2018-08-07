@@ -5,3 +5,6 @@ notebook
 numpy
 scipy
 plotly==2.0.10
+pandas
+seaborn
+tables

@@ -115,7 +115,7 @@ class HillCurveNull(HillCurve):
 
 
 class HillCurveLL4(HillCurve):
-    max_fit_evals = 10_000
+    max_fit_evals = 10000
 
     def __init__(self, popt):
         super(HillCurveLL4, self).__init__(popt)
