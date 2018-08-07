@@ -3,7 +3,10 @@ import collections
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
 from functools import reduce
-from django.utils.html import strip_tags
+try:
+    from django.utils.html import strip_tags
+except ImportError:
+    strip_tags = None
 
 
 _SI_PREFIXES = collections.OrderedDict([
@@ -57,6 +60,9 @@ def format_dose(num, sig_digits=12, array_as_string=None):
 
 
 def _plotly_scatter_to_dataframe(plot_fig):
+    if strip_tags is None:
+        raise ImportError('This function requires django')
+
     rows = []
     try:
         xaxis_name = strip_tags(plot_fig['layout']['xaxis']['title'])

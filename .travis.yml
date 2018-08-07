@@ -2,10 +2,10 @@ language: python
 python:
   - "3.6"
 before_install:
-  - pip install numpy scipy pandas seaborn pytest nbval plotly
-
+  - pip install pytest nbval django coveralls
 install:
   - python setup.py install
-
 script:
   - pytest --nbval
+after_success:
+  - coveralls

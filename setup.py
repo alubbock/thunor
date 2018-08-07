@@ -19,8 +19,8 @@ def main():
         author_email='code@alexlubbock.com',
         url='https://www.thunor.net',
         packages=['thunor'],
-        install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn'],
-        tests_require=['pytest', 'nbformat', 'nbconvert'],
+        install_requires=['numpy', 'scipy', 'pandas', 'plotly==2.0.10', 'seaborn', 'tables'],
+        tests_require=['pytest', 'nbval', 'django'],
         cmdclass=versioneer.get_cmdclass(),
         zip_safe=True,
         classifiers=[
