@@ -1,6 +1,32 @@
 Thunor Changelog
 ================
 
+## v0.1.10 - 2018-08-06
+
+### New features
+
+* IncuCyte Zoom format parser
+* Colour by dataset on two-dataset plots
+* Mann-Whitney U test on bar plots with two groups
+* One-way ANOVA on box plots
+* Support for 1536 well plates
+
+### Bugfixes
+
+* Various file parser improvements
+* Sort box plots ascending order, to match bar plots
+
+## v0.1.9 - 2018-03-08
+
+### Improvements
+
+* Only use control wells from same plate(s) as experimental data wells
+* Viability curves now use 3 parameter model, with upper plateau fixed at 1
+
+### Bugfixes
+
+* Fix axis label on viability plot
+
 ## v0.1.8 - 2018-03-05
 
 ### New features

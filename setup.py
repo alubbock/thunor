@@ -1,19 +1,35 @@
 from setuptools import setup
 import versioneer
+import os
 
 
 def main():
-    setup(name='thunor',
-          version=versioneer.get_version(),
-          description='Dose response curves and drug induced proliferation '
-                      '(DIP) rates in Python',
-          author='Alex Lubbock',
-          author_email='code@alexlubbock.com',
-          packages=['thunor'],
-          install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn'],
-          tests_require=['pytest', 'nbformat', 'nbconvert'],
-          cmdclass=versioneer.get_cmdclass(),
-          zip_safe=True
+    this_directory = os.path.abspath(os.path.dirname(__file__))
+    with open(os.path.join(this_directory, 'README.md'), 'r') as f:
+        long_description = f.read()
+
+    setup(
+        name='thunor',
+        version=versioneer.get_version(),
+        description='Dose response curves and drug induced proliferation '
+                    '(DIP) rates in Python',
+        long_description=long_description,
+        long_description_content_type='text/markdown',
+        author='Alex Lubbock',
+        author_email='code@alexlubbock.com',
+        url='https://www.thunor.net',
+        packages=['thunor'],
+        install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn'],
+        tests_require=['pytest', 'nbformat', 'nbconvert'],
+        cmdclass=versioneer.get_cmdclass(),
+        zip_safe=True,
+        classifiers=[
+            'Intended Audience :: Science/Research',
+            'Programming Language :: Python',
+            'Topic :: Scientific/Engineering :: Bio-Informatics',
+            'Topic :: Scientific/Engineering :: Chemistry',
+            'Topic :: Scientific/Engineering :: Medical Science Apps.',
+        ]
     )
 
 
