@@ -7,6 +7,12 @@ from decimal import Decimal
 
 PARAM_EQUAL_ATOL = 1e-16
 PARAM_EQUAL_RTOL = 1e-12
+# Curve fitting E0 tolerance parameters
+E0_TEST_MIN_CTRLS_STD_DEV = 5  # min # controls to use std. dev.
+E0_TEST_MULTIPLIER = 1.2
+# Value to divide minimum dose by to get "control dose" for visualization
+# and dip fits
+CTRL_DOSE_DIVISOR = 10.0
 
 
 class ValueWarning(UserWarning):
@@ -425,7 +431,7 @@ class HillCurveLL2(HillCurveLL3u):
 
 def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
             null_rejection_threshold=0.05,
-            ctrl_dose=None):
+            ctrl_dose_test=False):
     """
     Fit a dose response curve
 
@@ -443,10 +449,11 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     null_rejection_threshold: float, optional
         p-value for rejecting curve fit against no effect "flat" response
         model by F-test (default: 0.05). Set to None to skip test.
-    ctrl_dose: float, optional
-        Enter the dose used to represent control values, if you wish to reject
-        fits where E0 is not greater than a standard deviation higher than the
-        mean of the control response values. Leave as None to skip the test.
+    ctrl_dose_test: boolean
+        If True, the minimum dose is assumed to represent control values (in
+        DIP rate curves), and will reject fits where E0 is greater than a
+        standard deviation higher than the mean of the control response values.
+        Leave as False to skip the test.
 
     Returns
     -------
@@ -514,9 +521,14 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         # Reject fit if EC50 less than min dose
         return None
 
-    if ctrl_dose is not None:
-        controls = responses[np.equal(doses, ctrl_dose)]
-        if fit_obj.e0 > (np.mean(controls) + np.std(controls)):
+    if ctrl_dose_test:
+        responses = np.array(responses)
+        controls = responses[np.equal(doses, np.min(doses))]
+        if len(controls) >= E0_TEST_MIN_CTRLS_STD_DEV:
+            ctrl_resp_thresh = np.mean(controls) + np.std(controls)
+        else:
+            ctrl_resp_thresh = E0_TEST_MULTIPLIER * np.mean(controls)
+        if fit_obj.e0 > ctrl_resp_thresh:
             return None
 
     return fit_obj
@@ -602,7 +614,8 @@ def aa_obs(responses, doses=None):
 
 def fit_params_minimal(ctrl_data, expt_data,
                        fit_cls=HillCurveLL4,
-                       ctrl_dose_fn=lambda doses: np.min(doses) / 10.0):
+                       ctrl_dose_fn=lambda doses: np.min(doses) /
+                       CTRL_DOSE_DIVISOR):
     """
     Fit dose response curves to DIP or viability, and calculate statistics
 
@@ -732,10 +745,14 @@ def fit_params_minimal(ctrl_data, expt_data,
                 dip_ctrl_std_err,
                 dip_grp['dip_fit_std_err'].values))
 
-            fit_obj = fit_drc(
-                doses, dip_all, dip_std_errs,
-                fit_cls=fit_cls
-            )
+            try:
+                fit_obj = fit_drc(
+                    doses, dip_all, dip_std_errs,
+                    fit_cls=fit_cls,
+                    ctrl_dose_test=True
+                )
+            except KeyError:
+                fit_obj = None
 
             if fit_obj is not None:
                 aa_obs_val = aa_obs(resp_expt / fit_obj.divisor, doses_expt)
@@ -1011,7 +1028,7 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
 
 def fit_params(ctrl_data, expt_data,
                fit_cls=HillCurveLL4,
-               ctrl_dose_fn=lambda doses: np.min(doses) / 10.0):
+               ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR):
     """
     Fit dose response curves to DIP rates or viability data
 
@@ -1058,7 +1075,7 @@ def fit_params(ctrl_data, expt_data,
 def fit_params_from_base(
         base_params,
         ctrl_resp_data=None, expt_resp_data=None,
-        ctrl_dose_fn=lambda doses: np.min(doses) / 10.0,
+        ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
         custom_ic_concentrations=frozenset(),
         custom_ec_concentrations=frozenset(),
         custom_e_values=frozenset(),
