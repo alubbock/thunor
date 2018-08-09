@@ -75,15 +75,17 @@ def _load_wells(directory):
 
 
 def import_ctrp(directory):
+    print('This process may take several minutes, please be patient.')
     print('Reading HTS data...')
     compounds = _load_compounds(directory)
     plates = _load_plates(directory)
     cell_lines = _load_cell_lines(directory)
     experiments = _load_experiments(directory)
+    wells = _load_wells(directory)
+
+    print('Constructing dataset...')
     experiments = experiments.merge(cell_lines, left_on='master_ccl_id',
                                     right_index=True)
-    wells = _load_wells(directory)
-    # num_wells = wells.shape[0]
     wells = wells.merge(experiments, left_on='experiment_id',
                         right_index=True)
 
@@ -93,6 +95,7 @@ def import_ctrp(directory):
     # assert wells.shape[0] == num_wells
 
     # Process controls (we only have per-plate averages)
+    print('Processing controls...')
     controls_list = []
     for plate in wells['assay_plate_barcode'].unique():
         plate_data = plates.loc[plate]
@@ -112,6 +115,7 @@ def import_ctrp(directory):
                                    'timepoint'])
 
     # Process doses and assays
+    print('Processing assays...')
     wells = wells.drop(columns=['master_ccl_id', 'master_cpd_id',
                                 'experiment_id'])
     wells.columns = ['plate', 'value', 'dose', 'well_num', 'cell_line', 'drug']
@@ -134,6 +138,51 @@ def import_ctrp(directory):
 
 def convert_ctrp(directory='.',
                  output_file='ctrp_v2.h5'):
+    """
+    Convert CTRP v2.0 data to Thunor format
+
+    CTRP is the Cancer Therapeutics Response Portal, a project which has
+    generated a large quantity of viability data.
+
+    The data are freely available from the CTD2 Data Portal:
+
+    https://ocg.cancer.gov/programs/ctd2/data-portal
+
+    The required files can be downloaded from their FTP server:
+
+    ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/
+
+    You'll need to download and extract the following file:
+
+    * "CTRPv2.0_2015_ctd2_ExpandedDataset.zip"
+
+    Please note that the layout of wells in each plate after conversion is
+    arbitrary, since this information is not in the original files.
+
+    Please make sure you have the "tables" python package installed,
+    in addition to the standard Thunor Core requirements.
+
+    You can run this function at the command line to convert the files;
+    assuming the two files are in the current directory, simply run::
+
+        python -c "from thunor.converters import convert_ctrp; convert_ctrp()"
+
+    This script will take several minutes to run, please be patient. It is also
+    resource-intensive, due to the size of the dataset. We recommend you utilize
+    the highest-spec machine that you have available.
+
+    This will output a file called (by default) :file:`ctrp_v2.h5`,
+    which can be opened with :func:`thunor.io.read_hdf()`, or used with Thunor
+    Web.
+
+    Parameters
+    ----------
+    directory: str
+        Directory containing the extracted CTRP v2.0 dataset
+    output_file: str
+        Filename of output file (Thunor HDF5 format)
+
+    """
     hts = import_ctrp(directory)
     print('Writing HDF5 file...')
     write_hdf(hts, output_file)

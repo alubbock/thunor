@@ -50,6 +50,7 @@ def _get_controls(df, num_controls):
 
 
 def import_gdsc(drug_list_file, screen_data_file):
+    print('This process may take several minutes, please be patient.')
     print('Reading drug names...')
     drug_list = pd.read_excel(drug_list_file, converters={
         'Drug Name': str
@@ -146,19 +147,27 @@ def convert_gdsc(drug_list_file='Screened_Compounds.xlsx',
 
     You'll need to download two files to convert to Thunor format:
 
-    * The list of drugs, "Screened_Compoounds.xlsx"
+    * The list of drugs, "Screened_Compounds.xlsx"
     * Sensitivity data, "v17a_public_raw_data.xlsx"
 
     Please note that the layout of wells in each plate after conversion is
     arbitrary, since this information is not in the original files.
+
+    Please make sure you have the "tables" and "xlrd" python packages installed,
+    in addition to the standard Thunor Core requirements.
 
     You can run this function at the command line to convert the files;
     assuming the two files are in the current directory, simply run::
 
         python -c "from thunor.converters import convert_gdsc; convert_gdsc()"
 
+    This script will take several minutes to run, please be patient. It is also
+    resource-intensive, due to the size of the dataset. We recommend you utilize
+    the highest-spec machine that you have available.
+
     This will output a file called (by default) :file:`gdsc-v17a.h5`,
-    which can be opened with :func:`thunor.io.read_hdf()`.
+    which can be opened with :func:`thunor.io.read_hdf()`, or used with Thunor
+    Web.
 
     Parameters
     ----------
