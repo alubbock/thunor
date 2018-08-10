@@ -1,6 +1,24 @@
 Thunor Changelog
 ================
 
+## v0.1.12 - 2018-08-09
+
+### Improvements
+
+* Document CTRP converter
+* Hill coefficient plots now use log scale
+
+## v0.1.11 - 2018-08-08
+
+### Improvements
+
+* Add rejection test for DIP curve fits based on E0:
+
+    If number of controls >=5, then reject fit if
+      E0 > (mean(controls) + stddev(controls))
+    Else reject fit if
+      E0 > 1.2 * mean(controls)
+
 ## v0.1.10 - 2018-08-06
 
 ### New features

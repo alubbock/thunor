@@ -73,7 +73,8 @@ def _secs_to_str(seconds):
 
 
 def _param_is_log(param_id):
-    return IC_REGEX.match(param_id) or EC_REGEX.match(param_id)
+    return (IC_REGEX.match(param_id) or EC_REGEX.match(param_id) or
+            param_id == 'hill')
 
 
 def _param_na_first(param_id):
