@@ -112,8 +112,12 @@ def _expt_dip(df_timecourses, selector_fn):
     first_timepoint = None
     final_intercept = None
     dip_selector = -np.inf
-    if n_total < 3:
+    if n_total < 2:
         return None
+    if n_total == 2:
+        # Only two time points, so we can't do variable delay detection
+        dip, std_err, intercept = _ctrl_dip(df_timecourses)
+        return dip, std_err, t_hours[0], intercept
     for i in range(n_total - 2):
         x = t_hours[i:]
         y = assay_vals[i:]
