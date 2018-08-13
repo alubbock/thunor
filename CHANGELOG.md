@@ -1,6 +1,17 @@
 Thunor Changelog
 ================
 
+## v0.1.13 - 2018-08-13
+
+### Improvements
+
+* Support for DIP rate calculation with only two time points
+
+### Bugfixes
+
+* Use control data points to calculate relative DIP rate on
+  dose-response "curves" where no fit was available
+
 ## v0.1.12 - 2018-08-09
 
 ### Improvements
