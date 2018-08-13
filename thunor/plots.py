@@ -363,8 +363,10 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                 if fp.fit_obj is not None and \
                         not isinstance(fp.fit_obj, HillCurveNull):
                     divisor = fp.fit_obj.divisor
+                elif fp.fit_obj is None and ctrl_resp is not None:
+                    divisor = np.mean(ctrl_resp)
                 else:
-                    divisor = np.mean(y_trace)
+                    divisor = 1
                 y_trace /= divisor
                 if ctrl_resp is not None:
                     ctrl_resp /= divisor
