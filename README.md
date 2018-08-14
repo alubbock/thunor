@@ -26,7 +26,27 @@ pip install thunor
 
 ## Examples and documentation
 
-See [Thunor Core documentation](https://core.thunor.net).
+The Thunor Core documentation is available [online](https://core.thunor.net),
+or you can build it locally for offline use. To do so, clone this git
+repository and change into the `thunor` directory.
+
+To build documentation locally, you'll need a few software dependencies:
+
+    pip install -r doc/requirements.txt
+
+Then, you can build the documentation like so:
+
+    cd doc
+    make html
+
+After the build completes, open _build/html/index.html in your web browser.
+
+## Tutorial
+
+To manually work through the tutorial from the documentation above, you can
+open the file with Jupyter Notebook:
+
+    jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 doc/tutorial.ipynb
 
 ## Further help and resources
 
