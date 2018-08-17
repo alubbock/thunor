@@ -4,6 +4,7 @@ import pkg_resources
 import tempfile
 import io
 import pytest
+import os
 
 
 CSV_HEADER = 'cell.line,drug1.conc,drug1,upid,time,cell.count,well,drug1.units'
@@ -32,6 +33,10 @@ class TestWithDataset(unittest.TestCase):
 
     def test_hdf5_read_write(self):
         with tempfile.NamedTemporaryFile(suffix='.h5') as tf:
+            if os.name == 'nt':
+                # Can't have two file handles on Windows
+                tf.close()
+
             thunor.io.write_hdf(self.hts007, filename=tf.name)
 
             newdf = thunor.io.read_hdf(tf.name)
@@ -40,6 +45,10 @@ class TestWithDataset(unittest.TestCase):
 
     def test_vanderbilt_csv_read_write(self):
         with tempfile.NamedTemporaryFile(suffix='.csv') as tf:
+            if os.name == 'nt':
+                # Can't have two file handles on Windows
+                tf.close()
+
             thunor.io.write_vanderbilt_hts(self.hts007, filename=tf.name)
 
             newdf = thunor.io.read_vanderbilt_hts(tf.name)
