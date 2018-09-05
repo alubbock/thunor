@@ -472,6 +472,80 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     return go.Figure(data=data, layout=layout)
 
 
+def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
+                                  title=None, subtitle=None):
+    heat_label = 'DIP<br>rate'
+
+    if title is None:
+        title = _make_title('Dose response', expt_resp_data)
+
+    if subtitle is None:
+        datasets = expt_resp_data.index.get_level_values('dataset').unique()
+        subtitle = datasets[0]
+
+    title = _combine_title_subtitle(title, subtitle)
+
+    expt_resp_data = expt_resp_data['dip_rate']
+    if ctrl_resp_data is None:
+        raise CannotPlotError('There are no matching control wells for this '
+                              'selection, so relative DIP rate cannot be '
+                              'calculated')
+
+    expt_resp_data = expt_resp_data / ctrl_resp_data['dip_rate'].mean()
+    heat_label = 'Relative<br>' + heat_label
+
+    expt_resp_data = expt_resp_data.reset_index(['dose', 'drug'])
+    doses = expt_resp_data['dose'].apply(pd.Series)
+    doses.columns = ['dose1', 'dose2']
+
+    drugs = expt_resp_data['drug'].apply(pd.Series)
+    drugs.columns = ['drug1', 'drug2']
+    drug1 = drugs['drug1'].unique()[0]
+    drug2 = drugs['drug2'].unique()[0]
+
+    expt_resp_data = pd.concat([doses, drugs,
+                                expt_resp_data['dip_rate']], axis=1)
+
+    expt_resp_data = expt_resp_data.set_index(['dose1', 'dose2'])
+
+    dat = []
+    dose1 = sorted(expt_resp_data.index.get_level_values('dose1').unique())
+    dose2 = sorted(expt_resp_data.index.get_level_values('dose2').unique())
+    for d1, grp in expt_resp_data['dip_rate'].groupby('dose1'):
+        dat2 = []
+        grp.index = grp.index.droplevel()
+        for d2 in dose2:
+            try:
+                dat2.append(grp.loc[d2].mean())
+            except KeyError:
+                if d1 == 0 and d2 == 0:
+                    # Control well relative DIP rate is 1.0 by definition
+                    dat2.append(1.0)
+                else:
+                    dat2.append(None)
+        dat.append(dat2)
+
+    trace = go.Heatmap(x=format_dose(dose2), y=format_dose(dose1), z=dat,
+                       colorbar={'title': heat_label}, zmin=-1.5, zmax=1.5,
+                       colorscale=[
+                           (0, 'rgb(255,0,0)'),
+                           (0.5, 'rgb(255,255,0)'),
+                           (1, 'rgb(0,0,255)')
+                       ])
+
+    layout = go.Layout(
+        title=title,
+        xaxis={
+            'title': '{} concentration'.format(drug2)
+        },
+        yaxis={
+            'title': '{} concentration'.format(drug1)
+        }
+    )
+
+    return go.Figure(data=[trace], layout=layout)
+
+
 def _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
                                            fit_param, dataset_names):
     symbols = ['circle'] * len(df_params.index)
