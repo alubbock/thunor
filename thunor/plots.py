@@ -1009,8 +1009,13 @@ def plot_drc_params(df_params, fit_param,
         layout['hovermode'] = 'closest'
         layout['showlegend'] = color_by is not None
     elif not aggregate_cell_lines and not aggregate_drugs:
-        sort_by = [fit_param_sort, 'label'] if fit_param_sort is not None \
-                   else [fit_param, 'label']
+        if fit_param_sort is None:
+            sort_by = [fit_param, 'label']
+        elif fit_param_sort == 'label':
+            sort_by = ['label', fit_param]
+            fit_param_sort = None
+        else:
+            sort_by = [fit_param_sort, 'label']
         df_params = df_params.sort_values(
             by=sort_by, na_position='first' if _param_na_first(sort_by[0])
             else 'last')
@@ -1144,7 +1149,7 @@ def plot_drc_params(df_params, fit_param,
         if fit_param_sort == fit_param:
             fit_param_sort = None
 
-        if fit_param_sort is None:
+        if fit_param_sort is None or fit_param_sort == 'label':
             yvals = df_params.loc[:, [fit_param]].dropna()
         else:
             yvals = df_params.loc[:, [fit_param,
@@ -1176,11 +1181,15 @@ def plot_drc_params(df_params, fit_param,
 
         # Sort by median effect per drug set, or cell line set if there's
         # only one drug/drug group
-        if fit_param_sort is None:
+        if fit_param_sort is None or fit_param_sort == 'label':
+            if fit_param_sort == 'label':
+                sort_cols = aggregate_by + ['median']
+            else:
+                sort_cols = ['median'] + aggregate_by
             yvals['median'] = yvals[fit_param].groupby(
                 level=aggregate_by).transform(np.nanmedian)
             yvals.set_index('median', append=True, inplace=True)
-            yvals.sort_index(level=['median'] + aggregate_by, ascending=True,
+            yvals.sort_index(level=sort_cols, ascending=True,
                              inplace=True)
             yvals.reset_index('median', drop=True, inplace=True)
         else:
