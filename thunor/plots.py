@@ -360,8 +360,7 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
             except AttributeError:
                 ctrl_resp = None
             if not is_absolute:
-                if fp.fit_obj is not None and \
-                        not isinstance(fp.fit_obj, HillCurveNull):
+                if fp.fit_obj is not None:
                     divisor = fp.fit_obj.divisor
                 elif fp.fit_obj is None and ctrl_resp is not None:
                     divisor = np.mean(ctrl_resp)
