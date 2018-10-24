@@ -645,6 +645,28 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     axis_title = '{} {}'.format(dr_metric, axis_title)
 
     fit_param_data = df_params.loc[:, fit_param]
+
+    range_bounded_params = set()
+
+    match = IC_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add(match.group())
+    match = EC_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add(match.group())
+    match = E_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add('ec' + match.groups(0)[0])
+    match = E_REL_REGEX.match(fit_param)
+    if match:
+        range_bounded_params.add('ec' + match.groups(0)[0])
+
+    dataset_names = fit_param_data.columns
+
+    symbols, hovertext = _symbols_hovertext_two_dataset_scatter(
+        df_params, range_bounded_params, fit_param, dataset_names
+    )
+
     xdat = fit_param_data.iloc[:, 0]
     xdat_fit = xdat
     ydat = fit_param_data.iloc[:, 1]
@@ -653,7 +675,11 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         xdat_fit = np.log10(xdat)
         ydat_fit = np.log10(ydat)
 
-    dataset_names = fit_param_data.columns
+    fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
+                   ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
+                   [s != 'cross' for s in symbols])
+    xdat_fit = xdat_fit[fitdat_mask].values
+    ydat_fit = ydat_fit[fitdat_mask].values
 
     data = []
     layout = go.Layout(title=title)
@@ -686,21 +712,6 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                     'p-value: {:0.4g} '.format(r_value ** 2, p_value)
         }]
 
-    range_bounded_params = set()
-
-    match = IC_REGEX.match(fit_param)
-    if match:
-        range_bounded_params.add(match.group())
-    match = EC_REGEX.match(fit_param)
-    if match:
-        range_bounded_params.add(match.group())
-    match = E_REGEX.match(fit_param)
-    if match:
-        range_bounded_params.add('ec' + match.groups(0)[0])
-    match = E_REL_REGEX.match(fit_param)
-    if match:
-        range_bounded_params.add('ec' + match.groups(0)[0])
-
     if color_by:
         for idx, tag_name in enumerate(color_groups):
             dat = df_params[df_params.index.get_level_values(
@@ -724,8 +735,6 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                 name=tag_name
             ))
     else:
-        symbols, hovertext = _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
-                                                                    fit_param, dataset_names)
         colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
                        symbols]
 
@@ -907,6 +916,25 @@ def plot_drc_params(df_params, fit_param,
                 df_params._viability_time,
                 xaxis_title)
 
+        range_bounded_params = set()
+
+        for param in (fit_param, fit_param_compare):
+            match = IC_REGEX.match(param)
+            if match:
+                range_bounded_params.add(match.group())
+            match = EC_REGEX.match(param)
+            if match:
+                range_bounded_params.add(match.group())
+            match = E_REGEX.match(param)
+            if match:
+                range_bounded_params.add('ec' + match.groups(0)[0])
+            match = E_REL_REGEX.match(param)
+            if match:
+                range_bounded_params.add('ec' + match.groups(0)[0])
+
+        symbols, hovertext = _symbols_hovertext_two_param_scatter(
+            df_params, range_bounded_params)
+
         xdat_fit = np.log10(xdat) if _param_is_log(fit_param_compare) else xdat
         ydat_fit = np.log10(ydat) if _param_is_log(fit_param) else ydat
 
@@ -915,7 +943,8 @@ def plot_drc_params(df_params, fit_param,
         if len(xdat_fit) > 0:
             # Remove any infinite or NaN values from best fit line data
             fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
-                           ~np.isnan(ydat_fit) & np.isfinite(ydat_fit))
+                           ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
+                           [s != 'cross' for s in symbols])
             xdat_fit = xdat_fit[fitdat_mask].values
             ydat_fit = ydat_fit[fitdat_mask].values
 
@@ -948,22 +977,6 @@ def plot_drc_params(df_params, fit_param,
                         'p-value: {:0.4g} '.format(r_value ** 2, p_value)
             }]
 
-        range_bounded_params = set()
-
-        for param in (fit_param, fit_param_compare):
-            match = IC_REGEX.match(param)
-            if match:
-                range_bounded_params.add(match.group())
-            match = EC_REGEX.match(param)
-            if match:
-                range_bounded_params.add(match.group())
-            match = E_REGEX.match(param)
-            if match:
-                range_bounded_params.add('ec' + match.groups(0)[0])
-            match = E_REL_REGEX.match(param)
-            if match:
-                range_bounded_params.add('ec' + match.groups(0)[0])
-
         if color_by:
             for idx, tag_name in enumerate(color_groups):
                 location = df_params.index.get_level_values(color_by_col).isin(color_groups[tag_name])
@@ -985,8 +998,6 @@ def plot_drc_params(df_params, fit_param,
                     name=tag_name
                 ))
         else:
-            symbols, hovertext = _symbols_hovertext_two_param_scatter(
-                df_params, range_bounded_params)
             colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
                            symbols]
 
