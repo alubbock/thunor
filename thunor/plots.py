@@ -1178,6 +1178,14 @@ def plot_drc_params(df_params, fit_param,
             groups = cell_line_groups
             aggregate_by = ['dataset_id', 'drug']
 
+        # Add sort character '' to 'Everything else' tag
+        SORT_AT_END_CHAR = ''
+        vals = yvals.index.levels[yvals.index.names.index(
+            aggregate_by[1])].values
+        vals = [SORT_AT_END_CHAR + y if y.startswith('Everything else (')
+                else y for y in vals]
+        yvals.index = yvals.index.set_levels(vals, level=aggregate_by[1])
+
         # Sort by median effect per drug set, or cell line set if there's
         # only one drug/drug group
         if fit_param_sort is None or fit_param_sort == 'label':
@@ -1204,6 +1212,12 @@ def plot_drc_params(df_params, fit_param,
             yvals.sort_index(level=['median', 'median2'] + aggregate_by,
                              ascending=True, inplace=True)
             yvals.reset_index(['median', 'median2'], drop=True, inplace=True)
+
+        # Remove sort character '' from 'Everything else' tag
+        vals = yvals.index.levels[yvals.index.names.index(
+            aggregate_by[1])].values
+        vals = [y.replace(SORT_AT_END_CHAR, '') for y in vals]
+        yvals.index = yvals.index.set_levels(vals, level=aggregate_by[1])
 
         # Convert yvals to a series
         yvals = yvals.iloc[:, 0]
