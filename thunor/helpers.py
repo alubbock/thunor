@@ -82,7 +82,7 @@ def _plotly_scatter_to_dataframe(plot_fig):
                 xaxis_name: trace['x'][i],
                 yaxis_name: trace['y'][i],
                 'point_label': strip_tags(trace['hovertext'][i].replace(
-                    '<br>', '\n')) if trace['hovertext'] else None
+                    '<br>', '\n')) if trace['hovertext'] is not None else None
             })
 
     return pd.DataFrame(rows)
