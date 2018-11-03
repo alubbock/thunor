@@ -327,6 +327,9 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
+def setup(app):
+    app.add_javascript('https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js')
+
 import mock
 
 for mod_name in ('plotly', 'plotly.graph_objs', 'tables'):
