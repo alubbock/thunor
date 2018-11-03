@@ -930,7 +930,7 @@ def _read_hdf_unstacked(filename_or_buffer):
             'path': 'data.h5',
             'driver': 'H5FD_CORE',
             'driver_core_backing_store': 0,
-            'driver_core_image': filename_or_buffer
+            'driver_core_image': filename_or_buffer.read()
         })
     with pd.HDFStore(**hdf_kwargs) as hdf:
         df_assays = hdf['assays']
