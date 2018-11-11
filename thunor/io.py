@@ -926,11 +926,14 @@ def _read_hdf_unstacked(filename_or_buffer):
     if isinstance(filename_or_buffer, str):
         hdf_kwargs['path'] = filename_or_buffer
     else:
+        if hasattr(filename_or_buffer, 'read') and \
+                callable(filename_or_buffer.read):
+            filename_or_buffer = filename_or_buffer.read()
         hdf_kwargs.update({
             'path': 'data.h5',
             'driver': 'H5FD_CORE',
             'driver_core_backing_store': 0,
-            'driver_core_image': filename_or_buffer.read()
+            'driver_core_image': filename_or_buffer
         })
     with pd.HDFStore(**hdf_kwargs) as hdf:
         df_assays = hdf['assays']
