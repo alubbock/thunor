@@ -127,6 +127,56 @@ def import_gdsc(drug_list_file, screen_data_file):
     return HtsPandas(doses, assays, controls)
 
 
+def convert_gdsc_tags(cell_line_file='Cell_Lines_Details.xlsx',
+                      output_file='gdsc_cell_line_primary_site_tags.txt'):
+    """
+    Convert GDSC cell line tissue descriptors to Thunor tags
+
+    GDSC is the Genomics of Drug Sensitivity in Cancer, a project which has
+    generated a large quantity of viability data.
+
+    The data are freely available under the license agreement described on
+    their website:
+
+    https://www.cancerrxgene.org/downloads
+
+    The required files can be downloaded from here:
+
+    ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-6.0/
+
+    You'll need to download one file:
+
+    * Cell line details, "Cell_Lines_Details.xlsx"
+
+    You can run this function at the command line to convert the files;
+    assuming the downloaded file is in the current directory, simply run::
+
+        python -c "from thunor.converters import convert_gdsc_tags; convert_gdsc_tags()"
+
+    This will output a file called (by default)
+    :file:`gdsc_cell_line_primary_site_tags.txt`, which can be loaded into
+    Thunor Web using the "Upload cell line tags" function.
+
+    Parameters
+    ----------
+    cell_line_file: str
+        Filename of GDSC cell line details (Excel .xlsx format)
+    output_file: str
+        Filename of output file (tab separated values format)
+
+    """
+    df = pd.read_excel(cell_line_file,
+                       sheet_name='Cell line details')
+    cl_column = 'Sample Name'
+    tissue_column = 'GDSC\nTissue descriptor 1'
+    df = df[[cl_column, tissue_column]]
+    df.rename(columns={cl_column: 'cell_line',
+                       tissue_column: 'tag_name'},
+              inplace=True)
+    df['tag_category'] = 'GDSC primary site'
+    df.to_csv(output_file, sep='\t', index=False)
+
+
 def convert_gdsc(drug_list_file='Screened_Compounds.xlsx',
                  screen_data_file='v17a_public_raw_data.xlsx',
                  output_file='gdsc-v17a.h5'):
