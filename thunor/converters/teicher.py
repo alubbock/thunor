@@ -29,7 +29,7 @@ def import_teicher(directory):
     df['cell.line'] = df['cell.line'].str.replace(' ', '')
     df['cell.line'] = df['cell.line'].str.strip()
     df['drug'] = df['drug'].str.strip()
-    df = df.loc[df['drug'] != '', :]
+    df = df[~df['drug'].isna()]
 
     df['concentration'] = [(d,) for d in df['concentration'].values]
     df['drug'] = [(d,) for d in df['drug'].values]
