@@ -72,13 +72,24 @@ def _secs_to_str(seconds):
     return "Time: %d:%02d:%02d" % (h, m, s)
 
 
+def _remove_drmetric_prefix(param_id):
+    """ Remove DR metric prefix on parameter name, if present """
+    for prefix in ('viability__', 'dip__'):
+        if param_id.startswith(prefix):
+            param_id = param_id[len(prefix):]
+
+    return param_id
+
+
 def _param_is_log(param_id):
+    param_id = _remove_drmetric_prefix(param_id)
     return (IC_REGEX.match(param_id) or EC_REGEX.match(param_id) or
             param_id == 'hill')
 
 
 def _param_na_first(param_id):
     """ NAs go in the position corresponding to no effect """
+    param_id = _remove_drmetric_prefix(param_id)
     # Which is first for E, Emax, Erel, AA and Hill
     return param_id in ('hill', 'aa', 'emax', 'emax_rel', 'einf') \
            or E_REGEX.match(param_id) \
@@ -86,6 +97,7 @@ def _param_na_first(param_id):
 
 
 def _get_param_name(param_id):
+    param_id = _remove_drmetric_prefix(param_id)
     try:
         return PARAM_NAMES[param_id]
     except KeyError:
@@ -103,6 +115,7 @@ def _get_param_name(param_id):
 
 
 def _get_param_units(param_id):
+    param_id = _remove_drmetric_prefix(param_id)
     try:
         return PARAM_UNITS[param_id]
     except KeyError:
@@ -873,7 +886,7 @@ def plot_drc_params(df_params, fit_param,
         yaxis_title = '{} ({})'.format(yaxis_param_name, yaxis_units)
     else:
         yaxis_title = yaxis_param_name
-    if df_params._drmetric == 'dip':
+    if df_params._drmetric in ('dip', 'compare'):
         yaxis_title = 'DIP {}'.format(yaxis_title)
     else:
         yaxis_title = '{:g} hr viability {}'.format(df_params._viability_time,
