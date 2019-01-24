@@ -2,7 +2,7 @@ language: python
 python:
 - '3.6'
 before_install:
-- pip install pytest nbval django coveralls pytest-cov
+- pip install "pytest>=3.6" nbval django coveralls pytest-cov
 install:
 - python setup.py install
 script:
