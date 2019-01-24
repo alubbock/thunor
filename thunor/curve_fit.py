@@ -218,12 +218,13 @@ class HillCurveLL4(HillCurve):
 
         ic_frac = ic_num / 100.0
 
-        with warnings.filterwarnings(
-                'ignore',
-                'overflow encountered in double_scalars',
-                category=RuntimeWarning):
-            icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
-                               1 / self.hill_slope)
+        warnings.filterwarnings(
+            'once',
+            'overflow encountered in double_scalars',
+            category=RuntimeWarning
+        )
+        icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
+                           1 / self.hill_slope)
 
         # Filtered overflow will lead to -inf, which we deal with here
         if np.isnan(icN) or np.isinf(icN):
