@@ -4,6 +4,7 @@ import scipy.stats
 from abc import abstractmethod
 import pandas as pd
 from decimal import Decimal
+import warnings
 
 PARAM_EQUAL_ATOL = 1e-16
 PARAM_EQUAL_RTOL = 1e-12
@@ -217,10 +218,15 @@ class HillCurveLL4(HillCurve):
 
         ic_frac = ic_num / 100.0
 
-        icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
-                           1 / self.hill_slope)
+        with warnings.filterwarnings(
+                'ignore',
+                'overflow encountered in double_scalars',
+                category=RuntimeWarning):
+            icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
+                               1 / self.hill_slope)
 
-        if np.isnan(icN):
+        # Filtered overflow will lead to -inf, which we deal with here
+        if np.isnan(icN) or np.isinf(icN):
             icN = None
 
         return icN
