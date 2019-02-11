@@ -725,6 +725,13 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                     'p-value: {:0.4g} '.format(r_value ** 2, p_value)
         }]
 
+    custom_data = [
+        {'c': cl, 'd': dr} for cl, dr in zip(
+            df_params.index.get_level_values('cell_line'),
+            df_params.index.get_level_values('drug')
+        )
+    ]
+
     if color_by:
         for idx, tag_name in enumerate(color_groups):
             dat = df_params[df_params.index.get_level_values(
@@ -743,6 +750,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                 hovertext=hovertext,
                 hoverinfo="text+x+y",
                 mode='markers',
+                customdata=custom_data,
                 marker={'symbol': symbols,
                         'color': colours[idx]},
                 name=tag_name
@@ -757,6 +765,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
             hovertext=hovertext,
             hoverinfo="text+x+y",
             mode='markers',
+            customdata=custom_data,
             marker={'symbol': symbols,
                     'color': colour_list},
             name='{} vs {} {}'.format(dataset_names[0],
