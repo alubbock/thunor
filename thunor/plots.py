@@ -343,7 +343,7 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
             # No effect null hypothesis
             dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * \
                             len(dose_x_range)
-            line_dash = 5
+            line_dash = 'longdash'
         else:
             # Fit succeeded
             if is_absolute:
@@ -460,7 +460,7 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                     'hovertext': hovertext,
                     'text': annotation_label
                 })
-    data = go.Data(traces)
+
     yaxis_range = None
     yaxis_rangemode = 'tozero' if is_viability else 'normal'
     if not is_absolute:
@@ -481,7 +481,7 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                        annotations=annotations,
                        )
 
-    return go.Figure(data=data, layout=layout)
+    return go.Figure(data=traces, layout=layout)
 
 
 def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
@@ -990,6 +990,13 @@ def plot_drc_params(df_params, fit_param,
                         'p-value: {:0.4g} '.format(r_value ** 2, p_value)
             }]
 
+        custom_data = [
+            {'c': cl, 'd': dr} for cl, dr in zip(
+                df_params.index.get_level_values('cell_line'),
+                df_params.index.get_level_values('drug')
+            )
+        ]
+
         if color_by:
             for idx, tag_name in enumerate(color_groups):
                 location = df_params.index.get_level_values(color_by_col).isin(color_groups[tag_name])
@@ -1006,6 +1013,7 @@ def plot_drc_params(df_params, fit_param,
                     hovertext=hovertext,
                     hoverinfo="text+x+y",
                     mode='markers',
+                    customdata=custom_data,
                     marker={'symbol': symbols,
                             'color': colours[idx]},
                     name=tag_name
@@ -1020,6 +1028,7 @@ def plot_drc_params(df_params, fit_param,
                 hovertext=hovertext,
                 hoverinfo="text+x+y",
                 mode='markers',
+                customdata=custom_data,
                 marker={'symbol': symbols,
                         'color': colour_list},
                 name='{} vs {}'.format(xaxis_param_name,
@@ -1100,10 +1109,18 @@ def plot_drc_params(df_params, fit_param,
                         _get_param_name(fit_param)
                     )
 
+        custom_data = [
+            {'c': cl, 'd': dr} for cl, dr in zip(
+                df_params.index.get_level_values('cell_line'),
+                df_params.index.get_level_values('drug')
+            )
+        ]
+
         data = [go.Bar(x=groups,
                        y=yvals,
                        text=text,
                        name='',
+                       customdata=custom_data,
                        showlegend=False,
                        marker={'color': marker_cols}
                        )]
@@ -1510,7 +1527,7 @@ def plot_time_course(hts_pandas,
                       'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
                 name=dose_str,
-                customdata={'csvname': dose},
+                customdata=({'csvname': dose}, ),
                 legendgroup=dose_str,
                 showlegend=well_idx == 0
             ))
@@ -1529,12 +1546,12 @@ def plot_time_course(hts_pandas,
                     line={'color': this_colour},
                     marker={'size': 5},
                     name=dose_str,
-                    customdata={'csvname': 'DIP fit ' + dose_str},
+                    customdata=({'csvname': 'DIP fit ' + dose_str}, ),
                     legendgroup=dose_str,
                     showlegend=False
                 ))
 
-    data = go.Data(traces + traces_fits)
+    data = (traces + traces_fits)
     if log_yaxis:
         assay_name = "Change in log<sub>2</sub> {}".format(assay_name)
     max_time = df_vals.index.get_level_values('timepoint').max()
@@ -1597,10 +1614,9 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
             name=grp
         ))
 
-    data = go.Data(traces)
     layout = go.Layout(title=title,
                        yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'})
-    return go.Figure(data=data, layout=layout)
+    return go.Figure(data=traces, layout=layout)
 
 
 def plot_plate_map(plate_data, color_by='dip_rates',
@@ -1722,18 +1738,16 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         )
     )
 
-    data = go.Data([well_objs, col_labels, row_labels])
+    data = (well_objs, col_labels, row_labels)
 
     layout = go.Layout({
         'xaxis': {
             'showticklabels': False,
-            'autotick': False,
             'showgrid': False,
             'zeroline': False,
         },
         'yaxis': {
             'showticklabels': False,
-            'autotick': False,
             'showgrid': False,
             'zeroline': False,
             'scaleanchor': 'x'

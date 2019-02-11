@@ -65,11 +65,11 @@ def _plotly_scatter_to_dataframe(plot_fig):
 
     rows = []
     try:
-        xaxis_name = strip_tags(plot_fig['layout']['xaxis']['title'])
+        xaxis_name = strip_tags(plot_fig['layout']['xaxis']['title']['text'])
     except KeyError:
         xaxis_name = 'x'
     try:
-        yaxis_name = strip_tags(plot_fig['layout']['yaxis']['title'])
+        yaxis_name = strip_tags(plot_fig['layout']['yaxis']['title']['text'])
     except KeyError:
         yaxis_name = 'y'
     for trace in plot_fig['data']:
