@@ -50,6 +50,9 @@ class HillCurve(object):
     def fit(self, x):
         return self.fit_fn(x, *self.popt)
 
+    def fit_rel(self, x):
+        return None
+
     @classmethod
     @abstractmethod
     def initial_guess(cls, x, y):
