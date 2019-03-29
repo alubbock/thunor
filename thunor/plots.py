@@ -486,6 +486,28 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
 
 def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
                                   title=None, subtitle=None):
+    """
+    Plot heatmap of drug combination response by DIP rate
+
+    Two dimensional plot (each dimension is a drug concentration) where
+    squares are coloured by DIP rate value.
+
+    Parameters
+    ----------
+    ctrl_resp_data: pd.DataFrame
+        Control DIP rates from :func:`thunor.dip.dip_rates`
+    expt_resp_data: pd.DataFrame
+        Experiment (non-control) DIP rates from :func:`thunor.dip.dip_rates`
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
     heat_label = 'DIP<br>rate'
 
     if title is None:
