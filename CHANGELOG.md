@@ -1,6 +1,32 @@
 Thunor Changelog
 ================
 
+## v0.1.15 2019-03-28
+
+### Bugfixes
+
+* Make sure relative fit function is defined for all model types
+* Fix documentation generation on readthedocs
+
+## v0.1.14 - 2019-02-10
+
+### New Features
+
+* Drug combination heatmaps for DIP rate (`thunor.plots.plot_drug_combination_heatmap`)
+* Allow comparison of DIP rate and viability parameters (e.g. IC50 from each) on same plot
+* Add converters (`thunor.converters`) for Teicher Small Cell Lung Cancer dataset and
+Genomics of Drug Sensitivity in Cancer dataset
+* Upgrade to plotly 3.6.1
+
+### Improvements
+
+* Exclude truncated parameter values (e.g. IC50) from linear fit on scatter plots
+
+### Bugfixes
+
+* Fix where replicate points appear on relative DIP rate dose response curves
+* Fix reading HDF5 files from a buffer, rather than a file
+
 ## v0.1.13 - 2018-08-13
 
 ### Improvements
