@@ -6,7 +6,7 @@ jupyter_client
 notebook
 numpy
 scipy
-plotly==2.0.10
+plotly==3.6.1
 pandas
 seaborn
 tables
