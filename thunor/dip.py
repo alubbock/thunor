@@ -53,7 +53,7 @@ def dip_rates(df_data, selector_fn=tyson1):
         Two entry list, giving control DIP rates and experiment
         (non-control) DIP rates (both as Pandas DataFrames)
     """
-    if df_data.controls is None:
+    if df_data.controls is None or df_data.controls.empty:
         ctrl_dips = None
     else:
         if 'dataset' in df_data.controls.index.names:
@@ -61,7 +61,15 @@ def dip_rates(df_data, selector_fn=tyson1):
                                                 df_data.dip_assay_name), :]
         else:
             df_controls = df_data.controls.loc[df_data.dip_assay_name]
-        ctrl_dips = ctrl_dip_rates(df_controls)
+        df_controls = df_controls.loc[df_controls.index.dropna()]
+        if df_controls.empty:
+            ctrl_dips = None
+        else:
+            ctrl_dips = ctrl_dip_rates(df_controls)
+
+    if df_data.assays.empty:
+        return ctrl_dips, None
+
     df_assays = df_data.assays.loc[df_data.dip_assay_name]
 
     return ctrl_dips, \
