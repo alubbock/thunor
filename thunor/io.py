@@ -513,7 +513,7 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                              'drug2': str,
                              'drug2.conc': np.float64,
                              'drug2.units': str,
-                             'cell.count': np.int64,
+                             'cell.count': np.float64,
                          },
                          converters={
                              'time': _time_parser,
