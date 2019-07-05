@@ -16,6 +16,9 @@ ALPHABET_LENGTH = 26
 
 STANDARD_PLATE_SIZES = (96, 384, 1536)
 
+ANNOTATION_MSG = 'Annotation information (cell.line, drug, ' + \
+    'drug concentrations) must either all be present or all be absent.'
+
 
 class PlateFileParseException(Exception):
     pass
@@ -545,6 +548,14 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     except KeyError:
         raise PlateFileParseException('Please ensure columns "upid" and "well" are present')
 
+    required_columns = {'upid', 'cell.count', 'time'}
+    missing_cols = required_columns.difference(set(df.columns))
+    if len(missing_cols) > 1:
+        raise PlateFileParseException(
+            'The following required columns are missing: {}'.format(
+                ', '.join(missing_cols))
+        )
+
     return df
 
 
@@ -656,13 +667,23 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
         drug_no += 1
 
     has_annotation = True
-    if not drug_nums:
+    if drug_nums:
+        if 'cell.line' not in df.columns:
+            raise PlateFileParseException(
+                'cell.line column is not present, but drug and/or dose columns '
+                'are present. ' + ANNOTATION_MSG
+            )
+    else:
         if 'cell.line' in df.columns:
             raise PlateFileParseException(
                 'drug and/or dose columns not present, but cell.line is '
-                'present. Annotation information (cell.line, drug, '
-                'drug concentrations) must either all be present or all be '
-                'absent.')
+                'present. ' + ANNOTATION_MSG
+            )
+        if 'drug1.conc' in df.columns:
+            raise PlateFileParseException(
+                'drug1.conc column(s) present, but drug1 column '
+                'is not. ' + ANNOTATION_MSG
+            )
         has_annotation = False
 
     # Check for duplicate drugs in any row

@@ -80,6 +80,20 @@ class TestCSV(unittest.TestCase):
         with pytest.raises(thunor.io.PlateFileParseException):
             _check_csv(CSV_HEADER + '\ncl1,0.00013,drug1,plate1,12,X,A1,M')
 
+    def test_csv_cell_line_missing(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(
+                'drug1.conc,drug1,upid,time,cell.count,well,drug1.units\n'
+                '0.00013,drug1,plate1,12,1234,A1,M'
+            )
+
+    def test_csv_drug1_missing(self):
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(
+                'cell.line,drug1.conc,upid,time,cell.count,well,drug1.units\n'
+                'cl1,0.00013,plate1,12,1234,A1,M'
+            )
+
     def test_csv_only_control_well(self):
         _check_csv(CSV_HEADER + '\ncl1,0,,plate1,12,1234,A1,M')
 
