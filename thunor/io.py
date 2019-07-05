@@ -595,6 +595,16 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     pm = PlateMap(width=plate_width, height=plate_height)
 
     # Sanity checks
+    columns_with_na = set(df.columns[df.isnull().any()])
+    columns_with_na = columns_with_na.difference({'drug1', 'drug2', 'drug3',
+                                                  'expt.id', 'expt.date'})
+
+    if len(columns_with_na) > 0:
+        raise PlateFileParseException(
+            'The following column(s) contain blank, NA, or NaN values: {}'
+            .format(', '.join(columns_with_na))
+        )
+
     try:
         if (df['cell.count'] < 0).any():
             raise PlateFileParseException('cell.count contains negative '

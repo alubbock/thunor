@@ -104,7 +104,7 @@ class TestCSVTwoDrugs(unittest.TestCase):
 
     def test_csv_two_drugs_drug2_blank(self):
         csv = _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
-                         '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,')
+                         '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0')
         # Second drug should get dropped, since it's empty
         assert len(csv.doses.index.get_level_values('drug')[0]) == 1
         assert len(csv.doses.index.get_level_values('dose')[0]) == 1
