@@ -2,13 +2,13 @@ language: python
 python:
 - '3.6'
 before_install:
-- pip install "pytest>=3.6" nbval django coveralls pytest-cov
+- pip install "pytest>=3.6" nbval django codecov pytest-cov
 install:
 - python setup.py install
 script:
 - pytest --nbval --cov=thunor
 after_success:
-- coveralls
+- codecov
 deploy:
   provider: pypi
   username: alubbock
