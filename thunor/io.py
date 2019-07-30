@@ -334,6 +334,10 @@ class HtsPandas(object):
 
     def doses_unstacked(self):
         """ Split multiple drugs/doses into separate columns """
+        # If already unstacked, just return
+        if 'drug1' in self.doses.index.names:
+            return self.doses
+
         doses = self.doses.reset_index()
 
         n_drugs = doses['drug'].apply(len).max()
@@ -923,7 +927,10 @@ def _stack_doses(df_doses, inplace=True):
 
     df_doses.drop(list(df_doses.filter(regex='^(dose|drug)[0-9]+$')),
                   axis=1, inplace=True)
-    df_doses.set_index(['drug', 'cell_line', 'dose'], inplace=True)
+    index_cols = ['drug', 'cell_line', 'dose']
+    if 'dataset' in df_doses.columns:
+        index_cols = ['dataset'] + index_cols
+    df_doses.set_index(index_cols, inplace=True)
 
     if not inplace:
         return df_doses
