@@ -3,7 +3,7 @@ import scipy.optimize
 import scipy.stats
 from abc import abstractmethod
 import pandas as pd
-from decimal import Decimal
+from decimal import Decimal, Overflow
 import warnings
 
 PARAM_EQUAL_ATOL = 1e-16
@@ -303,13 +303,18 @@ class HillCurveLL4(HillCurve):
             return None
 
         hill = Decimal(self.hill_slope)
-        ec50_hill = Decimal(self.ec50) ** hill
-        min_conc = Decimal(min_conc)
-        max_conc = Decimal(max_conc)
+        try:
+            ec50_hill = Decimal(self.ec50) ** hill
+            min_conc = Decimal(min_conc)
+            max_conc = Decimal(max_conc)
 
-        return np.float64(((ec50_hill + max_conc ** hill).log10()
-                           - (ec50_hill + min_conc ** hill).log10())
-                          / hill) * ((e0 - emax) / e0)
+            return np.float64(((ec50_hill + max_conc ** hill).log10()
+                               - (ec50_hill + min_conc ** hill).log10())
+                              / hill) * ((e0 - emax) / e0)
+        except Overflow:
+            warnings.warn('Overflow finding activity area '
+                          '(Hill coeff.: {:.4g})'.format(hill))
+            return None
 
     @property
     def divisor(self):
