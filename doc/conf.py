@@ -18,6 +18,7 @@
 #
 import os
 import sys
+import datetime
 sys.path.insert(0, os.path.abspath('../'))
 
 # -- General configuration ------------------------------------------------
@@ -55,7 +56,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Thunor Core'
-copyright = u'2018, Alex Lubbock'
+copyright = u'2017-' + str(datetime.datetime.now().year) + u' Alex Lubbock'
 author = u'Alex Lubbock'
 
 import thunor, pkg_resources
