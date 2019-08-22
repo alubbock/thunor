@@ -627,6 +627,10 @@ def aa_obs(responses, doses=None):
         responses = responses.groupby('dose').agg('mean')
         doses = responses.index.get_level_values('dose')
     responses_shifted = 1.0 - np.minimum(responses, 1.0)
+    # Ensure array is sorted by dose
+    positions = np.argsort(doses)
+    responses_shifted = responses_shifted[positions]
+    doses = doses[positions]
     return np.trapz(responses_shifted, np.log10(doses))
 
 
