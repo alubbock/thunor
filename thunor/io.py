@@ -338,32 +338,7 @@ class HtsPandas(object):
         if 'drug1' in self.doses.index.names:
             return self.doses
 
-        doses = self.doses.reset_index()
-
-        n_drugs = doses['drug'].apply(len).max()
-
-        if n_drugs == 1:
-            # Single drug dataset
-            doses['drug1'] = doses['drug'].apply(lambda x: x[0])
-            doses['dose1'] = doses['dose'].apply(lambda x: x[0])
-            doses.drop(['drug', 'dose'], axis=1, inplace=True)
-        else:
-            # Multi-drug dataset
-            drug_cols = doses['drug'].apply(pd.Series)
-            dose_cols = doses['dose'].apply(pd.Series)
-            drug_cols.rename(columns={n: 'drug%d' % (n + 1) for n in range(
-                n_drugs)},
-                             inplace=True)
-            dose_cols.rename(columns={n: 'dose%d' % (n + 1) for n in range(
-                n_drugs)},
-                             inplace=True)
-            doses.drop(['drug', 'dose'], axis=1, inplace=True)
-            doses = pd.concat([doses, drug_cols, dose_cols], axis=1)
-        doses.set_index(['drug%d' % (n + 1) for n in range(n_drugs)]
-                        + ['cell_line'] +
-                        ['dose%d' % (n + 1) for n in range(n_drugs)],
-                        inplace=True)
-        return doses
+        return _unstack_doses(self.doses.reset_index())
 
     @property
     def cell_lines(self):
@@ -737,8 +712,6 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
                                          for n in drug_nums])
 
         df_doses = df.loc[expt_rows, doses_cols]
-        # Suppress warnings about altering a dataframe slice
-        df_doses.is_copy = False
         df_doses.reset_index(inplace=True)
         df_doses['well_num'] = df_doses['well']
         df_doses = df_doses.assign(well=list(
@@ -857,7 +830,7 @@ def write_vanderbilt_hts(df_data, filename, plate_width=24,
             controls['drug2'] = 'control'
             controls['dose2'] = 0.0
 
-        df = pd.concat([df, controls])
+        df = pd.concat([df, controls], sort=False)
 
     pm = PlateMap(width=plate_width, height=plate_height)
     df.reset_index(drop=True, inplace=True)
@@ -934,6 +907,33 @@ def _stack_doses(df_doses, inplace=True):
 
     if not inplace:
         return df_doses
+
+
+def _unstack_doses(df_doses):
+    n_drugs = df_doses['drug'].apply(len).max()
+
+    if n_drugs == 1:
+        # Single drug dataset
+        df_doses['drug1'] = df_doses['drug'].apply(lambda x: x[0])
+        df_doses['dose1'] = df_doses['dose'].apply(lambda x: x[0])
+        df_doses.drop(['drug', 'dose'], axis=1, inplace=True)
+    else:
+        # Multi-drug dataset
+        drug_cols = df_doses['drug'].apply(pd.Series)
+        dose_cols = df_doses['dose'].apply(pd.Series)
+        drug_cols.rename(columns={n: 'drug%d' % (n + 1) for n in range(
+            n_drugs)},
+                         inplace=True)
+        dose_cols.rename(columns={n: 'dose%d' % (n + 1) for n in range(
+            n_drugs)},
+                         inplace=True)
+        df_doses.drop(['drug', 'dose'], axis=1, inplace=True)
+        df_doses = pd.concat([df_doses, drug_cols, dose_cols], axis=1)
+    df_doses.set_index(['drug%d' % (n + 1) for n in range(n_drugs)]
+                       + ['cell_line'] +
+                       ['dose%d' % (n + 1) for n in range(n_drugs)],
+                       inplace=True)
+    return df_doses
 
 
 def read_hdf(filename_or_buffer):
