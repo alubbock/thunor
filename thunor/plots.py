@@ -1,6 +1,9 @@
+# -*- coding: utf-8 -*-
+
 import plotly.graph_objs as go
 import numpy as np
 import seaborn as sns
+import thunor.config as config
 from .helpers import format_dose
 from .dip import ctrl_dip_rates, expt_dip_rates
 from thunor.curve_fit import HillCurveNull, is_param_truncated
@@ -170,7 +173,7 @@ def _combine_title_subtitle(title, subtitle):
 
 
 def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
-             title=None, subtitle=None):
+             title=None, subtitle=None, template=config.plotly_template):
     """
     Plot dose response curve fits
 
@@ -191,6 +194,8 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
 
     Returns
     -------
@@ -411,11 +416,12 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                                      name=repl_name)
                           )
             if ctrl_resp is not None:
+                ctrl_color = 'white' if template == 'plotly_dark' else 'black'
                 traces.append(go.Scatter(x=ctrl_doses,
                                          y=ctrl_resp,
                                          mode='markers',
                                          marker={'symbol': shape,
-                                                 'color': 'black',
+                                                 'color': ctrl_color,
                                                  'size': 5},
                                          hoverinfo='y+text',
                                          text=ctrl_name,
@@ -479,13 +485,15 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                               'rangemode': yaxis_rangemode
                               },
                        annotations=annotations,
+                       template=template
                        )
 
     return go.Figure(data=traces, layout=layout)
 
 
-def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
-                                  title=None, subtitle=None):
+def plot_drug_combination_heatmap(
+        ctrl_resp_data, expt_resp_data, title=None, subtitle=None,
+        template=config.plotly_template):
     """
     Plot heatmap of drug combination response by DIP rate
 
@@ -502,6 +510,8 @@ def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
 
     Returns
     -------
@@ -574,7 +584,8 @@ def plot_drug_combination_heatmap(ctrl_resp_data, expt_resp_data,
         },
         yaxis={
             'title': '{} concentration'.format(drug1)
-        }
+        },
+        template=template
     )
 
     return go.Figure(data=[trace], layout=layout)
@@ -606,7 +617,8 @@ def _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
 
 
 def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
-                                   color_by, color_groups, **kwargs):
+                                   color_by, color_groups,
+                                   template=config.plotly_template, **kwargs):
     """
     Plot a parameter comparison across two datasets
 
@@ -620,6 +632,8 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
     kwargs: dict, optional
         Additional keyword arguments
 
@@ -801,6 +815,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
                        'type': 'log' if _param_is_log(fit_param) else None}
     layout['hovermode'] = 'closest'
     layout['showlegend'] = color_by is not None
+    layout['template'] = template
 
     return go.Figure(layout=layout, data=data)
 
@@ -830,6 +845,7 @@ def plot_drc_params(df_params, fit_param,
                     multi_dataset=False,
                     color_by=None,
                     color_groups=None,
+                    template=config.plotly_template,
                     **kwargs):
     """
     Box, bar, or scatter plots of DIP rate fit parameters
@@ -862,6 +878,8 @@ def plot_drc_params(df_params, fit_param,
         (default)
     color_groups: dict or None
         Groups of cell lines of drugs to color by
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
     kwargs: dict, optional
         Additional keyword arguments
 
@@ -924,6 +942,7 @@ def plot_drc_params(df_params, fit_param,
                                                      yaxis_title)
 
     layout = dict(title=title,
+                  template=template,
                   yaxis={'title': yaxis_title,
                          'type': 'log' if _param_is_log(fit_param) else None})
 
@@ -1404,7 +1423,8 @@ def _create_label_max_items(items, max_items=5):
 
 def plot_time_course(hts_pandas,
                      log_yaxis=False, assay_name='Assay', title=None,
-                     subtitle=None, show_dip_fit=False):
+                     subtitle=None, show_dip_fit=False,
+                     template=config.plotly_template):
     """
     Plot a dose response time course
 
@@ -1423,6 +1443,8 @@ def plot_time_course(hts_pandas,
         Subtitle (or None to auto-generate)
     show_dip_fit: bool
         Overlay the DIP rate fit on the time course
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
 
     Returns
     -------
@@ -1478,6 +1500,8 @@ def plot_time_course(hts_pandas,
     colours = _sns_to_rgb(sns.color_palette(
         "husl", len(df_doses.index.get_level_values(level='dose').unique())))
 
+    ctrl_color = 'white' if template == 'plotly_dark' else 'black'
+
     if show_dip_fit:
         if df_controls is not None:
             dip_rate_ctrl = ctrl_dip_rates(df_controls)
@@ -1502,7 +1526,7 @@ def plot_time_course(hts_pandas,
                 x=x_range,
                 y=timecourse,
                 mode='lines+markers',
-                line={'color': 'black',
+                line={'color': ctrl_color,
                       'shape': 'spline',
                       'dash': 'dot' if show_dip_fit else None},
                 marker={'size': 5},
@@ -1525,7 +1549,7 @@ def plot_time_course(hts_pandas,
                     x=minmax,
                     y=dip_points,
                     mode='lines',
-                    line={'color': 'black'},
+                    line={'color': ctrl_color},
                     marker={'size': 5},
                     name='DIP fit Control',
                     legendgroup='__Control',
@@ -1593,11 +1617,13 @@ def plot_time_course(hts_pandas,
                               'dtick': 12},
                        yaxis={'title': assay_name,
                               'range': (-2, 7) if log_yaxis else None},
+                       template=template
                        )
     return go.Figure(data=data, layout=layout)
 
 
-def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
+def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
+                           template=config.plotly_template):
     """
 
     Parameters
@@ -1608,6 +1634,8 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
         Title (or None to auto-generate)
     subtitle: str, optional
         Subtitle (or None to auto-generate)
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
 
     Returns
     -------
@@ -1646,12 +1674,14 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None):
         ))
 
     layout = go.Layout(title=title,
+                       template=template,
                        yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'})
     return go.Figure(data=traces, layout=layout)
 
 
 def plot_plate_map(plate_data, color_by='dip_rates',
-                   missing_color='lightgray', subtitle=None):
+                   missing_color='lightgray', subtitle=None,
+                   template=config.plotly_template):
     """
 
     Parameters
@@ -1664,6 +1694,8 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         Color to use for missing values (default: lightgray)
     subtitle: str or None
         Subtitle, or None to auto-generate
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
 
     Returns
     -------
@@ -1745,6 +1777,8 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         mode='text'
     )
 
+    label_color = 'white' if template == 'plotly_dark' else 'black'
+
     col_labels = go.Scatter(
         x=[i + well_rad for i in range(cols)],
         y=[rows + 1.2] * cols,
@@ -1752,7 +1786,7 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         text=col_labels,
         hoverinfo='none',
         textfont=dict(
-            color='black',
+            color=label_color,
             # size=18,
         )
     )
@@ -1764,7 +1798,7 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         text=row_labels,
         hoverinfo='none',
         textfont=dict(
-            color='black',
+            color=label_color,
             # size=18,
         )
     )
@@ -1792,7 +1826,8 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         },
         'hovermode': 'closest',
         'showlegend': False,
-        'title': title
+        'title': title,
+        'template': template
     })
 
     return go.Figure(data=data, layout=layout)
