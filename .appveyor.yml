@@ -19,4 +19,4 @@ install:
   - pip install tables pytest nbval django
   - python setup.py install
 test_script:
-  - pytest --nbval
+  - pytest --nbval doc/tutorial.ipynb --sanitize-with doc/pytest-sanitize.ini

@@ -6,7 +6,7 @@ before_install:
 install:
 - python setup.py install
 script:
-- pytest --nbval --cov=thunor
+- pytest --nbval doc/tutorial.ipynb --sanitize-with doc/pytest-sanitize.ini --cov=thunor
 after_success:
 - codecov
 deploy:

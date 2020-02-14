@@ -4,6 +4,7 @@ https://github.com/Juanlu001/sphinx_rtd_theme/archive/js-head.zip
 nbsphinx
 jupyter_client
 notebook
+nbformat>4,<5  # https://github.com/plotly/plotly.py/issues/692
 numpy
 scipy
 plotly==4.5.0
