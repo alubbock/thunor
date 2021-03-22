@@ -1,3 +1,4 @@
+# Tested on Python 3.7 and 3.8
 ipython==7.12.0
 numpy==1.18.4
 python-magic==0.4.15
