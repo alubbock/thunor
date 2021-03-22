@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest nbval django codecov pytest-cov numpy scipy pandas plotly seaborn tables
+        python -m pip install flake8 pytest nbval django codecov pytest-cov
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
