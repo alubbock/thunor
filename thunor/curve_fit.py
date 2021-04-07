@@ -728,10 +728,10 @@ def fit_params_minimal(ctrl_data, expt_data,
         else:
             dr_name = drugs[0]
 
-        doses_expt = dip_grp.index.get_level_values('dose').values
+        doses_expt = dip_grp.index.get_level_values('dose').to_numpy()
 
         if is_viability:
-            resp_expt = dip_grp['viability']
+            resp_expt = dip_grp['viability'].to_numpy()
             doses = doses_expt
             fit_obj = fit_drc(
                 doses_expt, resp_expt, response_std_errs=None,
