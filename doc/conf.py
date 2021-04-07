@@ -329,7 +329,7 @@ texinfo_documents = [
 ]
 
 def setup(app):
-    app.add_javascript('https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js')
+    app.add_js_file('https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js')
 
 import mock
 
