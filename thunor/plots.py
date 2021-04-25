@@ -1679,6 +1679,72 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
     return go.Figure(data=traces, layout=layout)
 
 
+def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
+                                   template=config.plotly_template):
+    """
+
+    Parameters
+    ----------
+    df_controls: pd.DataFrame
+        Control well cell counts
+    title: str, optional
+        Title (or None to auto-generate)
+    subtitle: str, optional
+        Subtitle (or None to auto-generate)
+    template: str
+        Name of plotly template (https://plot.ly/python/templates/)
+
+    Returns
+    -------
+    plotly.graph_objs.Figure
+        A plotly figure object containing the graph
+    """
+    assays = df_controls.index.get_level_values('assay').unique()
+    if len(assays) > 1:
+        raise ValueError('More than one assay detected')
+    assay = assays[0]
+
+    # Sort by median DIP rate
+    df_controls = df_controls.copy()
+
+    df_controls = df_controls['value'].groupby(level=['cell_line', 'plate']).apply(lambda x: x.quantile(q=(0, 0.25, 0.25, 0.5, 0.75, 0.75, 1))).reset_index(level=2, drop=True).to_frame()
+
+    df_controls['cl_median'] = df_controls['value'].groupby(
+        level=['cell_line']).transform(np.nanmedian)
+    df_controls['plate_median'] = df_controls['value'].groupby(
+        level=['cell_line', 'plate']).transform(np.nanmedian)
+    df_controls.sort_values(by=['cl_median', 'plate_median'], inplace=True)
+
+    if title is None:
+        title = 'Control cell counts by plate'
+
+    if 'dataset' in df_controls.index.names:
+        dataset_names = df_controls.index.get_level_values('dataset').unique()
+
+        if len(dataset_names) != 1:
+            raise ValueError('This function can only plot controls from a '
+                             'single dataset')
+
+        if subtitle is None:
+            subtitle = dataset_names[0]
+
+    title = _combine_title_subtitle(title, subtitle)
+
+    traces = []
+    for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
+        traces.append(go.Box(
+            x=ctrl_dat.index.get_level_values('plate').values,
+            y=ctrl_dat['value'].values,
+            name=grp
+        ))
+
+    layout = go.Layout(title=title,
+                       template=template,
+                       xaxis={'type': 'category'},
+                       yaxis={'title': assay})
+    return go.Figure(data=traces, layout=layout)
+
+
 def plot_plate_map(plate_data, color_by='dip_rates',
                    missing_color='lightgray', subtitle=None,
                    template=config.plotly_template):
