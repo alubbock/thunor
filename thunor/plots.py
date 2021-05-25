@@ -10,7 +10,7 @@ from thunor.curve_fit import HillCurveNull, is_param_truncated
 import scipy.stats
 import re
 import pandas as pd
-import collections
+from collections.abc import Iterable
 
 
 class CannotPlotError(ValueError):
@@ -147,7 +147,7 @@ def _make_title(title, df):
     if len(drug_list) == 1:
         drug_name = drug_list[0]
         if not isinstance(drug_name, str):
-            if isinstance(drug_name, collections.Iterable):
+            if isinstance(drug_name, Iterable):
                 if len(drug_name) == 1:
                     drug_name = drug_name[0]
                 else:

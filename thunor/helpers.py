@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
+from collections.abc import Iterable
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
 from functools import reduce
@@ -37,7 +38,7 @@ def format_dose(num, sig_digits=12, array_as_string=None):
     str or list of str
         Formatted dose values
     """
-    if not isinstance(num, str) and isinstance(num, collections.Iterable):
+    if not isinstance(num, str) and isinstance(num, Iterable):
         retval = [format_dose(each_num) for each_num in num]
         if array_as_string is not None:
             return array_as_string.join(retval)
