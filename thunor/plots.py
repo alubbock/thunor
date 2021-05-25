@@ -1242,8 +1242,7 @@ def plot_drc_params(df_params, fit_param,
         if fit_param_sort is None or fit_param_sort == 'label':
             yvals = df_params.loc[:, [fit_param]].dropna()
         else:
-            yvals = df_params.loc[:, [fit_param,
-                                      fit_param_sort]]
+            yvals = df_params.reindex(columns=[fit_param, fit_param_sort])
             yvals.dropna(subset=[fit_param], inplace=True)
 
         if yvals.empty:
@@ -1293,7 +1292,8 @@ def plot_drc_params(df_params, fit_param,
         else:
             # Sort by fit_column_sort, with tie breakers determined by
             # fit_param
-            median_cols = yvals.loc[:, [fit_param_sort, 'label']].groupby(
+            median_cols = yvals.reindex(
+                columns=[fit_param_sort, 'label']).groupby(
                 level=aggregate_by).transform(np.nanmedian)
             median_cols.rename(columns={fit_param_sort: 'median',
                                         'label': 'median2'},

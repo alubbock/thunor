@@ -87,6 +87,13 @@ class TestWithDataset(unittest.TestCase):
             fit_param='ic50')),
                           pd.DataFrame)
 
+    def test_plot_dip_params_aggregation_sortby(self):
+        assert isinstance(plotly_to_dataframe(plot_drc_params(
+            self.fit_params, aggregate_cell_lines={'tag': ['BT20', 'HCC1143']},
+            aggregate_drugs={'tag': ['abemaciclib', 'Panobinostat']},
+            fit_param='ic50', fit_param_sort='ec50')),
+                          pd.DataFrame)
+
     def test_plot_ctrl_dip_by_plate(self):
         res = plot_ctrl_dip_by_plate(self.ctrl_dip_data)
         assert isinstance(plotly_to_dataframe(res), pd.DataFrame)
