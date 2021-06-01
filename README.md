@@ -8,7 +8,9 @@ automatic calculation of dose response curves, and an interactive
 multi-panelled plot system.
 
 This repository, Thunor Core, is a Python package which can be used for
-standalone analysis or integration into computational pipelines.
+standalone analysis or integration into computational pipelines. There
+is also a web interface, [Thunor Web](https://github.com/alubbock/thunor-web),
+built around this package with added database and multi-user capabilities.
 
 ## Implementation
 
@@ -47,6 +49,12 @@ To manually work through the tutorial from the documentation above, you can
 open the file with Jupyter Notebook:
 
     jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 doc/tutorial.ipynb
+
+## Citation
+
+Lubbock A.L.R., Harris L.A., Quaranta V., Tyson D.R., Lopez C.F.
+[Thunor: visualization and analysis of high-throughput dose–response datasets](https://doi.org/10.1093/nar/gkab424)
+Nucleic Acids Research (2021), gkab424.
 
 ## Further help and resources
 
