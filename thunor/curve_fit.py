@@ -990,13 +990,19 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
                             ctrl_dose_fn):
     is_viability = df_params._drmetric == 'viability'
     data_list = []
+    if 'dataset' not in expt_dip_data.index.names:
+        expt_dip_data = expt_dip_data.copy()
+        expt_dip_data['dataset'] = ''
+        old_index_cols = expt_dip_data.index.names
+        expt_dip_data.reset_index(inplace=True)
+        expt_dip_data.set_index(['dataset'] + old_index_cols, inplace=True)
     for grp, dip_grp in expt_dip_data.groupby(
             ['dataset', 'cell_line', 'drug'], sort=False):
         # Assumes drug combinations have been ruled out by fit_params_minimal
         doses_expt = [d[0] for d in dip_grp.index.get_level_values(
             'dose').values]
-        fit_data = {'dataset_id': grp[0], 'cell_line': grp[1], 'drug': grp[
-            2][0]}
+        fit_data = {'dataset_id': grp[0],
+            'cell_line': grp[1], 'drug': grp[2][0]}
 
         ctrl_dip_data_cl = \
             _get_control_responses(ctrl_dip_data, grp[0], grp[1],
