@@ -4,7 +4,7 @@ numpy==1.18.4
 python-magic==0.4.15
 xlrd==1.2.0
 XlsxWriter==1.2.7
-pandas==1.0.3
+pandas==1.2.5
 plotly==4.5.0
 scipy==1.4.1
 matplotlib==3.1.3
