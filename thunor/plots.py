@@ -237,7 +237,8 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
         is_absolute = True
 
     if is_viability:
-        yaxis_title = '{:g} hr viability'.format(fit_params._viability_time)
+        yaxis_title = '{:g} hr viability'.format(
+            fit_params._viability_time.total_seconds() / SECONDS_IN_HOUR)
     else:
         yaxis_title = 'DIP rate'
     if is_absolute:
@@ -652,7 +653,8 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     if df_params._drmetric == 'dip':
         dr_metric = 'DIP'
     else:
-        dr_metric = '{:g} hr viability'.format(df_params._viability_time)
+        dr_metric = '{:g} hr viability'.format(
+            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR)
 
     df_params = df_params.loc[:, [fit_param,
                                   'max_dose_measured',
@@ -938,8 +940,9 @@ def plot_drc_params(df_params, fit_param,
     if df_params._drmetric in ('dip', 'compare'):
         yaxis_title = 'DIP {}'.format(yaxis_title)
     else:
-        yaxis_title = '{:g} hr viability {}'.format(df_params._viability_time,
-                                                     yaxis_title)
+        yaxis_title = '{:g} hr viability {}'.format(
+            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR,
+            yaxis_title)
 
     layout = dict(title=title,
                   template=template,
@@ -976,7 +979,7 @@ def plot_drc_params(df_params, fit_param,
             xaxis_title = 'DIP {}'.format(xaxis_title)
         else:
             xaxis_title = '{:g} hr viability {}'.format(
-                df_params._viability_time,
+                df_params._viability_time.total_seconds() / SECONDS_IN_HOUR,
                 xaxis_title)
 
         range_bounded_params = set()
@@ -1343,9 +1346,17 @@ def plot_drc_params(df_params, fit_param,
             })
 
         # One way anova test
-        anova_f, anova_p = scipy.stats.f_oneway(
-            *[x[1].values for x in yvals.groupby(level=aggregate_by)]
-        )
+        try:
+            anova_f, anova_p = scipy.stats.f_oneway(
+                *[x[1].values for x in yvals.groupby(level=aggregate_by)]
+            )
+        except TypeError as te:
+            te_str = str(te)
+            if 'at least two inputs are required' in te_str:
+                anova_f = np.NaN
+                anova_p = np.NaN
+            else:
+                raise
         if not np.isnan(anova_f):
             layout['annotations'].append({
                 'x': 0.5, 'y': 0.95, 'xref': 'paper',
@@ -1388,10 +1399,7 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
     label_type_tag = label_type + '_tag'
 
     for tag_name, names in aggregate_items.items():
-        yvals_tmp = yvals.loc[yvals.index.isin(names, level=label_type), :]
-        # Avoid warning about setting on copy, since we're using the copy to
-        # build a new dataframe
-        yvals_tmp.is_copy = None
+        yvals_tmp = yvals.loc[yvals.index.isin(names, level=label_type), :].copy()
 
         # Add counts to the tag names
         if add_counts:
@@ -1399,7 +1407,7 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
                 yvals_tmp.index.get_level_values(label_type).unique()))
 
         yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
-        new = new.append(yvals_tmp)
+        new = yvals_tmp
 
     labels = list(new.index.names)
     new.reset_index([l for l in labels if l != label_type], inplace=True)

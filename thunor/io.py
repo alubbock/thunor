@@ -265,7 +265,7 @@ class HtsPandas(object):
         Filter by cell lines and/or drugs
 
         "None" means "no filter"
-        
+
         Parameters
         ----------
         cell_lines: Iterable, optional
@@ -463,7 +463,7 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     Read a Vanderbilt HTS format file as a single dataframe
 
     See the wiki for a file format description
-    
+
     Parameters
     ----------
     file_or_source: str or object
@@ -586,8 +586,11 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
     # Sanity checks
     columns_with_na = set(df.columns[df.isnull().any()])
-    columns_with_na = columns_with_na.difference({'drug1', 'drug2', 'drug3',
-                                                  'expt.id', 'expt.date'})
+    columns_with_na = columns_with_na.intersection(
+        {'upid', 'cell.line', 'well', 'time', 'cell.count',
+         'drug1.conc', 'drug1.units'
+         'drug2.conc', 'drug2.units'}
+    )
 
     if len(columns_with_na) > 0:
         raise PlateFileParseException(

@@ -40,10 +40,10 @@ class TestWithDataset(unittest.TestCase):
     def test_plot_param_comparison(self):
         # Mock up a two-dataset set of fit params
         df1 = self.fit_params.copy()
-        df1.index.set_levels(['one'], level='dataset_id', inplace=True)
+        df1.index = df1.index.set_levels(['one'], level='dataset_id')
 
         df2 = df1.copy()
-        df2.index.set_levels(['two'], level='dataset_id', inplace=True)
+        df2.index = df2.index.set_levels(['two'], level='dataset_id')
 
         df = pd.concat([df1, df2])
 

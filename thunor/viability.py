@@ -72,7 +72,8 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
     controls_means = controls['value'].groupby(level=idx_cols).mean()
 
     if include_controls:
-        controls['value'] = controls['value'].groupby(level=idx_cols).apply(
+        controls['value'] = controls['value'].groupby(
+            level=idx_cols, group_keys=False).apply(
             lambda x: x / x.mean())
 
     df.reset_index(inplace=True)
@@ -90,10 +91,9 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
 
     timepoints = df['timepoint'].unique()
     if len(timepoints) == 1:
-        time_hrs = timepoints[0].astype('timedelta64[h]').item()\
-                       .total_seconds() / SECONDS_IN_HOUR
+        time = timepoints[0]
 
-    df._viability_time = time_hrs
+    df._viability_time = time
     df._viability_assay = assay_name
 
     if include_controls:

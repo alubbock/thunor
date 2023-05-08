@@ -139,7 +139,8 @@ def plotly_to_dataframe(plot_fig):
             series.append(pd.Series(yvals, index=xvals, name=trace_name))
 
     try:
-        return pd.concat(series, axis=1, sort=True)
+        df = pd.concat(series, axis=1)
+        return df.sort_index()
     except (ValueError, InvalidIndexError):
         # At least one of the indices contains duplicates, so we'll have to
         # fall back on a (slower) merge, rather than trying to
