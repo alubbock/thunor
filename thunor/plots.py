@@ -1353,7 +1353,7 @@ def plot_drc_params(df_params, fit_param,
                 *[x[1].values for x in yvals.groupby(level=aggregate_by)]
             )
         except TypeError as te:
-            te_str = str(te)
+            te_str = str(te).lower()
             if te_str.startswith('at least two'):
                 anova_f = np.NaN
                 anova_p = np.NaN
