@@ -1038,13 +1038,13 @@ def read_incucyte(filename_or_buffer, plate_width=24, plate_height=16):
     dat = dat.set_index(['Elapsed'])
     # Aggregate columns representing the same well
     dat = dat.rename(columns=lambda x: re.sub(',.*$', '', x))
-    dat = dat.groupby(by=dat.columns, axis=1).agg(np.sum)
+    dat = dat.T.groupby(level=0).agg("sum").T
 
     dat = dat.stack()
     dat = dat.reset_index()
     dat.columns = ['time', 'well', 'cell.count']
 
-    dat['time'] = pd.to_timedelta(dat['time'], unit='H')
+    dat['time'] = pd.to_timedelta(dat['time'], unit='h')
 
     pm = PlateMap(width=plate_width, height=plate_height)
 
