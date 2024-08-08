@@ -20,7 +20,7 @@ def main():
         url='https://www.thunor.net',
         packages=['thunor', 'thunor.converters'],
         install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn', 'tables'],
-        tests_require=['pytest', 'nbval', 'django', 'nbformat>4,<5'],
+        tests_require=['pytest', 'nbval', 'django', 'nbformat'],
         cmdclass=versioneer.get_cmdclass(),
         zip_safe=True,
         classifiers=[

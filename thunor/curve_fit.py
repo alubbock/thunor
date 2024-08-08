@@ -35,7 +35,7 @@ class DrugCombosNotImplementedError(NotImplementedError):
 
 class HillCurve(object):
     """ Base class defining Hill/log-logistic curve functionality """
-    fit_bounds = (np.NINF, np.PINF)
+    fit_bounds = (-np.inf, np.inf)
     null_response_fn = np.mean
     max_fit_evals = None
 
@@ -336,8 +336,8 @@ class HillCurveLL3u(HillCurveLL4):
     """ Three parameter log logistic curve, for viability data """
     # Constrain 0<=emax<=1, Hill slope +ve
     fit_bounds = (
-        (0.0, 0.0, np.NINF),
-        (np.PINF, 1.0, np.PINF)
+        (0.0, 0.0, -np.inf),
+        (np.inf, 1.0, np.inf)
     )
     max_fit_evals = None
 
@@ -507,7 +507,7 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     except TypeError as te:
         # This occurs if there are fewer data points than parameters
         te_str = str(te)
-        if 'Improper input:' in te_str or 'The number of func parameters' in te_str:
+        if 'Improper input:' in te_str or te_str.startswith('The number of func parameters'):
             warnings.warn(te_str)
             return None
         else:

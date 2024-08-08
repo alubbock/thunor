@@ -1,5 +1,5 @@
 import unittest
-import pkg_resources
+import importlib
 import thunor.io
 import thunor.dip
 import thunor.viability
@@ -13,9 +13,9 @@ import pandas as pd
 class TestWithDataset(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.filename = pkg_resources.resource_filename('thunor',
-                                                       'testdata/hts007.h5')
-        cls.dataset = thunor.io.read_hdf(cls.filename)
+        ref = importlib.resources.files('thunor') / 'testdata/hts007.h5'
+        with importlib.resources.as_file(ref) as filename:
+            cls.dataset = thunor.io.read_hdf(filename)
         ctrl_dip_data, expt_dip_data = thunor.dip.dip_rates(cls.dataset)
         cls.ctrl_dip_data = ctrl_dip_data
 

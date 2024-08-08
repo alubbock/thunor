@@ -728,7 +728,7 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
 
     fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
                    ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
-                   [s != 'cross' for s in symbols])
+                   np.array([s != 'cross' for s in symbols]))
     xdat_fit = xdat_fit[fitdat_mask].values
     ydat_fit = ydat_fit[fitdat_mask].values
 
@@ -1010,7 +1010,7 @@ def plot_drc_params(df_params, fit_param,
             # Remove any infinite or NaN values from best fit line data
             fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
                            ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
-                           [s != 'cross' for s in symbols])
+                           np.array([s != 'cross' for s in symbols]))
             xdat_fit = xdat_fit[fitdat_mask].values
             ydat_fit = ydat_fit[fitdat_mask].values
 
@@ -1287,7 +1287,7 @@ def plot_drc_params(df_params, fit_param,
             else:
                 sort_cols = ['median'] + aggregate_by
             yvals['median'] = yvals[fit_param].groupby(
-                level=aggregate_by).transform(np.nanmedian)
+                level=aggregate_by, observed=True).transform('median')
             yvals.set_index('median', append=True, inplace=True)
             yvals.sort_index(level=sort_cols, ascending=True,
                              inplace=True)
@@ -1297,7 +1297,7 @@ def plot_drc_params(df_params, fit_param,
             # fit_param
             median_cols = yvals.reindex(
                 columns=[fit_param_sort, 'label']).groupby(
-                level=aggregate_by).transform(np.nanmedian)
+                level=aggregate_by, observed=True).transform('median')
             median_cols.rename(columns={fit_param_sort: 'median',
                                         'label': 'median2'},
                                inplace=True)
@@ -1324,6 +1324,8 @@ def plot_drc_params(df_params, fit_param,
 
         group_by = ['dataset_id'] if len(datasets) > 1 else []
         group_by += ['drug'] if aggregate_by == 'cell_line' else ['cell_line']
+        if len(group_by) == 1:
+            group_by = group_by[0]
 
         for grp_name, grp in yvals.groupby(level=group_by):
             if len(groups) > 1:
@@ -1394,7 +1396,7 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
             _create_label_max_items(items, 5): items
         }
 
-    new = pd.DataFrame()
+    df_list = []
 
     label_type_tag = label_type + '_tag'
 
@@ -1406,8 +1408,10 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
             tag_name = '{} ({})'.format(tag_name, len(
                 yvals_tmp.index.get_level_values(label_type).unique()))
 
-        yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
-        new = yvals_tmp
+        yvals_tmp.loc[:, label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
+        df_list.append(yvals_tmp)
+
+    new = pd.concat(df_list)
 
     labels = list(new.index.names)
     new.reset_index([l for l in labels if l != label_type], inplace=True)
@@ -1526,7 +1530,7 @@ def plot_time_course(hts_pandas,
             t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)
-                t0_offset = timecourse[0]
+                t0_offset = timecourse.iloc[0]
                 timecourse -= t0_offset
             x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
                        timecourse.index.get_level_values('timepoint')]
@@ -1576,7 +1580,7 @@ def plot_time_course(hts_pandas,
             t0_offset = 0
             if log_yaxis:
                 timecourse = np.log2(timecourse)
-                t0_offset = timecourse[0]
+                t0_offset = timecourse.iloc[0]
                 timecourse -= t0_offset
             x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
                        timecourse.index.get_level_values('timepoint')]
@@ -1653,9 +1657,9 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
     # Sort by median DIP rate
     df_controls = df_controls.copy()
     df_controls['cl_median'] = df_controls['dip_rate'].groupby(
-        level=['cell_line']).transform(np.nanmedian)
+        level=['cell_line'], observed=True).transform('median')
     df_controls['plate_median'] = df_controls['dip_rate'].groupby(
-        level=['cell_line', 'plate']).transform(np.nanmedian)
+        level=['cell_line', 'plate'], observed=True).transform('median')
     df_controls.sort_values(by=['cl_median', 'plate_median'], inplace=True)
 
     if title is None:
@@ -1674,7 +1678,7 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
     title = _combine_title_subtitle(title, subtitle)
 
     traces = []
-    for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
+    for grp, ctrl_dat in df_controls.groupby(level='cell_line'):
         traces.append(go.Box(
             x=ctrl_dat.index.get_level_values('plate').values,
             y=ctrl_dat['dip_rate'].values,
