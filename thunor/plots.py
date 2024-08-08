@@ -1394,7 +1394,7 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
             _create_label_max_items(items, 5): items
         }
 
-    new = pd.DataFrame()
+    df_list = []
 
     label_type_tag = label_type + '_tag'
 
@@ -1407,7 +1407,9 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
                 yvals_tmp.index.get_level_values(label_type).unique()))
 
         yvals_tmp[label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
-        new = yvals_tmp
+        df_list.append(yvals_tmp)
+
+    new = pd.concat(df_list)
 
     labels = list(new.index.names)
     new.reset_index([l for l in labels if l != label_type], inplace=True)

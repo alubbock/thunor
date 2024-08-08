@@ -5,6 +5,7 @@ import numpy as np
 from datetime import timedelta, datetime
 import itertools
 import io
+import pathlib
 import re
 from .dip import _choose_dip_assay, dip_rates
 
@@ -964,7 +965,7 @@ def read_hdf(filename_or_buffer):
 
 def _read_hdf_unstacked(filename_or_buffer):
     hdf_kwargs = {'mode': 'r'}
-    if isinstance(filename_or_buffer, str):
+    if isinstance(filename_or_buffer, (str, pathlib.Path)):
         hdf_kwargs['path'] = filename_or_buffer
     else:
         if hasattr(filename_or_buffer, 'read') and \

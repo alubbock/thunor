@@ -1,6 +1,6 @@
 import thunor.io
 import unittest
-import pkg_resources
+import importlib
 import tempfile
 import io
 import pytest
@@ -27,9 +27,9 @@ def _check_csv(csv_data):
 class TestWithDataset(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        filename = pkg_resources.resource_filename('thunor',
-                                                   'testdata/hts007.h5')
-        cls.hts007 = thunor.io.read_hdf(filename)
+        ref = importlib.resources.files('thunor') / 'testdata/hts007.h5'
+        with importlib.resources.as_file(ref) as filename:
+            cls.hts007 = thunor.io.read_hdf(filename)
 
     def test_hdf5_read_write(self):
         with tempfile.NamedTemporaryFile(suffix='.h5') as tf:
@@ -125,9 +125,9 @@ class TestCSVTwoDrugs(unittest.TestCase):
 
 
 def test_read_incucyte():
-    filename = pkg_resources.resource_filename(
-        'thunor', 'testdata/test_incucyte_minimal.txt')
-    thunor.io.read_incucyte(filename)
+    ref = importlib.resources.files('thunor') / 'testdata/test_incucyte_minimal.txt'
+    with importlib.resources.as_file(ref) as filename:
+        thunor.io.read_incucyte(filename)
 
 
 class TestPlateMap(unittest.TestCase):
