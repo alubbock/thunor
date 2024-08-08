@@ -122,9 +122,10 @@ class PlateMap(object):
                 raise ValueError('Well name too short')
 
             if len(well_name) > 2 and well_name[1].isalpha():
-                row_num_mult = ord(well_name[0]) - 64 # one-based
+                row_num_mult = ord(well_name[0]) - 64  # one-based
                 if row_num_mult < 0 or row_num_mult > 25:
-                    raise ValueError('First letter is not capital alphanumeric')
+                    raise ValueError(
+                        'First letter is not capital alphanumeric')
                 row_num = ord(well_name[1]) - 65  # zero-based
                 row_num += (row_num_mult * 26)
                 col_num_start = 2
@@ -156,7 +157,8 @@ class PlateMap(object):
         -------
         Iterator of dict
             Iterator over the wells in the plate. Each well is given as a dict
-            of 'well' (well ID), 'row' (row character) and 'col' (column number)
+            of 'well' (well ID), 'row' (row character) and 'col'
+            (column number)
         """
         row_it = iter(np.repeat(list(self.row_iterator()), self.width))
         col_it = itertools.cycle(self.col_iterator())
@@ -501,8 +503,7 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
                          converters={
                              'time': _time_parser,
                              'well': lambda w: pm.well_name_to_id(w),
-                             'expt.date': lambda
-                                 d: datetime.strptime(
+                             'expt.date': lambda d: datetime.strptime(
                                  d, '%Y-%m-%d').date()
                          },
                          sep=sep
@@ -517,7 +518,8 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
         elif errstr.startswith('invalid literal for int() with base 10'):
             raise PlateFileParseException(
                 'Invalid value for cell count ({})'.format(errstr))
-        elif errstr.startswith('time data') and 'does not match format' in errstr:
+        elif errstr.startswith('time data') and \
+                'does not match format' in errstr:
             raise PlateFileParseException(
                 'Date format should be YYYY-MM-DD ({})'.format(errstr))
         else:
@@ -526,7 +528,8 @@ def _read_vanderbilt_hts_single_df(file_or_source, plate_width=24,
     try:
         df.set_index(['upid', 'well'], inplace=True)
     except KeyError:
-        raise PlateFileParseException('Please ensure columns "upid" and "well" are present')
+        raise PlateFileParseException(
+            'Please ensure columns "upid" and "well" are present')
 
     required_columns = {'upid', 'cell.count', 'time'}
     missing_cols = required_columns.difference(set(df.columns))
@@ -644,8 +647,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
 
             if du != 'M':
                 raise PlateFileParseException(
-                    'Only supported drug concentration unit is M (not {})'.
-                        format(du))
+                    f'Only supported drug concentration unit is M (not {du})')
         drug_nums.append(drug_no)
         drug_no += 1
 
@@ -653,8 +655,8 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     if drug_nums:
         if 'cell.line' not in df.columns:
             raise PlateFileParseException(
-                'cell.line column is not present, but drug and/or dose columns '
-                'are present. ' + ANNOTATION_MSG
+                'cell.line column is not present, but drug and/or dose '
+                'columns are present. ' + ANNOTATION_MSG
             )
     else:
         if 'cell.line' in df.columns:
@@ -690,8 +692,8 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
     # Check for duplicate time point definitions
     dup_timepoints = df.set_index('time', append=True)
     if dup_timepoints.index.duplicated().any():
-        dups = dup_timepoints.loc[dup_timepoints.index.duplicated(),
-               :].index.tolist()
+        dups = dup_timepoints.loc[
+            dup_timepoints.index.duplicated(), :].index.tolist()
         n_dups = len(dups)
         first_dup = dups[0]
 
@@ -723,7 +725,7 @@ def read_vanderbilt_hts(file_or_source, plate_width=24, plate_height=16,
              zip(df_doses["upid"], df_doses["well"])]))
         df_doses = df_doses.drop_duplicates(subset='well')
         col_renames = {'drug{}.conc'.format(n): 'dose{}'.format(n) for
-                                 n in drug_nums}
+                       n in drug_nums}
         col_renames.update({
             'cell.line': 'cell_line',
             'well': 'well_id',
@@ -1006,7 +1008,7 @@ def read_incucyte(filename_or_buffer, plate_width=24, plate_height=16):
     elif hasattr(filename_or_buffer, 'name'):
         plate_name = filename_or_buffer.name
 
-    def _incucyte_header(filedat):
+    def _incucyte_header(filedat, plate_name, cell_type):
         for line_no, line in enumerate(filedat):
             if line.startswith(LABEL_STR):
                 new_plate_name = line[len(LABEL_STR):].strip()
@@ -1015,18 +1017,20 @@ def read_incucyte(filename_or_buffer, plate_width=24, plate_height=16):
             elif line.startswith(CELL_TYPE_STR):
                 cell_type = line[len(CELL_TYPE_STR):].strip()
             elif line.startswith(TSV_START_STR):
-                return line_no
-        return None
+                return line_no, plate_name, cell_type
+        return None, plate_name, cell_type
 
     if isinstance(filename_or_buffer, io.BytesIO):
         filedat = io.TextIOWrapper(filename_or_buffer,
                                    encoding='utf-8')
-        line_no = _incucyte_header(filedat)
+        line_no, plate_name, cell_type = _incucyte_header(
+            filedat, plate_name, cell_type)
         filedat.detach()
         filename_or_buffer.seek(0)
     else:
         with open(filename_or_buffer, 'r') as f:
-            line_no = _incucyte_header(f)
+            line_no, plate_name, cell_type = _incucyte_header(
+                f, plate_name, cell_type)
 
     if line_no is None:
         raise PlateFileParseException('Does not appear to be an Incucyte '

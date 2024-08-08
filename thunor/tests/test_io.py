@@ -125,7 +125,8 @@ class TestCSVTwoDrugs(unittest.TestCase):
 
 
 def test_read_incucyte():
-    ref = importlib.resources.files('thunor') / 'testdata/test_incucyte_minimal.txt'
+    ref = importlib.resources.files('thunor') / \
+        'testdata/test_incucyte_minimal.txt'
     with importlib.resources.as_file(ref) as filename:
         thunor.io.read_incucyte(filename)
 

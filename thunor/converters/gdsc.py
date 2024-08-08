@@ -69,7 +69,7 @@ def import_gdsc(drug_list_file, screen_data_file):
     df = screen_data
 
     # Drop the blank wells (no cells, no drugs)
-    df.drop(list(df.filter(regex='blank\d+')), axis=1, inplace=True)
+    df.drop(list(df.filter(regex=r'blank\d+')), axis=1, inplace=True)
 
     # Merge in the drug names
     df = df.merge(drug_ids, left_on='DRUG_ID', right_index=True)
@@ -151,7 +151,8 @@ def convert_gdsc_tags(cell_line_file='Cell_Lines_Details.xlsx',
     You can run this function at the command line to convert the files;
     assuming the downloaded file is in the current directory, simply run::
 
-        python -c "from thunor.converters import convert_gdsc_tags; convert_gdsc_tags()"
+        python -c "from thunor.converters import convert_gdsc_tags; \
+                   convert_gdsc_tags()"
 
     This will output a file called (by default)
     :file:`gdsc_cell_line_primary_site_tags.txt`, which can be loaded into
@@ -203,8 +204,8 @@ def convert_gdsc(drug_list_file='Screened_Compounds.xlsx',
     Please note that the layout of wells in each plate after conversion is
     arbitrary, since this information is not in the original files.
 
-    Please make sure you have the "tables" and "xlrd" python packages installed,
-    in addition to the standard Thunor Core requirements.
+    Please make sure you have the "tables" and "xlrd" python packages
+    installed, in addition to the standard Thunor Core requirements.
 
     You can run this function at the command line to convert the files;
     assuming the two files are in the current directory, simply run::
@@ -212,8 +213,8 @@ def convert_gdsc(drug_list_file='Screened_Compounds.xlsx',
         python -c "from thunor.converters import convert_gdsc; convert_gdsc()"
 
     This script will take several minutes to run, please be patient. It is also
-    resource-intensive, due to the size of the dataset. We recommend you utilize
-    the highest-spec machine that you have available.
+    resource-intensive, due to the size of the dataset. We recommend you
+    utilize the highest-spec machine that you have available.
 
     This will output a file called (by default) :file:`gdsc-v17a.h5`,
     which can be opened with :func:`thunor.io.read_hdf()`, or used with Thunor

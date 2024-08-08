@@ -507,7 +507,8 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
     except TypeError as te:
         # This occurs if there are fewer data points than parameters
         te_str = str(te)
-        if 'Improper input:' in te_str or te_str.startswith('The number of func parameters'):
+        if 'Improper input:' in te_str or te_str.startswith(
+                'The number of func parameters'):
             warnings.warn(te_str)
             return None
         else:
@@ -950,7 +951,7 @@ def _attach_extra_params(base_params,
 
     if not is_viability and include_emax:
         divisor = base_params['fit_obj'].apply(lambda fo: fo.divisor if fo
-            else None)
+                                               else None)
         base_params['emax_rel'] = base_params['emax'] / divisor
         base_params['emax_obs_rel'] = base_params['emax_obs'] / divisor
 
@@ -1004,7 +1005,7 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
         doses_expt = [d[0] for d in dip_grp.index.get_level_values(
             'dose').values]
         fit_data = {'dataset_id': grp[0],
-            'cell_line': grp[1], 'drug': grp[2][0]}
+                    'cell_line': grp[1], 'drug': grp[2][0]}
 
         ctrl_dip_data_cl = \
             _get_control_responses(ctrl_dip_data, grp[0], grp[1],

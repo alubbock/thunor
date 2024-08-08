@@ -72,8 +72,9 @@ def dip_rates(df_data, selector_fn=tyson1):
 
     df_assays = df_data.assays.loc[df_data.dip_assay_name]
 
-    return ctrl_dips, \
-           expt_dip_rates(df_data.doses, df_assays, selector_fn=selector_fn)
+    return ctrl_dips, expt_dip_rates(df_data.doses,
+                                     df_assays,
+                                     selector_fn=selector_fn)
 
 
 def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):

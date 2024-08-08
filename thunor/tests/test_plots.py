@@ -78,7 +78,7 @@ class TestWithDataset(unittest.TestCase):
             fit_param_sort='ec25')
 
         assert isinstance(plotly_to_dataframe(x),
-            pd.DataFrame)
+                          pd.DataFrame)
 
     def test_plot_dip_params_aggregation(self):
         assert isinstance(plotly_to_dataframe(plot_drc_params(

@@ -88,7 +88,8 @@ def convert_teicher(directory='.', output_file='teicher.h5'):
     Unzip the downloaded file. The dataset can then be converted on the command
     line::
 
-        python -c "from thunor.converters import convert_teicher; convert_teicher()"
+        python -c "from thunor.converters import convert_teicher; \
+                   convert_teicher()"
 
     Please note that the layout of wells in each plate after conversion is
     arbitrary, since this information is not in the original files.
