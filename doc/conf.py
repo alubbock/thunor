@@ -16,8 +16,11 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import mock
 import os
 import sys
+import thunor
+import pkg_resources
 import datetime
 sys.path.insert(0, os.path.abspath('../'))
 
@@ -58,8 +61,6 @@ master_doc = 'index'
 project = u'Thunor Core'
 copyright = u'2017-' + str(datetime.datetime.now().year) + u' Alex Lubbock'
 author = u'Alex Lubbock'
-
-import thunor, pkg_resources
 
 # The full version, including alpha/beta/rc tags.
 release = thunor.__version__
@@ -152,8 +153,8 @@ html_theme = 'sphinx_rtd_theme'
 # html_logo = None
 
 # The name of an image file (relative to this directory) to use as a favicon of
-# the docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
-# pixels large.
+# the docs.  This file should be a Windows icon file (.ico) being 16x16 or
+# 32x32 pixels large.
 #
 # html_favicon = None
 
@@ -328,10 +329,13 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-def setup(app):
-    app.add_js_file('https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js')
 
-import mock
+def setup(app):
+    app.add_js_file(
+        'https://cdnjs.cloudflare.com/ajax/libs/'
+        'require.js/2.1.10/require.min.js'
+    )
+
 
 for mod_name in ('plotly', 'plotly.graph_objs', 'tables'):
     sys.modules[mod_name] = mock.MagicMock()

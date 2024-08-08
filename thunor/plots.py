@@ -95,8 +95,8 @@ def _param_na_first(param_id):
     param_id = _remove_drmetric_prefix(param_id)
     # Which is first for E, Emax, Erel, AA and Hill
     return param_id in ('hill', 'aa', 'emax', 'emax_rel', 'einf') \
-           or E_REGEX.match(param_id) \
-           or E_REL_REGEX.match(param_id)
+        or E_REGEX.match(param_id) \
+        or E_REL_REGEX.match(param_id)
 
 
 def _get_param_name(param_id):
@@ -366,8 +366,8 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                                        'width': 3},
                                  hoverinfo=hoverinfo,
                                  legendgroup=legend_grp,
-                                 showlegend=not show_replicates or
-                                            multi_dataset,
+                                 showlegend=(not show_replicates or
+                                             multi_dataset),
                                  visible=visible,
                                  name=group_name_disp)
                       )
@@ -478,13 +478,14 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     layout = go.Layout(title=title,
                        hovermode='closest' if show_replicates
                                  or len(traces) > 50 else 'x',
-                       xaxis={'title': 'Dose (M)',
-                              'range': (xaxis_min, xaxis_max),
-                              'type': 'log'},
-                       yaxis={'title': yaxis_title,
-                              'range': yaxis_range,
-                              'rangemode': yaxis_rangemode
-                              },
+                       xaxis={
+                           'title': 'Dose (M)',
+                           'range': (xaxis_min, xaxis_max),
+                           'type': 'log'},
+                       yaxis={
+                           'title': yaxis_title,
+                           'range': yaxis_range,
+                           'rangemode': yaxis_rangemode},
                        annotations=annotations,
                        template=template
                        )
@@ -595,7 +596,7 @@ def plot_drug_combination_heatmap(
 def _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
                                            fit_param, dataset_names):
     symbols = ['circle'] * len(df_params.index)
-    hovertext = [" ".join(l) for l in df_params.index.values]
+    hovertext = [" ".join(lbl) for lbl in df_params.index.values]
     for param in range_bounded_params:
         msg = _out_of_range_msg(param)
         for i in (0, 1):
@@ -751,9 +752,10 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
             line=dict(
                 color="darkorange"
             ),
-            name='{} vs {} {} Linear Fit'.format(dataset_names[0],
-                                      dataset_names[1],
-                                      param_name),
+            name='{} vs {} {} Linear Fit'.format(
+                dataset_names[0],
+                dataset_names[1],
+                param_name),
             showlegend=False
         ))
         layout['annotations'] = [{
@@ -775,8 +777,8 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
             dat = df_params[df_params.index.get_level_values(
                 'cell_line' if color_by == 'cl' else 'drug').isin(
                 color_groups[tag_name])]
-            symbols, hovertext = _symbols_hovertext_two_dataset_scatter(dat, range_bounded_params,
-                                                                        fit_param, dataset_names)
+            symbols, hovertext = _symbols_hovertext_two_dataset_scatter(
+                dat, range_bounded_params, fit_param, dataset_names)
 
             fit_param_data = dat.loc[:, fit_param]
             xdat = fit_param_data.iloc[:, 0]
@@ -912,7 +914,9 @@ def plot_drc_params(df_params, fit_param,
     if multi_dataset and not color_by:
         color_by_col = 'dataset_id'
         color_by = 'dataset'
-        color_groups = {dataset: [dataset] for dataset in df_params.index.get_level_values('dataset_id').unique()}
+        color_groups = {dataset: [dataset]
+                        for dataset in df_params.index.get_level_values(
+                            'dataset_id').unique()}
         colours = _sns_to_rgb(sns.color_palette("husl", 2))
     elif color_by:
         color_by_col = 'cell_line' if color_by == 'cl' else 'drug'
@@ -1052,7 +1056,8 @@ def plot_drc_params(df_params, fit_param,
 
         if color_by:
             for idx, tag_name in enumerate(color_groups):
-                location = df_params.index.get_level_values(color_by_col).isin(color_groups[tag_name])
+                location = df_params.index.get_level_values(
+                    color_by_col).isin(color_groups[tag_name])
                 dat = df_params[location]
                 symbols, hovertext = _symbols_hovertext_two_param_scatter(
                     dat, range_bounded_params)
@@ -1215,8 +1220,7 @@ def plot_drc_params(df_params, fit_param,
                             'yanchor': 'bottom',
                             'yref': 'paper', 'showarrow': False,
                             'text': 'Two-sided Mann-Whitney U: {:.4g} '
-                                    'p-value: {:.4g}'.format(
-                                mw_u, mw_p)
+                                    'p-value: {:.4g}'.format(mw_u, mw_p)
                         })
 
         layout['annotations'].extend([
@@ -1401,7 +1405,8 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
     label_type_tag = label_type + '_tag'
 
     for tag_name, names in aggregate_items.items():
-        yvals_tmp = yvals.loc[yvals.index.isin(names, level=label_type), :].copy()
+        yvals_tmp = yvals.loc[yvals.index.isin(
+            names, level=label_type), :].copy()
 
         # Add counts to the tag names
         if add_counts:
@@ -1414,7 +1419,7 @@ def _aggregate_by_tag(yvals, aggregate_items, label_type,
     new = pd.concat(df_list)
 
     labels = list(new.index.names)
-    new.reset_index([l for l in labels if l != label_type], inplace=True)
+    new.reset_index([lbl for lbl in labels if lbl != label_type], inplace=True)
     labels[labels.index(label_type)] = label_type_tag
     new.set_index(labels, inplace=True, drop=replace_index)
     if replace_index:
@@ -1517,7 +1522,8 @@ def plot_time_course(hts_pandas,
     if show_dip_fit:
         if df_controls is not None:
             dip_rate_ctrl = ctrl_dip_rates(df_controls)
-            dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
+            dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(
+                level='cell_line')
         dip_rates = expt_dip_rates(df_doses, df_vals)
         dip_rates.reset_index(inplace=True)
         dip_rates.set_index('well_id', inplace=True)
@@ -1719,7 +1725,11 @@ def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
     # Sort by median DIP rate
     df_controls = df_controls.copy()
 
-    df_controls = df_controls['value'].groupby(level=['cell_line', 'plate']).apply(lambda x: x.quantile(q=(0, 0.25, 0.25, 0.5, 0.75, 0.75, 1))).reset_index(level=2, drop=True).to_frame()
+    df_controls = df_controls['value'].groupby(
+        level=['cell_line', 'plate']).apply(
+            lambda x: x.quantile(
+                q=(0, 0.25, 0.25, 0.5, 0.75, 0.75, 1))
+        ).reset_index(level=2, drop=True).to_frame()
 
     df_controls['cl_median'] = df_controls['value'].groupby(
         level=['cell_line']).transform(np.nanmedian)
@@ -1834,22 +1844,25 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         y=[rows - (well_num // cols) + well_rad for well_num in
            range(num_wells)],
         text='',
-        hovertext=['Well {}{}<br>'
-                   'DIP: {}<br>'
-                   'Cell Line: {}<br>'
-                   'Drug: {}<br>'
-                   'Dose: {}'.format(
-                        row_labels[well_num // cols],
-                        col_labels[well_num % cols],
-                        plate_data.dip_rates[well_num],
-                        plate_data.cell_lines[well_num],
-                        " &amp; ".join(["(None)" if d is None else d for d in
-                                        plate_data.drugs[well_num]]) if
-                                        plate_data.drugs[well_num] else 'None',
-                        " &amp; ".join([format_dose(d) for d in
-                                        plate_data.doses[well_num]]) if
-                                        plate_data.doses[well_num] else 'N/A'
-            )
+        hovertext=[
+            'Well {}{}<br>'
+            'DIP: {}<br>'
+            'Cell Line: {}<br>'
+            'Drug: {}<br>'
+            'Dose: {}'.format(
+                row_labels[well_num // cols],
+                col_labels[well_num % cols],
+                plate_data.dip_rates[well_num],
+                plate_data.cell_lines[well_num],
+                " &amp; ".join(
+                    ["(None)" if d is None else d for d in
+                        plate_data.drugs[well_num]])
+                if plate_data.drugs[well_num] else 'None',
+                " &amp; ".join(
+                    [format_dose(d) for d in
+                        plate_data.doses[well_num]])
+                if plate_data.doses[well_num] else 'N/A'
+                    )
             for well_num in range(num_wells)],
         hoverinfo='text',
         mode='text'

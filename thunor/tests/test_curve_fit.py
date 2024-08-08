@@ -1,5 +1,4 @@
 from thunor.curve_fit import fit_drc, HillCurveLL4
-from numpy.testing import assert_raises
 
 
 def test_fit_drc_3_data_points():

@@ -1,0 +1,31 @@
+[project]
+name = "thunor"
+dynamic = ["version", "dependencies"]
+description = "Dose response curve and drug induced proliferation (DIP) rate fits and visualisation"
+authors = [
+    {name = "Alex Lubbock", email = "code@alexlubbock.com"},
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "GPL-3.0-only"}
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+[project.urls]
+Homepage = "https://www.thunor.net"
+
+[build-system]
+requires = ["setuptools", "versioneer-518"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest]
+norecursedirs = "doc/_build"
+
+[tool.flake8]
+extend-ignore = "E203"
+max-line-length = 88

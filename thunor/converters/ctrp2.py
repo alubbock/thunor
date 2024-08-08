@@ -168,8 +168,8 @@ def convert_ctrp(directory='.',
         python -c "from thunor.converters import convert_ctrp; convert_ctrp()"
 
     This script will take several minutes to run, please be patient. It is also
-    resource-intensive, due to the size of the dataset. We recommend you utilize
-    the highest-spec machine that you have available.
+    resource-intensive, due to the size of the dataset. We recommend you
+    utilize the highest-spec machine that you have available.
 
     This will output a file called (by default) :file:`ctrp_v2.h5`,
     which can be opened with :func:`thunor.io.read_hdf()`, or used with Thunor
