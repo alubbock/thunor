@@ -3,7 +3,7 @@
 **Thunor** (pronounced THOO-nor) is a free software platform for managing,
 visualizing, and analyzing high throughput screen (HTS) data, which measure
 the dose-dependent response of cells to one or more drug(s).
-Thunor has a web interface for drag-and-drop upload of cell count data, 
+Thunor has a web interface for drag-and-drop upload of cell count data,
 automatic calculation of dose response curves, and an interactive
 multi-panelled plot system.
 
@@ -15,12 +15,14 @@ built around this package with added database and multi-user capabilities.
 ## Implementation
 
 Thunor is written in pure Python and is compatible with Python 3 only.
-It makes extensive use of [pandas](http://pandas.pydata.org/) and 
+It makes extensive use of [pandas](http://pandas.pydata.org/) and
 [plotly](http://plot.ly/python/).
 
 ## Installation
 
-Install using `pip`:
+Thunor Core is tested against the three most recent stable releases
+of Python (currently 3.10-3.12), so one of these versions is
+recommended. Install Thunor Core using `pip`:
 
 ```
 pip install thunor
