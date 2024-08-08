@@ -701,7 +701,9 @@ def fit_params_minimal(ctrl_data, expt_data,
 
     is_viability = 'viability' in expt_data.columns
 
-    for group_name, dip_grp in expt_data.groupby(level=group_by):
+    for group_name, dip_grp in expt_data.groupby(
+        level=group_by[0] if len(group_by) == 1 else group_by
+    ):
         if 'dataset' in group_by:
             if len(group_by) > 1:
                 dataset = group_name[group_by.index('dataset')]
