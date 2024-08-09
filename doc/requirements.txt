@@ -1,5 +1,5 @@
 -r ../requirements.txt
-MarkupSafe<2.1
+MarkupSafe<2.2
 Sphinx==7.4.7
 jinja2==3.1.4
 jupyter-client==8.6.2
