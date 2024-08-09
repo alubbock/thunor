@@ -19,10 +19,10 @@
 import mock
 import os
 import sys
-import thunor
 import pkg_resources
 import datetime
 sys.path.insert(0, os.path.abspath('../'))
+import thunor  # noqa: E402
 
 # -- General configuration ------------------------------------------------
 
