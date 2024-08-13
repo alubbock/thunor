@@ -23,9 +23,6 @@ Homepage = "https://www.thunor.net"
 requires = ["setuptools", "versioneer-518"]
 build-backend = "setuptools.build_meta"
 
-[tool.pytest]
-norecursedirs = "doc/_build"
-
 [tool.flake8]
 extend-ignore = "E203"
 max-line-length = 88
