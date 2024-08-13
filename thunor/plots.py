@@ -275,8 +275,8 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                                      showlegend=True,
                                      name='<b>{}</b>'.format(name))
                           )
-    xaxis_min = np.Inf
-    xaxis_max = np.NINF
+    xaxis_min = np.inf
+    xaxis_max = -np.inf
     for fp in fit_params.itertuples():
         if color_by:
             grp = fp.Index[color_index_col]
@@ -1359,8 +1359,8 @@ def plot_drc_params(df_params, fit_param,
         except TypeError as te:
             te_str = str(te).lower()
             if te_str.startswith('at least two'):
-                anova_f = np.NaN
-                anova_p = np.NaN
+                anova_f = np.nan
+                anova_p = np.nan
             else:
                 raise
         if not np.isnan(anova_f):
