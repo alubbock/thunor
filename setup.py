@@ -19,9 +19,13 @@ def main():
         author_email='code@alexlubbock.com',
         url='https://www.thunor.net',
         packages=['thunor', 'thunor.converters'],
+        python_requires='>=3.10',
         install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn',
                           'tables'],
-        tests_require=['pytest', 'nbval', 'django', 'nbformat'],
+        extras_require={
+            'test': ['pytest', 'nbval', 'django', 'nbformat'],
+            'docs': ['sphinx<8', 'sphinx-rtd-theme', 'mock', 'nbsphinx'],
+        },
         cmdclass=versioneer.get_cmdclass(),
         zip_safe=True,
         classifiers=[
