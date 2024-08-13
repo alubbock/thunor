@@ -3,14 +3,13 @@
 **Thunor** (pronounced THOO-nor) is a free software platform for managing,
 visualizing, and analyzing high throughput screen (HTS) data, which measure
 the dose-dependent response of cells to one or more drug(s).
-Thunor has a web interface for drag-and-drop upload of cell count data,
-automatic calculation of dose response curves, and an interactive
-multi-panelled plot system.
 
 This repository, Thunor Core, is a Python package which can be used for
 standalone analysis or integration into computational pipelines. There
 is also a web interface, [Thunor Web](https://github.com/alubbock/thunor-web),
-built around this package with added database and multi-user capabilities.
+built around this package with added database, multi-user capabilities, drag-and-drop upload of cell count data,
+automatic calculation of dose response curves, and an interactive
+multi-panelled plot system ([demo](https://demo.thunor.net)).
 
 ## Implementation
 
@@ -36,7 +35,9 @@ repository and change into the `thunor` directory.
 
 To build documentation locally, you'll need a few software dependencies:
 
-    pip install -r doc/requirements.txt
+    pip install -e '.[docs]'
+
+You'll also need to install [pandoc](https://pandoc.org/installing.html).
 
 Then, you can build the documentation like so:
 
@@ -47,8 +48,8 @@ After the build completes, open _build/html/index.html in your web browser.
 
 ## Tutorial
 
-To manually work through the tutorial from the documentation above, you can
-open the file with Jupyter Notebook:
+Like the docs, you can also view the [tutorial](https://core.thunor.net/en/latest/tutorial.html) online.
+To work through the tutorial locally, build the documentation as per the previous section. You can then open the file with Jupyter Notebook:
 
     jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 doc/tutorial.ipynb
 
