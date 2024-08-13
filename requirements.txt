@@ -1,7 +1,7 @@
 XlsxWriter==3.2.0
 ipython==8.26.0
 matplotlib==3.9.2
-numpy<2
+numpy<3
 pandas==2.2.2
 plotly==5.23.0
 python-magic==0.4.27
