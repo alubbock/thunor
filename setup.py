@@ -24,7 +24,8 @@ def main():
                           'tables'],
         extras_require={
             'test': ['pytest', 'nbval', 'django', 'nbformat'],
-            'docs': ['sphinx<8', 'sphinx-rtd-theme', 'mock', 'nbsphinx'],
+            'docs': ['sphinx<8', 'sphinx-rtd-theme', 'mock', 'nbsphinx',
+                     'ipykernel'],
         },
         cmdclass=versioneer.get_cmdclass(),
         zip_safe=True,
