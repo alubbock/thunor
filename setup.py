@@ -23,7 +23,8 @@ def main():
         install_requires=['numpy', 'scipy', 'pandas', 'plotly', 'seaborn',
                           'tables'],
         extras_require={
-            'test': ['pytest', 'nbval', 'django', 'nbformat'],
+            'test': ['pytest', 'nbval', 'django', 'nbformat', 'flake8',
+                     'codecov', 'pytest-cov'],
             'docs': ['sphinx', 'sphinx-rtd-theme', 'mock', 'nbsphinx',
                      'ipykernel'],
         },
