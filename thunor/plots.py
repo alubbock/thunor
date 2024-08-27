@@ -736,8 +736,12 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     data = []
     layout = go.Layout(title=title)
 
-    slope, intercept, r_value, p_value, std_err = \
-        scipy.stats.linregress(xdat_fit, ydat_fit)
+    try:
+        slope, intercept, r_value, p_value, std_err = \
+            scipy.stats.linregress(xdat_fit, ydat_fit)
+    except ValueError:
+        slope = np.nan
+
     if not np.isnan(slope):
         xfit = (min(xdat_fit), max(xdat_fit))
         yfit = [x * slope + intercept for x in xfit]
