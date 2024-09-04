@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 import collections
-from thunor.io import HtsPandas, write_hdf
+from ..io import HtsPandas, write_hdf
 
 # The data are 72 hour viability
 TIMEPOINT = timedelta(hours=72)

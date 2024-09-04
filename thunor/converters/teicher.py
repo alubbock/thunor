@@ -1,4 +1,4 @@
-from thunor.io import HtsPandas, write_hdf
+from ..io import HtsPandas, write_hdf
 import pandas as pd
 import datetime
 import os

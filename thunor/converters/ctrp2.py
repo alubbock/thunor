@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import timedelta
-from thunor.io import HtsPandas, write_hdf
+from ..io import HtsPandas, write_hdf
 import os
 
 # The data are 72 hour viability
