@@ -1,11 +1,13 @@
 [project]
 name = "thunor"
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
 description = "Dose response curve and drug induced proliferation (DIP) rate fits and visualisation"
 authors = [
     {name = "Alex Lubbock", email = "code@alexlubbock.com"},
 ]
 requires-python = ">=3.10"
+dependencies = ['numpy', 'scipy', 'pandas', 'plotly', 'seaborn',
+                'tables']
 readme = "README.md"
 license = {text = "GPL-3.0-only"}
 classifiers = [
@@ -16,11 +18,17 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 
+[project.optional-dependencies]
+test = ['pytest', 'nbval', 'django', 'nbformat', 'flake8',
+        'codecov', 'pytest-cov']
+docs = ['sphinx', 'sphinx-rtd-theme', 'mock', 'nbsphinx',
+        'ipykernel']
+
 [project.urls]
 Homepage = "https://www.thunor.net"
 
 [build-system]
-requires = ["setuptools", "versioneer-518"]
+requires = ["setuptools", "versioneer"]
 build-backend = "setuptools.build_meta"
 
 [tool.flake8]
