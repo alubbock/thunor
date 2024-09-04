@@ -1,5 +1,5 @@
-from thunor import __name__ as package_name
-from thunor import __version__
+from . import __name__ as package_name
+from . import __version__
 import pandas as pd
 import numpy as np
 from datetime import timedelta, datetime

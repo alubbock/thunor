@@ -3,10 +3,10 @@
 import plotly.graph_objs as go
 import numpy as np
 import seaborn as sns
-import thunor.config as config
+from . import config
 from .helpers import format_dose
 from .dip import ctrl_dip_rates, expt_dip_rates
-from thunor.curve_fit import HillCurveNull, is_param_truncated
+from .curve_fit import HillCurveNull, is_param_truncated
 import scipy.stats
 import re
 import pandas as pd
