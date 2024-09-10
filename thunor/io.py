@@ -868,18 +868,27 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
     ----------
     df_data: HtsPandas
         HTS dataset
-    filename: str
-        Output filename
+    filename: str or io.BytesIO
+        Output filename, or io.BytesIO instance for in-memory use
     dataset_format: str
         One of 'fixed' or 'table'. See pandas HDFStore docs for details
     """
-    with pd.HDFStore(filename, 'w', complib='zlib', complevel=9) as hdf:
+    if isinstance(filename, io.BytesIO):
+        extra_kwargs = {"driver": "H5FD_CORE", "driver_core_backing_store": 0}
+        filepath = 'in-memory-file'
+    else:
+        extra_kwargs = {}
+        filepath = filename
+    with pd.HDFStore(filepath, 'w', complib='zlib', complevel=9,
+                     **extra_kwargs) as hdf:
         hdf.root._v_attrs.generator = package_name
         hdf.root._v_attrs.generator_version = __version__
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
         hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
             hdf.put('controls', df_data.controls, format=dataset_format)
+        if isinstance(filename, io.BytesIO):
+            filename.write(hdf._handle.get_file_image())
 
 
 def _stack_doses(df_doses, inplace=True):
