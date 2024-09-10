@@ -31,7 +31,7 @@ class TestWithDataset(unittest.TestCase):
         with importlib.resources.as_file(ref) as filename:
             cls.hts007 = thunor.io.read_hdf(filename)
 
-    def test_hdf5_read_write(self):
+    def test_hdf5_read_write_file(self):
         with tempfile.NamedTemporaryFile(suffix='.h5') as tf:
             if os.name == 'nt':
                 # Can't have two file handles on Windows
@@ -42,6 +42,17 @@ class TestWithDataset(unittest.TestCase):
             newdf = thunor.io.read_hdf(tf.name)
 
             _assert_datasets_equal(self.hts007, newdf)
+
+    def test_hdf5_read_write_buffer(self):
+        buf = io.BytesIO()
+
+        thunor.io.write_hdf(self.hts007, filename=buf)
+
+        buf.seek(0)
+
+        newdf = thunor.io.read_hdf(buf)
+
+        _assert_datasets_equal(self.hts007, newdf)
 
     def test_vanderbilt_csv_read_write(self):
         with tempfile.NamedTemporaryFile(suffix='.csv') as tf:
