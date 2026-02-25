@@ -632,7 +632,7 @@ def aa_obs(responses, doses=None):
     positions = np.argsort(doses)
     responses_shifted = responses_shifted[positions]
     doses = doses[positions]
-    return np.trapz(responses_shifted, np.log10(doses))
+    return np.trapezoid(responses_shifted, np.log10(doses))
 
 
 def fit_params_minimal(ctrl_data, expt_data,
