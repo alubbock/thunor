@@ -1,11 +1,11 @@
 repos:
   - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
+    rev: 7.3.0
     hooks:
     -   id: flake8
         args: []
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v3.4.0
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
