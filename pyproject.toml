@@ -6,8 +6,16 @@ authors = [
     {name = "Alex Lubbock", email = "code@alexlubbock.com"},
 ]
 requires-python = ">=3.10"
-dependencies = ['numpy', 'scipy', 'pandas', 'plotly', 'seaborn',
-                'tables']
+dependencies = [
+    'numpy',
+    'scipy',
+    # pandas >=3 has a bug with HDFStore + compression + StringDtype
+    # https://github.com/pandas-dev/pandas/issues/64180
+    'pandas <3',
+    'plotly',
+    'seaborn',
+    'tables',
+]
 readme = "README.md"
 license = {text = "GPL-3.0-only"}
 classifiers = [
