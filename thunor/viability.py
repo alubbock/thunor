@@ -32,8 +32,9 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
         return value otherwise)
     """
     if df_data.controls is None:
-        raise ValueError('Control wells not found, and are needed for '
-                         'viability calculation')
+        raise ValueError(
+            'Control wells not found, and are needed for viability calculation'
+        )
 
     time = timedelta(hours=time_hrs)
 
@@ -55,9 +56,11 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
     if 'dataset' in df_data.doses.index.names:
         dataset_assays = df.groupby('dataset')['assay'].unique()
         if not (dataset_assays.apply(len) == 1).all():
-            raise NotImplementedError('Cannot calculate viability across two '
-                                      'datasets when the datasets are '
-                                      'multi-assay')
+            raise NotImplementedError(
+                'Cannot calculate viability across two '
+                'datasets when the datasets are '
+                'multi-assay'
+            )
     if 'dataset' in df_data.controls.index.names:
         controls = df_data.controls.reset_index('assay', drop=True)
     else:
@@ -72,9 +75,11 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
     controls_means = controls['value'].groupby(level=idx_cols).mean()
 
     if include_controls:
-        controls['value'] = controls['value'].groupby(
-            level=idx_cols, group_keys=False).apply(
-            lambda x: x / x.mean())
+        controls['value'] = (
+            controls['value']
+            .groupby(level=idx_cols, group_keys=False)
+            .apply(lambda x: x / x.mean())
+        )
 
     df.reset_index(inplace=True)
     df.rename(columns={'plate_id': 'plate'}, inplace=True)
@@ -103,9 +108,9 @@ def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
 
 
 def _get_closest_timepoint_for_each_well(dataframe, timediff):
-    dataframe['timediff'] = abs(dataframe.index.get_level_values('timepoint') -
-                                timediff)
-    dataframe = dataframe.loc[dataframe.groupby('well_id')[
-        'timediff'].idxmin()]
+    dataframe['timediff'] = abs(
+        dataframe.index.get_level_values('timepoint') - timediff
+    )
+    dataframe = dataframe.loc[dataframe.groupby('well_id')['timediff'].idxmin()]
 
     return dataframe

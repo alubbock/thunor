@@ -37,14 +37,15 @@ def _ctrl_well(df, num_controls):
                     'well_id': well_id,
                     'timepoint': TIMEPOINT,
                     'value': ctrl_val,
-                    'well_num': i
+                    'well_num': i,
                 }
 
 
 def _get_controls(df, num_controls):
     controls = pd.DataFrame(_ctrl_well(df, num_controls))
-    controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
-                        'timepoint'], inplace=True)
+    controls.set_index(
+        ['assay', 'cell_line', 'plate', 'well_id', 'timepoint'], inplace=True
+    )
 
     return controls
 
@@ -52,18 +53,15 @@ def _get_controls(df, num_controls):
 def import_gdsc(drug_list_file, screen_data_file):
     print('This process may take several minutes, please be patient.')
     print('Reading drug names...')
-    drug_list = pd.read_excel(drug_list_file, converters={
-        'Drug Name': str
-    })
+    drug_list = pd.read_excel(drug_list_file, converters={'Drug Name': str})
 
     drug_ids = drug_list.loc[:, ('Drug ID', 'Drug Name')]
     drug_ids.set_index('Drug ID', inplace=True)
 
     print('Reading HTS data...')
-    screen_data = pd.read_excel(screen_data_file, converters={
-        'BARCODE': str,
-        'CELL_LINE_NAME': str
-    })
+    screen_data = pd.read_excel(
+        screen_data_file, converters={'BARCODE': str, 'CELL_LINE_NAME': str}
+    )
 
     print('Merging data...')
     df = screen_data
@@ -74,8 +72,7 @@ def import_gdsc(drug_list_file, screen_data_file):
     # Merge in the drug names
     df = df.merge(drug_ids, left_on='DRUG_ID', right_index=True)
 
-    df.rename(columns={'Drug Name': 'DRUG_NAME',
-                       'raw_max': 'raw1'}, inplace=True)
+    df.rename(columns={'Drug Name': 'DRUG_NAME', 'raw_max': 'raw1'}, inplace=True)
 
     powers = list(range(NUM_RAW))
 
@@ -90,30 +87,33 @@ def import_gdsc(drug_list_file, screen_data_file):
     print('Extracting data...')
     for row in df.itertuples():
         # Create the dilution series for this row
-        concs = 1 / np.power(row.FOLD_DILUTION, powers) * WELL_CONVERSION * \
-                row.MAX_CONC
+        concs = 1 / np.power(row.FOLD_DILUTION, powers) * WELL_CONVERSION * row.MAX_CONC
 
         start_well = plate_counter[row.BARCODE]
         for i, conc in enumerate(concs):
             well_num = i + START_WELL_EXPT + start_well
             well_id = '{}__{}'.format(row.BARCODE, well_num)
-            well_val = getattr(row, 'raw{}'.format(i+1))
-            doses_list.append({
-                'drug': (row.DRUG_NAME, ),
-                'cell_line': row.CELL_LINE_NAME,
-                'dose': (conc, ),
-                'well_id': well_id,
-                'plate': row.BARCODE,
-                'well_num': well_num
-            })
+            well_val = getattr(row, 'raw{}'.format(i + 1))
+            doses_list.append(
+                {
+                    'drug': (row.DRUG_NAME,),
+                    'cell_line': row.CELL_LINE_NAME,
+                    'dose': (conc,),
+                    'well_id': well_id,
+                    'plate': row.BARCODE,
+                    'well_num': well_num,
+                }
+            )
 
             if not np.isnan(well_val):
-                assay_list.append({
-                    'assay': ASSAY,
-                    'well_id': well_id,
-                    'timepoint': TIMEPOINT,
-                    'value': well_val
-                })
+                assay_list.append(
+                    {
+                        'assay': ASSAY,
+                        'well_id': well_id,
+                        'timepoint': TIMEPOINT,
+                        'value': well_val,
+                    }
+                )
                 # assert well_vals.setdefault(well_id, well_val) == well_val
 
         plate_counter[row.BARCODE] += NUM_RAW
@@ -127,8 +127,10 @@ def import_gdsc(drug_list_file, screen_data_file):
     return HtsPandas(doses, assays, controls)
 
 
-def convert_gdsc_tags(cell_line_file='Cell_Lines_Details.xlsx',
-                      output_file='gdsc_cell_line_primary_site_tags.txt'):
+def convert_gdsc_tags(
+    cell_line_file='Cell_Lines_Details.xlsx',
+    output_file='gdsc_cell_line_primary_site_tags.txt',
+):
     """
     Convert GDSC cell line tissue descriptors to Thunor tags
 
@@ -166,21 +168,20 @@ def convert_gdsc_tags(cell_line_file='Cell_Lines_Details.xlsx',
         Filename of output file (tab separated values format)
 
     """
-    df = pd.read_excel(cell_line_file,
-                       sheet_name='Cell line details')
+    df = pd.read_excel(cell_line_file, sheet_name='Cell line details')
     cl_column = 'Sample Name'
     tissue_column = 'GDSC\nTissue descriptor 1'
     df = df[[cl_column, tissue_column]]
-    df.rename(columns={cl_column: 'cell_line',
-                       tissue_column: 'tag_name'},
-              inplace=True)
+    df.rename(columns={cl_column: 'cell_line', tissue_column: 'tag_name'}, inplace=True)
     df['tag_category'] = 'GDSC primary site'
     df.to_csv(output_file, sep='\t', index=False)
 
 
-def convert_gdsc(drug_list_file='Screened_Compounds.xlsx',
-                 screen_data_file='v17a_public_raw_data.xlsx',
-                 output_file='gdsc-v17a.h5'):
+def convert_gdsc(
+    drug_list_file='Screened_Compounds.xlsx',
+    screen_data_file='v17a_public_raw_data.xlsx',
+    output_file='gdsc-v17a.h5',
+):
     """
     Convert GDSC data to Thunor format
 

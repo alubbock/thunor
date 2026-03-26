@@ -57,8 +57,7 @@ def dip_rates(df_data, selector_fn=tyson1):
         ctrl_dips = None
     else:
         if 'dataset' in df_data.controls.index.names:
-            df_controls = df_data.controls.loc[(slice(None),
-                                                df_data.dip_assay_name), :]
+            df_controls = df_data.controls.loc[(slice(None), df_data.dip_assay_name), :]
         else:
             df_controls = df_data.controls.loc[df_data.dip_assay_name]
         df_controls = df_controls.loc[df_controls.index.dropna()]
@@ -72,9 +71,7 @@ def dip_rates(df_data, selector_fn=tyson1):
 
     df_assays = df_data.assays.loc[df_data.dip_assay_name]
 
-    return ctrl_dips, expt_dip_rates(df_data.doses,
-                                     df_assays,
-                                     selector_fn=selector_fn)
+    return ctrl_dips, expt_dip_rates(df_data.doses, df_assays, selector_fn=selector_fn)
 
 
 def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
@@ -98,20 +95,32 @@ def expt_dip_rates(df_doses, df_vals, selector_fn=tyson1):
     pd.DataFrame
         Fitted DIP rate values
     """
-    res = df_vals.groupby(level='well_id')['value'].\
-        apply(_expt_dip, selector_fn=selector_fn).apply(pd.Series).\
-        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
-                        2: 'dip_first_timepoint', 3: 'dip_y_intercept'})
-    dip_df = pd.merge(df_doses, res, left_on='well_id',
-                      right_index=True)
+    res = (
+        df_vals.groupby(level='well_id')['value']
+        .apply(_expt_dip, selector_fn=selector_fn)
+        .apply(pd.Series)
+        .rename(
+            columns={
+                0: 'dip_rate',
+                1: 'dip_fit_std_err',
+                2: 'dip_first_timepoint',
+                3: 'dip_y_intercept',
+            }
+        )
+    )
+    dip_df = pd.merge(df_doses, res, left_on='well_id', right_index=True)
     dip_df.set_index('well_id', append=True, inplace=True)
     dip_df.sort_index(inplace=True)
     return dip_df
 
 
 def _expt_dip(df_timecourses, selector_fn):
-    t_hours = np.array(df_timecourses.index.get_level_values(
-        level='timepoint').total_seconds()) / SECONDS_IN_HOUR
+    t_hours = (
+        np.array(
+            df_timecourses.index.get_level_values(level='timepoint').total_seconds()
+        )
+        / SECONDS_IN_HOUR
+    )
 
     assay_vals = np.log2(np.array(df_timecourses))
     n_total = len(t_hours)
@@ -130,8 +139,7 @@ def _expt_dip(df_timecourses, selector_fn):
     for i in range(n_total - 2):
         x = t_hours[i:]
         y = assay_vals[i:]
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-            x, y)
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
 
         n = len(x)
         adj_r_sq = adjusted_r_squared(r_value, n, 1)
@@ -163,22 +171,27 @@ def ctrl_dip_rates(df_controls):
     pd.DataFrame
         Fitted control DIP rate values
     """
-    res = df_controls.groupby(level=('cell_line', 'plate', 'well_id'))[
-        'value'].apply(
-        _ctrl_dip).apply(pd.Series).\
-        rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err',
-                        2: 'dip_y_intercept'})
+    res = (
+        df_controls.groupby(level=('cell_line', 'plate', 'well_id'))['value']
+        .apply(_ctrl_dip)
+        .apply(pd.Series)
+        .rename(columns={0: 'dip_rate', 1: 'dip_fit_std_err', 2: 'dip_y_intercept'})
+    )
 
     return res
 
 
 def _ctrl_dip(df_timecourse):
-    t_hours = np.array(df_timecourse.index.get_level_values(
-        level='timepoint').total_seconds()) / SECONDS_IN_HOUR
+    t_hours = (
+        np.array(
+            df_timecourse.index.get_level_values(level='timepoint').total_seconds()
+        )
+        / SECONDS_IN_HOUR
+    )
 
-    ctrl_slope, ctrl_intercept, ctrl_r, ctrl_p, ctrl_std_err = \
-        scipy.stats.linregress(
-            t_hours, np.log2(np.array(df_timecourse)))
+    ctrl_slope, ctrl_intercept, ctrl_r, ctrl_p, ctrl_std_err = scipy.stats.linregress(
+        t_hours, np.log2(np.array(df_timecourse))
+    )
 
     return ctrl_slope, ctrl_std_err, ctrl_intercept
 
@@ -203,4 +216,4 @@ def adjusted_r_squared(r, n, p):
     """
     if n <= p:
         return np.nan
-    return 1 - (1 - r ** 2) * ((n - 1) / (n - p - 1))
+    return 1 - (1 - r**2) * ((n - 1) / (n - p - 1))

@@ -12,15 +12,12 @@ FILE_DR = 'sclc_export_compound_19FEB2016.csv'
 
 
 def import_teicher(directory):
-    df = pd.read_csv(os.path.join(directory, FILE_MAIN),
-                     dtype={'concentration': float})
+    df = pd.read_csv(os.path.join(directory, FILE_MAIN), dtype={'concentration': float})
 
-    df_cl = pd.read_csv(os.path.join(directory, FILE_CL),
-                        dtype={'cell_line': str})
+    df_cl = pd.read_csv(os.path.join(directory, FILE_CL), dtype={'cell_line': str})
     df = df.merge(df_cl, left_on='experiment_id', right_on='id')
 
-    df_dr = pd.read_csv(os.path.join(directory, FILE_DR),
-                        dtype={'drug_name': str})
+    df_dr = pd.read_csv(os.path.join(directory, FILE_DR), dtype={'drug_name': str})
     df = df.merge(df_dr, on='nsc')
 
     df = df.rename(columns={'cell_line': 'cell.line', 'drug_name': 'drug'})
@@ -34,12 +31,15 @@ def import_teicher(directory):
     df['concentration'] = [(d,) for d in df['concentration'].values]
     df['drug'] = [(d,) for d in df['drug'].values]
 
-    df.rename(columns={
-        'experiment_id': 'plate',
-        'concentration': 'dose',
-        'cell.line': 'cell_line',
-        'mean_pct_ctrl': 'value'
-    }, inplace=True)
+    df.rename(
+        columns={
+            'experiment_id': 'plate',
+            'concentration': 'dose',
+            'cell.line': 'cell_line',
+            'mean_pct_ctrl': 'value',
+        },
+        inplace=True,
+    )
 
     df['well_num'] = df.groupby('plate').cumcount() + 1
     df['well_id'] = df['plate'].astype(str) + '__' + df['well_num'].astype(str)
@@ -49,22 +49,24 @@ def import_teicher(directory):
         cell_lines = dat['cell_line'].unique()
         assert len(cell_lines == 1)
         cell_line = cell_lines[0]
-        controls_list.append({
-            'assay': ASSAY,
-            'cell_line': cell_line,
-            'plate': plate,
-            'well_id': '{}__{}'.format(plate, 0),
-            'timepoint': TIMEPOINT,
-            'value': 100.0,
-            'well_num': 0
-        })
+        controls_list.append(
+            {
+                'assay': ASSAY,
+                'cell_line': cell_line,
+                'plate': plate,
+                'well_id': '{}__{}'.format(plate, 0),
+                'timepoint': TIMEPOINT,
+                'value': 100.0,
+                'well_num': 0,
+            }
+        )
 
     controls = pd.DataFrame(controls_list)
-    controls = controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
-                                   'timepoint'])
+    controls = controls.set_index(
+        ['assay', 'cell_line', 'plate', 'well_id', 'timepoint']
+    )
 
-    doses = df.loc[:, ['drug', 'cell_line', 'dose', 'well_id', 'plate',
-                       'well_num']]
+    doses = df.loc[:, ['drug', 'cell_line', 'dose', 'well_id', 'plate', 'well_num']]
     doses = doses.set_index(['drug', 'cell_line', 'dose'])
 
     assays = df.loc[:, ['well_id', 'value']]
