@@ -35,21 +35,25 @@ SECONDS_IN_HOUR = 3600.0
 NS_IN_SEC = 1e9
 PLATE_MAP_WELL_DIAM = 0.95
 ASCII_CAP_A = 65
-PARAM_UNITS = {'auc': _activity_area_units,
-               'aa': _activity_area_units,
-               'einf': 'h<sup>-1</sup>',
-               'emax': 'h<sup>-1</sup>',
-               'emax_obs': 'h<sup>-1</sup>'}
-PARAM_NAMES = {'aa': 'Activity area',
-               'aa_obs': 'Activity area (observed)',
-               'aa_num': 'Activity area (numerical integration)',
-               'auc': 'Area under curve',
-               'einf': 'E<sub>inf</sub>',
-               'emax': 'E<sub>max</sub>',
-               'emax_rel': 'E<sub>max</sub> (relative)',
-               'emax_obs': 'E<sub>max</sub> observed',
-               'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
-               'hill': 'Hill coefficient'}
+PARAM_UNITS = {
+    'auc': _activity_area_units,
+    'aa': _activity_area_units,
+    'einf': 'h<sup>-1</sup>',
+    'emax': 'h<sup>-1</sup>',
+    'emax_obs': 'h<sup>-1</sup>',
+}
+PARAM_NAMES = {
+    'aa': 'Activity area',
+    'aa_obs': 'Activity area (observed)',
+    'aa_num': 'Activity area (numerical integration)',
+    'auc': 'Area under curve',
+    'einf': 'E<sub>inf</sub>',
+    'emax': 'E<sub>max</sub>',
+    'emax_rel': 'E<sub>max</sub> (relative)',
+    'emax_obs': 'E<sub>max</sub> observed',
+    'emax_obs_rel': 'E<sub>Max</sub> observed (relative)',
+    'hill': 'Hill coefficient',
+}
 IC_REGEX = re.compile('^ic([0-9]+)$')
 EC_REGEX = re.compile('^ec([0-9]+)$')
 E_REGEX = re.compile('^e([0-9]+)$')
@@ -72,31 +76,32 @@ def _secs_to_str(seconds):
     """
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
-    return "Time: %d:%02d:%02d" % (h, m, s)
+    return 'Time: %d:%02d:%02d' % (h, m, s)
 
 
 def _remove_drmetric_prefix(param_id):
-    """ Remove DR metric prefix on parameter name, if present """
+    """Remove DR metric prefix on parameter name, if present"""
     for prefix in ('viability__', 'dip__'):
         if param_id.startswith(prefix):
-            param_id = param_id[len(prefix):]
+            param_id = param_id[len(prefix) :]
 
     return param_id
 
 
 def _param_is_log(param_id):
     param_id = _remove_drmetric_prefix(param_id)
-    return (IC_REGEX.match(param_id) or EC_REGEX.match(param_id) or
-            param_id == 'hill')
+    return IC_REGEX.match(param_id) or EC_REGEX.match(param_id) or param_id == 'hill'
 
 
 def _param_na_first(param_id):
-    """ NAs go in the position corresponding to no effect """
+    """NAs go in the position corresponding to no effect"""
     param_id = _remove_drmetric_prefix(param_id)
     # Which is first for E, Emax, Erel, AA and Hill
-    return param_id in ('hill', 'aa', 'emax', 'emax_rel', 'einf') \
-        or E_REGEX.match(param_id) \
+    return (
+        param_id in ('hill', 'aa', 'emax', 'emax_rel', 'einf')
+        or E_REGEX.match(param_id)
         or E_REL_REGEX.match(param_id)
+    )
 
 
 def _get_param_name(param_id):
@@ -112,7 +117,8 @@ def _get_param_name(param_id):
             return 'E<sub>{:d}</sub>'.format(int(param_id[1:]))
         elif E_REL_REGEX.match(param_id):
             return 'E<sub>{:d}</sub> (relative)'.format(
-                int(param_id[1:param_id.index('_')]))
+                int(param_id[1 : param_id.index('_')])
+            )
         else:
             return param_id
 
@@ -137,9 +143,12 @@ def _out_of_range_msg(param_id):
 
 
 def _sns_to_rgb(palette):
-    return ['rgb(%d, %d, %d)' % (c[0] * 255, c[1] * 255, c[2] * 255)
-            if not isinstance(c, str) else c
-            for c in palette]
+    return [
+        'rgb(%d, %d, %d)' % (c[0] * 255, c[1] * 255, c[2] * 255)
+        if not isinstance(c, str)
+        else c
+        for c in palette
+    ]
 
 
 def _make_title(title, df):
@@ -151,10 +160,9 @@ def _make_title(title, df):
                 if len(drug_name) == 1:
                     drug_name = drug_name[0]
                 else:
-                    drug_name = " &amp; ".join(drug_name)
+                    drug_name = ' &amp; '.join(drug_name)
             else:
-                raise ValueError('Unknown drug_name type: {}'.format(type(
-                    drug_name)))
+                raise ValueError('Unknown drug_name type: {}'.format(type(drug_name)))
         title += ' for {}'.format(drug_name)
 
     cell_line_list = df.index.get_level_values('cell_line').unique()
@@ -166,14 +174,22 @@ def _make_title(title, df):
 
 def _combine_title_subtitle(title, subtitle):
     if subtitle:
-        title += '<br> <span style="color:#999;font-size:0.9em">' \
-                 '{}</span>'.format(subtitle)
+        title += '<br> <span style="color:#999;font-size:0.9em">{}</span>'.format(
+            subtitle
+        )
 
     return title
 
 
-def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
-             title=None, subtitle=None, template=config.plotly_template):
+def plot_drc(
+    fit_params,
+    is_absolute=False,
+    color_by=None,
+    color_groups=None,
+    title=None,
+    subtitle=None,
+    template=config.plotly_template,
+):
     """
     Plot dose response curve fits
 
@@ -210,7 +226,7 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     else:
         num_colors = len(fit_params)
 
-    colours = _sns_to_rgb(sns.color_palette("husl", num_colors))
+    colours = _sns_to_rgb(sns.color_palette('husl', num_colors))
     color_index_col = None
     if color_by == 'cl':
         color_index_col = fit_params.index.names.index('cell_line')
@@ -227,8 +243,9 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     shapes = ['circle', 'circle-open']
 
     try:
-        is_viability = 'viability' in fit_params.columns or \
-                       fit_params._drmetric == 'viability'
+        is_viability = (
+            'viability' in fit_params.columns or fit_params._drmetric == 'viability'
+        )
     except AttributeError:
         is_viability = False
 
@@ -238,7 +255,8 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
 
     if is_viability:
         yaxis_title = '{:g} hr viability'.format(
-            fit_params._viability_time.total_seconds() / SECONDS_IN_HOUR)
+            fit_params._viability_time.total_seconds() / SECONDS_IN_HOUR
+        )
     else:
         yaxis_title = 'DIP rate'
     if is_absolute:
@@ -250,15 +268,16 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     multi_dataset = len(datasets) > 1
     show_annotations = len(fit_params.index) == 1
 
-    show_replicates = len(fit_params.index) == 1 or \
-        (multi_dataset and
-         len(fit_params.index.get_level_values('cell_line').unique()) == 1 and
-         len(fit_params.index.get_level_values('drug').unique()) == 1)
+    show_replicates = len(fit_params.index) == 1 or (
+        multi_dataset
+        and len(fit_params.index.get_level_values('cell_line').unique()) == 1
+        and len(fit_params.index.get_level_values('drug').unique()) == 1
+    )
 
     if title is None:
         title = _make_title('Dose response', fit_params)
     if subtitle is None:
-        subtitle = " &amp; ".join(str(d) for d in datasets)
+        subtitle = ' &amp; '.join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     if show_annotations:
@@ -270,11 +289,16 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     traces = []
     if color_by:
         for idx, name in enumerate(color_groups):
-            traces.append(go.Scatter(mode='none', x=[0], y=[0],
-                                     legendgroup=name,
-                                     showlegend=True,
-                                     name='<b>{}</b>'.format(name))
-                          )
+            traces.append(
+                go.Scatter(
+                    mode='none',
+                    x=[0],
+                    y=[0],
+                    legendgroup=name,
+                    showlegend=True,
+                    name='<b>{}</b>'.format(name),
+                )
+            )
     xaxis_min = np.inf
     xaxis_max = -np.inf
     for fp in fit_params.itertuples():
@@ -307,8 +331,9 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
             else:
                 ctrl_doses = fp.dip_ctrl.index.get_level_values('dose')
 
-            log_dose_min = min(log_dose_min, int(np.floor(np.log10(np.min(
-                ctrl_doses.values)))))
+            log_dose_min = min(
+                log_dose_min, int(np.floor(np.log10(np.min(ctrl_doses.values))))
+            )
         except AttributeError:
             ctrl_doses = []
 
@@ -325,12 +350,14 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
 
         dose_x_range = np.concatenate(
             # [np.arange(2, 11) * 10 ** dose_mag
-            [0.5 * np.arange(3, 21) * 10 ** dose_mag
-             for dose_mag in range(log_dose_min, log_dose_max + 1)],
-            axis=0)
+            [
+                0.5 * np.arange(3, 21) * 10**dose_mag
+                for dose_mag in range(log_dose_min, log_dose_max + 1)
+            ],
+            axis=0,
+        )
 
-        dose_x_range = np.append([10 ** log_dose_min], dose_x_range,
-                                 axis=0)
+        dose_x_range = np.append([10**log_dose_min], dose_x_range, axis=0)
 
         line_dash = 'solid'
         line_mode = 'lines'
@@ -341,14 +368,14 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
             dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
-            group_name_disp = '<i>{}</i>'.format(
-                group_name_disp)
+            group_name_disp = '<i>{}</i>'.format(group_name_disp)
             hoverinfo = 'none'
             visible = 'legendonly'
         elif isinstance(fp.fit_obj, HillCurveNull):
             # No effect null hypothesis
-            dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * \
-                            len(dose_x_range)
+            dip_rate_fit = [1 if not is_absolute else fp.fit_obj.divisor] * len(
+                dose_x_range
+            )
             line_dash = 'longdash'
         else:
             # Fit succeeded
@@ -357,20 +384,24 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
             else:
                 dip_rate_fit = fp.fit_obj.fit_rel(dose_x_range)
 
-        traces.append(go.Scatter(x=dose_x_range,
-                                 y=dip_rate_fit,
-                                 mode=line_mode,
-                                 line={'shape': 'spline',
-                                       'color': this_colour,
-                                       'dash': line_dash,
-                                       'width': 3},
-                                 hoverinfo=hoverinfo,
-                                 legendgroup=legend_grp,
-                                 showlegend=(not show_replicates or
-                                             multi_dataset),
-                                 visible=visible,
-                                 name=group_name_disp)
-                      )
+        traces.append(
+            go.Scatter(
+                x=dose_x_range,
+                y=dip_rate_fit,
+                mode=line_mode,
+                line={
+                    'shape': 'spline',
+                    'color': this_colour,
+                    'dash': line_dash,
+                    'width': 3,
+                },
+                hoverinfo=hoverinfo,
+                legendgroup=legend_grp,
+                showlegend=(not show_replicates or multi_dataset),
+                visible=visible,
+                name=group_name_disp,
+            )
+        )
 
         if show_replicates:
             y_trace = fp.viability if is_viability else fp.dip_expt
@@ -397,57 +428,57 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
 
             if is_viability:
                 # viability times are in nanoseconds - convert
-                hoverlabels = [_secs_to_str(int(x) / 1e9) for x in
-                               fp.viability_time]
+                hoverlabels = [_secs_to_str(int(x) / 1e9) for x in fp.viability_time]
             else:
                 hoverlabels = repl_name
 
             shape = shapes.pop(0)
 
-            traces.append(go.Scatter(x=expt_doses,
-                                     y=y_trace,
-                                     mode='markers',
-                                     marker={'symbol': shape,
-                                             'color': this_colour,
-                                             'size': 5},
-                                     legendgroup=group_name_disp,
-                                     hoverinfo='x+y+text',
-                                     text=hoverlabels,
-                                     showlegend=False,
-                                     name=repl_name)
-                          )
+            traces.append(
+                go.Scatter(
+                    x=expt_doses,
+                    y=y_trace,
+                    mode='markers',
+                    marker={'symbol': shape, 'color': this_colour, 'size': 5},
+                    legendgroup=group_name_disp,
+                    hoverinfo='x+y+text',
+                    text=hoverlabels,
+                    showlegend=False,
+                    name=repl_name,
+                )
+            )
             if ctrl_resp is not None:
                 ctrl_color = 'white' if template == 'plotly_dark' else 'black'
-                traces.append(go.Scatter(x=ctrl_doses,
-                                         y=ctrl_resp,
-                                         mode='markers',
-                                         marker={'symbol': shape,
-                                                 'color': ctrl_color,
-                                                 'size': 5},
-                                         hoverinfo='y+text',
-                                         text=ctrl_name,
-                                         name=ctrl_name,
-                                         legendgroup=group_name_disp,
-                                         showlegend=False)
-                              )
+                traces.append(
+                    go.Scatter(
+                        x=ctrl_doses,
+                        y=ctrl_resp,
+                        mode='markers',
+                        marker={'symbol': shape, 'color': ctrl_color, 'size': 5},
+                        hoverinfo='y+text',
+                        text=ctrl_name,
+                        name=ctrl_name,
+                        legendgroup=group_name_disp,
+                        showlegend=False,
+                    )
+                )
 
         if show_annotations:
             annotation_label = ''
             if fp.ec50 is not None:
                 annotation_label += 'EC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ec50_truncated else '',
-                    format_dose(fp.ec50, sig_digits=5)
+                    '*' if fp.ec50_truncated else '', format_dose(fp.ec50, sig_digits=5)
                 )
             if fp.ic50 is not None:
                 annotation_label += 'IC<sub>50</sub>{}: {} '.format(
-                    '*' if fp.ic50_truncated else '',
-                    format_dose(fp.ic50, sig_digits=5)
+                    '*' if fp.ic50_truncated else '', format_dose(fp.ic50, sig_digits=5)
                 )
             if fp.emax is not None:
                 annotation_label += 'E<sub>max{}</sub>{}: {:.5g}'.format(
                     ' rel' if not is_absolute else '',
                     '*' if fp.fit_obj.emax < fp.emax else '',
-                    fp.emax if is_absolute else fp.emax_rel)
+                    fp.emax if is_absolute else fp.emax_rel,
+                )
             if annotation_label:
                 hovermsgs = []
                 hovertext = None
@@ -457,16 +488,18 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
                     hovermsgs.append(_out_of_range_msg('ic50'))
                 if hovermsgs:
                     hovertext = '*' + '<br>'.join(hovermsgs)
-                annotations.append({
-                    'x': 0.5,
-                    'y': 1.0,
-                    'xref': 'paper',
-                    'yanchor': 'bottom',
-                    'yref': 'paper',
-                    'showarrow': False,
-                    'hovertext': hovertext,
-                    'text': annotation_label
-                })
+                annotations.append(
+                    {
+                        'x': 0.5,
+                        'y': 1.0,
+                        'xref': 'paper',
+                        'yanchor': 'bottom',
+                        'yref': 'paper',
+                        'showarrow': False,
+                        'hovertext': hovertext,
+                        'text': annotation_label,
+                    }
+                )
 
     yaxis_range = None
     yaxis_rangemode = 'tozero' if is_viability else 'normal'
@@ -475,27 +508,29 @@ def plot_drc(fit_params, is_absolute=False, color_by=None, color_groups=None,
     elif not is_viability:
         yaxis_range = (-0.02, 0.07)
 
-    layout = go.Layout(title=title,
-                       hovermode='closest' if show_replicates
-                                 or len(traces) > 50 else 'x',
-                       xaxis={
-                           'title': 'Dose (M)',
-                           'range': (xaxis_min, xaxis_max),
-                           'type': 'log'},
-                       yaxis={
-                           'title': yaxis_title,
-                           'range': yaxis_range,
-                           'rangemode': yaxis_rangemode},
-                       annotations=annotations,
-                       template=template
-                       )
+    layout = go.Layout(
+        title=title,
+        hovermode='closest' if show_replicates or len(traces) > 50 else 'x',
+        xaxis={'title': 'Dose (M)', 'range': (xaxis_min, xaxis_max), 'type': 'log'},
+        yaxis={
+            'title': yaxis_title,
+            'range': yaxis_range,
+            'rangemode': yaxis_rangemode,
+        },
+        annotations=annotations,
+        template=template,
+    )
 
     return go.Figure(data=traces, layout=layout)
 
 
 def plot_drug_combination_heatmap(
-        ctrl_resp_data, expt_resp_data, title=None, subtitle=None,
-        template=config.plotly_template):
+    ctrl_resp_data,
+    expt_resp_data,
+    title=None,
+    subtitle=None,
+    template=config.plotly_template,
+):
     """
     Plot heatmap of drug combination response by DIP rate
 
@@ -533,9 +568,11 @@ def plot_drug_combination_heatmap(
 
     expt_resp_data = expt_resp_data['dip_rate']
     if ctrl_resp_data is None:
-        raise CannotPlotError('There are no matching control wells for this '
-                              'selection, so relative DIP rate cannot be '
-                              'calculated')
+        raise CannotPlotError(
+            'There are no matching control wells for this '
+            'selection, so relative DIP rate cannot be '
+            'calculated'
+        )
 
     expt_resp_data = expt_resp_data / ctrl_resp_data['dip_rate'].mean()
     heat_label = 'Relative<br>' + heat_label
@@ -549,8 +586,7 @@ def plot_drug_combination_heatmap(
     drug1 = drugs['drug1'].unique()[0]
     drug2 = drugs['drug2'].unique()[0]
 
-    expt_resp_data = pd.concat([doses, drugs,
-                                expt_resp_data['dip_rate']], axis=1)
+    expt_resp_data = pd.concat([doses, drugs, expt_resp_data['dip_rate']], axis=1)
 
     expt_resp_data = expt_resp_data.set_index(['dose1', 'dose2'])
 
@@ -571,56 +607,66 @@ def plot_drug_combination_heatmap(
                     dat2.append(None)
         dat.append(dat2)
 
-    trace = go.Heatmap(x=format_dose(dose2), y=format_dose(dose1), z=dat,
-                       colorbar={'title': heat_label}, zmin=-1.5, zmax=1.5,
-                       colorscale=[
-                           (0, 'rgb(255,0,0)'),
-                           (0.5, 'rgb(255,255,0)'),
-                           (1, 'rgb(0,0,255)')
-                       ])
+    trace = go.Heatmap(
+        x=format_dose(dose2),
+        y=format_dose(dose1),
+        z=dat,
+        colorbar={'title': heat_label},
+        zmin=-1.5,
+        zmax=1.5,
+        colorscale=[(0, 'rgb(255,0,0)'), (0.5, 'rgb(255,255,0)'), (1, 'rgb(0,0,255)')],
+    )
 
     layout = go.Layout(
         title=title,
-        xaxis={
-            'title': '{} concentration'.format(drug2)
-        },
-        yaxis={
-            'title': '{} concentration'.format(drug1)
-        },
-        template=template
+        xaxis={'title': '{} concentration'.format(drug2)},
+        yaxis={'title': '{} concentration'.format(drug1)},
+        template=template,
     )
 
     return go.Figure(data=[trace], layout=layout)
 
 
-def _symbols_hovertext_two_dataset_scatter(df_params, range_bounded_params,
-                                           fit_param, dataset_names):
+def _symbols_hovertext_two_dataset_scatter(
+    df_params, range_bounded_params, fit_param, dataset_names
+):
     symbols = ['circle'] * len(df_params.index)
-    hovertext = [" ".join(lbl) for lbl in df_params.index.values]
+    hovertext = [' '.join(lbl) for lbl in df_params.index.values]
     for param in range_bounded_params:
         msg = _out_of_range_msg(param)
         for i in (0, 1):
-            tmp_df = pd.concat([
-                df_params.loc[:, fit_param].iloc[:, i],
-                df_params.loc[:, 'max_dose_measured'].iloc[:, i],
-                df_params.loc[:, 'min_dose_measured'].iloc[:, i]
-            ], axis=1)
-            tmp_df.columns = [fit_param,
-                              'max_dose_measured',
-                              'min_dose_measured']
+            tmp_df = pd.concat(
+                [
+                    df_params.loc[:, fit_param].iloc[:, i],
+                    df_params.loc[:, 'max_dose_measured'].iloc[:, i],
+                    df_params.loc[:, 'min_dose_measured'].iloc[:, i],
+                ],
+                axis=1,
+            )
+            tmp_df.columns = [fit_param, 'max_dose_measured', 'min_dose_measured']
             param_truncated = is_param_truncated(tmp_df, fit_param)
-            addtxt = ['<br> {} {}'.format(dataset_names[i], msg) if x else
-                      '' for x in param_truncated]
+            addtxt = [
+                '<br> {} {}'.format(dataset_names[i], msg) if x else ''
+                for x in param_truncated
+            ]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-            symbols = ['cross' if x else old for x, old in
-                       zip(param_truncated, symbols)]
+            symbols = [
+                'cross' if x else old for x, old in zip(param_truncated, symbols)
+            ]
 
     return symbols, hovertext
 
 
-def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
-                                   color_by, color_groups,
-                                   template=config.plotly_template, **kwargs):
+def plot_two_dataset_param_scatter(
+    df_params,
+    fit_param,
+    title,
+    subtitle,
+    color_by,
+    color_groups,
+    template=config.plotly_template,
+    **kwargs,
+):
     """
     Plot a parameter comparison across two datasets
 
@@ -648,40 +694,42 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         title = _make_title('Dose response parameters', df_params)
     if subtitle is None:
         datasets = df_params.index.get_level_values('dataset_id').unique()
-        subtitle = " &amp; ".join(str(d) for d in datasets)
+        subtitle = ' &amp; '.join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     if df_params._drmetric == 'dip':
         dr_metric = 'DIP'
     else:
         dr_metric = '{:g} hr viability'.format(
-            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR)
+            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR
+        )
 
-    df_params = df_params.loc[:, [fit_param,
-                                  'max_dose_measured',
-                                  'min_dose_measured']]
+    df_params = df_params.loc[:, [fit_param, 'max_dose_measured', 'min_dose_measured']]
     df_params.dropna(subset=[fit_param], inplace=True)
     df_params.reset_index(inplace=True)
-    df_params = df_params.pivot_table(index=['cell_line', 'drug'], columns=[
-        'dataset_id'])
+    df_params = df_params.pivot_table(
+        index=['cell_line', 'drug'], columns=['dataset_id']
+    )
     df_params.dropna(inplace=True)
 
     if len(df_params.index) == 0:
         raise CannotPlotError(
             'Dataset vs dataset scatter plot is empty. Check the cell lines '
             'and drugs in the two datasets overlap. If you want a bar plot '
-            'instead, choose an ordering parameter.')
+            'instead, choose an ordering parameter.'
+        )
 
     if len(df_params.columns) < 4:
         raise CannotPlotError(
             'The cell lines and/or drugs selected only have data in one of '
             'the two datasets, so a scatter plot cannot be created. If you '
-            'want a bar plot instead, choose an ordering parameter.')
+            'want a bar plot instead, choose an ordering parameter.'
+        )
 
     if color_by:
-        colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups)))
+        colours = _sns_to_rgb(sns.color_palette('husl', len(color_groups)))
     else:
-        colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
+        colours = _sns_to_rgb(sns.color_palette('Paired'))[0:2]
 
     param_name = _get_param_name(fit_param)
     param_units = _get_param_units(fit_param)
@@ -727,9 +775,13 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         xdat_fit = np.log10(xdat)
         ydat_fit = np.log10(ydat)
 
-    fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
-                   ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
-                   np.array([s != 'cross' for s in symbols]))
+    fitdat_mask = (
+        ~np.isnan(xdat_fit)
+        & np.isfinite(xdat_fit)
+        & ~np.isnan(ydat_fit)
+        & np.isfinite(ydat_fit)
+        & np.array([s != 'cross' for s in symbols])
+    )
     xdat_fit = xdat_fit[fitdat_mask].values
     ydat_fit = ydat_fit[fitdat_mask].values
 
@@ -737,8 +789,9 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     layout = go.Layout(title=title)
 
     try:
-        slope, intercept, r_value, p_value, std_err = \
-            scipy.stats.linregress(xdat_fit, ydat_fit)
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            xdat_fit, ydat_fit
+        )
     except ValueError:
         slope = np.nan
 
@@ -748,79 +801,94 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
         if _param_is_log(fit_param):
             xfit = np.power(10, xfit)
             yfit = np.power(10, yfit)
-        data.append(go.Scatter(
-            x=xfit,
-            y=yfit,
-            mode='lines',
-            hoverinfo="none",
-            line=dict(
-                color="darkorange"
-            ),
-            name='{} vs {} {} Linear Fit'.format(
-                dataset_names[0],
-                dataset_names[1],
-                param_name),
-            showlegend=False
-        ))
-        layout['annotations'] = [{
-            'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
-            'yref': 'paper', 'showarrow': False,
-            'text': 'R<sup>2</sup>: {:0.4g} '
-                    'p-value: {:0.4g} '.format(r_value ** 2, p_value)
-        }]
+        data.append(
+            go.Scatter(
+                x=xfit,
+                y=yfit,
+                mode='lines',
+                hoverinfo='none',
+                line=dict(color='darkorange'),
+                name='{} vs {} {} Linear Fit'.format(
+                    dataset_names[0], dataset_names[1], param_name
+                ),
+                showlegend=False,
+            )
+        )
+        layout['annotations'] = [
+            {
+                'x': 0.5,
+                'y': 1.0,
+                'xref': 'paper',
+                'yanchor': 'bottom',
+                'yref': 'paper',
+                'showarrow': False,
+                'text': 'R<sup>2</sup>: {:0.4g} p-value: {:0.4g} '.format(
+                    r_value**2, p_value
+                ),
+            }
+        ]
 
     custom_data = [
-        {'c': cl, 'd': dr} for cl, dr in zip(
+        {'c': cl, 'd': dr}
+        for cl, dr in zip(
             df_params.index.get_level_values('cell_line'),
-            df_params.index.get_level_values('drug')
+            df_params.index.get_level_values('drug'),
         )
     ]
 
     if color_by:
         for idx, tag_name in enumerate(color_groups):
-            dat = df_params[df_params.index.get_level_values(
-                'cell_line' if color_by == 'cl' else 'drug').isin(
-                color_groups[tag_name])]
+            dat = df_params[
+                df_params.index.get_level_values(
+                    'cell_line' if color_by == 'cl' else 'drug'
+                ).isin(color_groups[tag_name])
+            ]
             symbols, hovertext = _symbols_hovertext_two_dataset_scatter(
-                dat, range_bounded_params, fit_param, dataset_names)
+                dat, range_bounded_params, fit_param, dataset_names
+            )
 
             fit_param_data = dat.loc[:, fit_param]
             xdat = fit_param_data.iloc[:, 0]
             ydat = fit_param_data.iloc[:, 1]
 
-            data.append(go.Scatter(
+            data.append(
+                go.Scatter(
+                    x=xdat,
+                    y=ydat,
+                    hovertext=hovertext,
+                    hoverinfo='text+x+y',
+                    mode='markers',
+                    customdata=custom_data,
+                    marker={'symbol': symbols, 'color': colours[idx]},
+                    name=tag_name,
+                )
+            )
+    else:
+        colour_list = [colours[1] if s == 'circle' else 'crimson' for s in symbols]
+
+        data.append(
+            go.Scatter(
                 x=xdat,
                 y=ydat,
                 hovertext=hovertext,
-                hoverinfo="text+x+y",
+                hoverinfo='text+x+y',
                 mode='markers',
                 customdata=custom_data,
-                marker={'symbol': symbols,
-                        'color': colours[idx]},
-                name=tag_name
-            ))
-    else:
-        colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
-                       symbols]
+                marker={'symbol': symbols, 'color': colour_list},
+                name='{} vs {} {}'.format(
+                    dataset_names[0], dataset_names[1], param_name
+                ),
+            )
+        )
 
-        data.append(go.Scatter(
-            x=xdat,
-            y=ydat,
-            hovertext=hovertext,
-            hoverinfo="text+x+y",
-            mode='markers',
-            customdata=custom_data,
-            marker={'symbol': symbols,
-                    'color': colour_list},
-            name='{} vs {} {}'.format(dataset_names[0],
-                                      dataset_names[1],
-                                      param_name)
-        ))
-
-    layout['xaxis'] = {'title': '{} {}'.format(dataset_names[0], axis_title),
-                       'type': 'log' if _param_is_log(fit_param) else None}
-    layout['yaxis'] = {'title': '{} {}'.format(dataset_names[1], axis_title),
-                       'type': 'log' if _param_is_log(fit_param) else None}
+    layout['xaxis'] = {
+        'title': '{} {}'.format(dataset_names[0], axis_title),
+        'type': 'log' if _param_is_log(fit_param) else None,
+    }
+    layout['yaxis'] = {
+        'title': '{} {}'.format(dataset_names[1], axis_title),
+        'type': 'log' if _param_is_log(fit_param) else None,
+    }
     layout['hovermode'] = 'closest'
     layout['showlegend'] = color_by is not None
     layout['template'] = template
@@ -828,33 +896,33 @@ def plot_two_dataset_param_scatter(df_params, fit_param, title, subtitle,
     return go.Figure(layout=layout, data=data)
 
 
-def _symbols_hovertext_two_param_scatter(df_params,
-                                         range_bounded_params):
+def _symbols_hovertext_two_param_scatter(df_params, range_bounded_params):
     hovertext = df_params['label']
     symbols = ['circle'] * len(df_params)
     for param in range_bounded_params:
         msg = _out_of_range_msg(param)
         param_truncated = is_param_truncated(df_params, param)
-        addtxt = ['<br> ' + msg if x else '' for x in
-                  param_truncated]
+        addtxt = ['<br> ' + msg if x else '' for x in param_truncated]
         hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
-        symbols = ['cross' if x else old for x, old in
-                   zip(param_truncated, symbols)]
+        symbols = ['cross' if x else old for x, old in zip(param_truncated, symbols)]
     return symbols, hovertext
 
 
-def plot_drc_params(df_params, fit_param,
-                    fit_param_compare=None,
-                    fit_param_sort=None,
-                    title=None,
-                    subtitle=None,
-                    aggregate_cell_lines=False,
-                    aggregate_drugs=False,
-                    multi_dataset=False,
-                    color_by=None,
-                    color_groups=None,
-                    template=config.plotly_template,
-                    **kwargs):
+def plot_drc_params(
+    df_params,
+    fit_param,
+    fit_param_compare=None,
+    fit_param_sort=None,
+    title=None,
+    subtitle=None,
+    aggregate_cell_lines=False,
+    aggregate_drugs=False,
+    multi_dataset=False,
+    color_by=None,
+    color_groups=None,
+    template=config.plotly_template,
+    **kwargs,
+):
     """
     Box, bar, or scatter plots of DIP rate fit parameters
 
@@ -898,41 +966,40 @@ def plot_drc_params(df_params, fit_param,
     """
     if fit_param_compare and (aggregate_cell_lines or aggregate_drugs):
         raise CannotPlotError(
-            'Aggregation is not available when comparing two dose response '
-            'parameters')
+            'Aggregation is not available when comparing two dose response parameters'
+        )
 
-    if multi_dataset and fit_param_compare is None and \
-            not aggregate_cell_lines and \
-            not aggregate_drugs and fit_param_sort is None:
+    if (
+        multi_dataset
+        and fit_param_compare is None
+        and not aggregate_cell_lines
+        and not aggregate_drugs
+        and fit_param_sort is None
+    ):
         return plot_two_dataset_param_scatter(
-            df_params,
-            fit_param,
-            title,
-            subtitle,
-            color_by,
-            color_groups,
-            **kwargs
+            df_params, fit_param, title, subtitle, color_by, color_groups, **kwargs
         )
 
     color_by_col = None
     if multi_dataset and not color_by:
         color_by_col = 'dataset_id'
         color_by = 'dataset'
-        color_groups = {dataset: [dataset]
-                        for dataset in df_params.index.get_level_values(
-                            'dataset_id').unique()}
-        colours = _sns_to_rgb(sns.color_palette("husl", 2))
+        color_groups = {
+            dataset: [dataset]
+            for dataset in df_params.index.get_level_values('dataset_id').unique()
+        }
+        colours = _sns_to_rgb(sns.color_palette('husl', 2))
     elif color_by:
         color_by_col = 'cell_line' if color_by == 'cl' else 'drug'
-        colours = _sns_to_rgb(sns.color_palette("husl", len(color_groups)))
+        colours = _sns_to_rgb(sns.color_palette('husl', len(color_groups)))
     else:
-        colours = _sns_to_rgb(sns.color_palette("Paired"))[0:2]
+        colours = _sns_to_rgb(sns.color_palette('Paired'))[0:2]
 
     if title is None:
         title = _make_title('Dose response parameters', df_params)
     if subtitle is None:
         datasets = df_params.index.get_level_values('dataset_id').unique()
-        subtitle = " &amp; ".join(str(d) for d in datasets)
+        subtitle = ' &amp; '.join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
     yaxis_param_name = _get_param_name(fit_param)
@@ -949,22 +1016,26 @@ def plot_drc_params(df_params, fit_param,
         yaxis_title = 'DIP {}'.format(yaxis_title)
     else:
         yaxis_title = '{:g} hr viability {}'.format(
-            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR,
-            yaxis_title)
+            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR, yaxis_title
+        )
 
-    layout = dict(title=title,
-                  template=template,
-                  yaxis={'title': yaxis_title,
-                         'type': 'log' if _param_is_log(fit_param) else None})
+    layout = dict(
+        title=title,
+        template=template,
+        yaxis={
+            'title': yaxis_title,
+            'type': 'log' if _param_is_log(fit_param) else None,
+        },
+    )
 
     if fit_param_compare:
-        df_params.dropna(subset=[fit_param, fit_param_compare],
-                         inplace=True)
+        df_params.dropna(subset=[fit_param, fit_param_compare], inplace=True)
         if df_params.empty:
             raise CannotPlotError(
                 'No data exists for this selection. This may be due to '
                 'missing drug/cell line combinations, or undefined parameters '
-                'for the selection.')
+                'for the selection.'
+            )
         if fit_param == fit_param_compare:
             xdat = df_params.loc[:, fit_param]
             ydat = xdat
@@ -987,8 +1058,8 @@ def plot_drc_params(df_params, fit_param,
             xaxis_title = 'DIP {}'.format(xaxis_title)
         else:
             xaxis_title = '{:g} hr viability {}'.format(
-                df_params._viability_time.total_seconds() / SECONDS_IN_HOUR,
-                xaxis_title)
+                df_params._viability_time.total_seconds() / SECONDS_IN_HOUR, xaxis_title
+            )
 
         range_bounded_params = set()
 
@@ -1007,7 +1078,8 @@ def plot_drc_params(df_params, fit_param,
                 range_bounded_params.add('ec' + match.groups(0)[0])
 
         symbols, hovertext = _symbols_hovertext_two_param_scatter(
-            df_params, range_bounded_params)
+            df_params, range_bounded_params
+        )
 
         xdat_fit = np.log10(xdat) if _param_is_log(fit_param_compare) else xdat
         ydat_fit = np.log10(ydat) if _param_is_log(fit_param) else ydat
@@ -1016,15 +1088,20 @@ def plot_drc_params(df_params, fit_param,
 
         if len(xdat_fit) > 0:
             # Remove any infinite or NaN values from best fit line data
-            fitdat_mask = (~np.isnan(xdat_fit) & np.isfinite(xdat_fit) &
-                           ~np.isnan(ydat_fit) & np.isfinite(ydat_fit) &
-                           np.array([s != 'cross' for s in symbols]))
+            fitdat_mask = (
+                ~np.isnan(xdat_fit)
+                & np.isfinite(xdat_fit)
+                & ~np.isnan(ydat_fit)
+                & np.isfinite(ydat_fit)
+                & np.array([s != 'cross' for s in symbols])
+            )
             xdat_fit = xdat_fit[fitdat_mask].values
             ydat_fit = ydat_fit[fitdat_mask].values
 
         if len(xdat_fit) > 0:
-            slope, intercept, r_value, p_value, std_err = \
-                scipy.stats.linregress(xdat_fit, ydat_fit)
+            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+                xdat_fit, ydat_fit
+            )
 
             xfit = (min(xdat_fit), max(xdat_fit))
             yfit = [x * slope + intercept for x in xfit]
@@ -1032,74 +1109,86 @@ def plot_drc_params(df_params, fit_param,
                 xfit = np.power(10, xfit)
             if _param_is_log(fit_param):
                 yfit = np.power(10, yfit)
-            data.append(go.Scatter(
-                x=xfit,
-                y=yfit,
-                mode='lines',
-                hoverinfo="none",
-                line=dict(
-                    color="darkorange"
-                ),
-                name='{} vs {} Linear Fit'.format(xaxis_param_name,
-                                                  yaxis_param_name),
-                showlegend=False
-            ))
-            layout['annotations'] = [{
-                'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
-                'yref': 'paper', 'showarrow': False,
-                'text': 'R<sup>2</sup>: {:0.4g} '
-                        'p-value: {:0.4g} '.format(r_value ** 2, p_value)
-            }]
+            data.append(
+                go.Scatter(
+                    x=xfit,
+                    y=yfit,
+                    mode='lines',
+                    hoverinfo='none',
+                    line=dict(color='darkorange'),
+                    name='{} vs {} Linear Fit'.format(
+                        xaxis_param_name, yaxis_param_name
+                    ),
+                    showlegend=False,
+                )
+            )
+            layout['annotations'] = [
+                {
+                    'x': 0.5,
+                    'y': 1.0,
+                    'xref': 'paper',
+                    'yanchor': 'bottom',
+                    'yref': 'paper',
+                    'showarrow': False,
+                    'text': 'R<sup>2</sup>: {:0.4g} p-value: {:0.4g} '.format(
+                        r_value**2, p_value
+                    ),
+                }
+            ]
 
         custom_data = [
-            {'c': cl, 'd': dr} for cl, dr in zip(
+            {'c': cl, 'd': dr}
+            for cl, dr in zip(
                 df_params.index.get_level_values('cell_line'),
-                df_params.index.get_level_values('drug')
+                df_params.index.get_level_values('drug'),
             )
         ]
 
         if color_by:
             for idx, tag_name in enumerate(color_groups):
-                location = df_params.index.get_level_values(
-                    color_by_col).isin(color_groups[tag_name])
+                location = df_params.index.get_level_values(color_by_col).isin(
+                    color_groups[tag_name]
+                )
                 dat = df_params[location]
                 symbols, hovertext = _symbols_hovertext_two_param_scatter(
-                    dat, range_bounded_params)
+                    dat, range_bounded_params
+                )
 
                 xdat = dat.loc[:, fit_param_compare]
                 ydat = dat.loc[:, fit_param]
 
-                data.append(go.Scatter(
+                data.append(
+                    go.Scatter(
+                        x=xdat,
+                        y=ydat,
+                        hovertext=hovertext,
+                        hoverinfo='text+x+y',
+                        mode='markers',
+                        customdata=custom_data,
+                        marker={'symbol': symbols, 'color': colours[idx]},
+                        name=tag_name,
+                    )
+                )
+        else:
+            colour_list = [colours[1] if s == 'circle' else 'crimson' for s in symbols]
+
+            data.append(
+                go.Scatter(
                     x=xdat,
                     y=ydat,
                     hovertext=hovertext,
-                    hoverinfo="text+x+y",
+                    hoverinfo='text+x+y',
                     mode='markers',
                     customdata=custom_data,
-                    marker={'symbol': symbols,
-                            'color': colours[idx]},
-                    name=tag_name
-                ))
-        else:
-            colour_list = [colours[1] if s == 'circle' else 'crimson' for s in
-                           symbols]
+                    marker={'symbol': symbols, 'color': colour_list},
+                    name='{} vs {}'.format(xaxis_param_name, yaxis_param_name),
+                )
+            )
 
-            data.append(go.Scatter(
-                x=xdat,
-                y=ydat,
-                hovertext=hovertext,
-                hoverinfo="text+x+y",
-                mode='markers',
-                customdata=custom_data,
-                marker={'symbol': symbols,
-                        'color': colour_list},
-                name='{} vs {}'.format(xaxis_param_name,
-                                       yaxis_param_name)
-            ))
-
-        layout['xaxis'] = {'title': xaxis_title,
-                           'type': 'log' if _param_is_log(fit_param_compare)
-                           else None}
+        layout['xaxis'] = {
+            'title': xaxis_title,
+            'type': 'log' if _param_is_log(fit_param_compare) else None,
+        }
         layout['hovermode'] = 'closest'
         layout['showlegend'] = color_by is not None
     elif not aggregate_cell_lines and not aggregate_drugs:
@@ -1111,8 +1200,8 @@ def plot_drc_params(df_params, fit_param,
         else:
             sort_by = [fit_param_sort, 'label']
         df_params = df_params.sort_values(
-            by=sort_by, na_position='first' if _param_na_first(sort_by[0])
-            else 'last')
+            by=sort_by, na_position='first' if _param_na_first(sort_by[0]) else 'last'
+        )
         groups = df_params['label']
         yvals = df_params[fit_param]
 
@@ -1136,15 +1225,17 @@ def plot_drc_params(df_params, fit_param,
             ec_truncated = is_param_truncated(df_params, ec_match)
             text = [msg if x else '' for x in ec_truncated]
             if not color_by:
-                marker_cols = [colours[0] if est else colours[1] for
-                               est in ec_truncated]
+                marker_cols = [
+                    colours[0] if est else colours[1] for est in ec_truncated
+                ]
         elif IC_REGEX.match(fit_param):
             msg = _out_of_range_msg(fit_param)
             ic_truncated = is_param_truncated(df_params, fit_param)
             text = [msg if x else '' for x in ic_truncated]
             if not color_by:
-                marker_cols = [colours[0] if est else colours[1] for
-                               est in ic_truncated]
+                marker_cols = [
+                    colours[0] if est else colours[1] for est in ic_truncated
+                ]
 
         if color_by:
             color_ent = df_params.index.get_level_values(color_by_col)
@@ -1167,25 +1258,28 @@ def plot_drc_params(df_params, fit_param,
                     if text[idx]:
                         text[idx] += '<br>'
                     text[idx] += '{} undefined, sorted by {}'.format(
-                        _get_param_name(fit_param_sort),
-                        _get_param_name(fit_param)
+                        _get_param_name(fit_param_sort), _get_param_name(fit_param)
                     )
 
         custom_data = [
-            {'c': cl, 'd': dr} for cl, dr in zip(
+            {'c': cl, 'd': dr}
+            for cl, dr in zip(
                 df_params.index.get_level_values('cell_line'),
-                df_params.index.get_level_values('drug')
+                df_params.index.get_level_values('drug'),
             )
         ]
 
-        data = [go.Bar(x=groups,
-                       y=yvals,
-                       text=text,
-                       name='',
-                       customdata=custom_data,
-                       showlegend=False,
-                       marker={'color': marker_cols}
-                       )]
+        data = [
+            go.Bar(
+                x=groups,
+                y=yvals,
+                text=text,
+                name='',
+                customdata=custom_data,
+                showlegend=False,
+                marker={'color': marker_cols},
+            )
+        ]
 
         layout['annotations'] = []
 
@@ -1196,15 +1290,17 @@ def plot_drc_params(df_params, fit_param,
             for idx, tag in enumerate(color_groups.items()):
                 tag_name, tag_targets = tag
                 tag_targets = set(tag_targets)
-                data.append(go.Bar(
-                    x=groups,
-                    y=[c in tag_targets for c in color_ent],
-                    text=tag_name,
-                    name=tag_name,
-                    hoverinfo='none',
-                    showlegend=True,
-                    marker={'color': colours[idx]}
-                ))
+                data.append(
+                    go.Bar(
+                        x=groups,
+                        y=[c in tag_targets for c in color_ent],
+                        text=tag_name,
+                        name=tag_name,
+                        hoverinfo='none',
+                        showlegend=True,
+                        marker={'color': colours[idx]},
+                    )
+                )
 
             # Mann Whitney U test w/ cont. correction, two-sided
             if len(color_groups) == 2 and fit_param_sort is None:
@@ -1213,28 +1309,38 @@ def plot_drc_params(df_params, fit_param,
                 # Need more than 20 entries in each group, as per scipy docs
                 if len(group1) > 20 and len(group2) > 20:
                     mw_u, mw_p = scipy.stats.mannwhitneyu(
-                        group1,
-                        group2,
-                        use_continuity=True,
-                        alternative='two-sided'
+                        group1, group2, use_continuity=True, alternative='two-sided'
                     )
                     if not np.isnan(mw_u):
-                        layout['annotations'].append({
-                            'x': 0.5, 'y': 0.95, 'xref': 'paper',
-                            'yanchor': 'bottom',
-                            'yref': 'paper', 'showarrow': False,
-                            'text': 'Two-sided Mann-Whitney U: {:.4g} '
-                                    'p-value: {:.4g}'.format(mw_u, mw_p)
-                        })
+                        layout['annotations'].append(
+                            {
+                                'x': 0.5,
+                                'y': 0.95,
+                                'xref': 'paper',
+                                'yanchor': 'bottom',
+                                'yref': 'paper',
+                                'showarrow': False,
+                                'text': 'Two-sided Mann-Whitney U: {:.4g} '
+                                'p-value: {:.4g}'.format(mw_u, mw_p),
+                            }
+                        )
 
-        layout['annotations'].extend([
-            {'x': x, 'y': 0, 'text': '<em>N/A</em>',
-             'textangle': 90,
-             'xanchor': 'center', 'yanchor': 'bottom',
-             'yref': 'paper',
-             'showarrow': False,
-             'font': {'color': 'rgba(150, 150, 150, 1)'}}
-            for x in groups[yvals.isnull().values]])
+        layout['annotations'].extend(
+            [
+                {
+                    'x': x,
+                    'y': 0,
+                    'text': '<em>N/A</em>',
+                    'textangle': 90,
+                    'xanchor': 'center',
+                    'yanchor': 'bottom',
+                    'yref': 'paper',
+                    'showarrow': False,
+                    'font': {'color': 'rgba(150, 150, 150, 1)'},
+                }
+                for x in groups[yvals.isnull().values]
+            ]
+        )
         layout.setdefault('xaxis', {})['type'] = 'category'
         layout['barmode'] = 'stack'
         layout['showlegend'] = color_by is not None
@@ -1259,15 +1365,16 @@ def plot_drc_params(df_params, fit_param,
         if yvals.empty:
             raise CannotPlotError(
                 'The selected cell line/drug combinations have no data '
-                'available for the selected parameter(s)')
+                'available for the selected parameter(s)'
+            )
 
         if aggregate_cell_lines:
-            yvals = _aggregate_by_cell_line(yvals, aggregate_cell_lines,
-                                            replace_index=True)
+            yvals = _aggregate_by_cell_line(
+                yvals, aggregate_cell_lines, replace_index=True
+            )
 
         if aggregate_drugs:
-            yvals = _aggregate_by_drug(yvals, aggregate_drugs,
-                                       replace_index=True)
+            yvals = _aggregate_by_drug(yvals, aggregate_drugs, replace_index=True)
 
         drug_groups = yvals.index.get_level_values('drug').unique()
         cell_line_groups = yvals.index.get_level_values('cell_line').unique()
@@ -1281,10 +1388,11 @@ def plot_drc_params(df_params, fit_param,
 
         # Add sort character '' to 'Everything else' tag
         SORT_AT_END_CHAR = ''
-        vals = yvals.index.levels[yvals.index.names.index(
-            aggregate_by[1])].values
-        vals = [SORT_AT_END_CHAR + y if y.startswith('Everything else (')
-                else y for y in vals]
+        vals = yvals.index.levels[yvals.index.names.index(aggregate_by[1])].values
+        vals = [
+            SORT_AT_END_CHAR + y if y.startswith('Everything else (') else y
+            for y in vals
+        ]
         yvals.index = yvals.index.set_levels(vals, level=aggregate_by[1])
 
         # Sort by median effect per drug set, or cell line set if there's
@@ -1294,30 +1402,34 @@ def plot_drc_params(df_params, fit_param,
                 sort_cols = aggregate_by + ['median']
             else:
                 sort_cols = ['median'] + aggregate_by
-            yvals['median'] = yvals[fit_param].groupby(
-                level=aggregate_by, observed=True).transform('median')
+            yvals['median'] = (
+                yvals[fit_param]
+                .groupby(level=aggregate_by, observed=True)
+                .transform('median')
+            )
             yvals.set_index('median', append=True, inplace=True)
-            yvals.sort_index(level=sort_cols, ascending=True,
-                             inplace=True)
+            yvals.sort_index(level=sort_cols, ascending=True, inplace=True)
             yvals.reset_index('median', drop=True, inplace=True)
         else:
             # Sort by fit_column_sort, with tie breakers determined by
             # fit_param
-            median_cols = yvals.reindex(
-                columns=[fit_param_sort, 'label']).groupby(
-                level=aggregate_by, observed=True).transform('median')
-            median_cols.rename(columns={fit_param_sort: 'median',
-                                        'label': 'median2'},
-                               inplace=True)
+            median_cols = (
+                yvals.reindex(columns=[fit_param_sort, 'label'])
+                .groupby(level=aggregate_by, observed=True)
+                .transform('median')
+            )
+            median_cols.rename(
+                columns={fit_param_sort: 'median', 'label': 'median2'}, inplace=True
+            )
             yvals = pd.concat([yvals, median_cols], axis=1)
             yvals.set_index(['median', 'median2'], append=True, inplace=True)
-            yvals.sort_index(level=['median', 'median2'] + aggregate_by,
-                             ascending=True, inplace=True)
+            yvals.sort_index(
+                level=['median', 'median2'] + aggregate_by, ascending=True, inplace=True
+            )
             yvals.reset_index(['median', 'median2'], drop=True, inplace=True)
 
         # Remove sort character '' from 'Everything else' tag
-        vals = yvals.index.levels[yvals.index.names.index(
-            aggregate_by[1])].values
+        vals = yvals.index.levels[yvals.index.names.index(aggregate_by[1])].values
         vals = [y.replace(SORT_AT_END_CHAR, '') for y in vals]
         yvals.index = yvals.index.set_levels(vals, level=aggregate_by[1])
 
@@ -1337,23 +1449,34 @@ def plot_drc_params(df_params, fit_param,
 
         for grp_name, grp in yvals.groupby(level=group_by):
             if len(groups) > 1:
-                group_name = grp_name if isinstance(grp_name, str) else \
-                    "<br>".join(str(g) for g in grp_name)
+                group_name = (
+                    grp_name
+                    if isinstance(grp_name, str)
+                    else '<br>'.join(str(g) for g in grp_name)
+                )
             else:
                 # If there's only one drug/cell line group, just need dataset
                 group_name = grp_name[0] if grp_name else None
-            data.append(go.Box(x=grp.index.get_level_values(aggregate_by),
-                               y=grp,
-                               name=group_name
-                               ))
+            data.append(
+                go.Box(
+                    x=grp.index.get_level_values(aggregate_by), y=grp, name=group_name
+                )
+            )
 
         layout['annotations'] = []
         if len(groups) == 1:
             annotation_label = str(groups[0])
-            layout['annotations'].append({
-                'x': 0.5, 'y': 1.0, 'xref': 'paper', 'yanchor': 'bottom',
-                'yref': 'paper', 'showarrow': False, 'text': annotation_label
-            })
+            layout['annotations'].append(
+                {
+                    'x': 0.5,
+                    'y': 1.0,
+                    'xref': 'paper',
+                    'yanchor': 'bottom',
+                    'yref': 'paper',
+                    'showarrow': False,
+                    'text': annotation_label,
+                }
+            )
 
         # One way anova test
         try:
@@ -1368,13 +1491,19 @@ def plot_drc_params(df_params, fit_param,
             else:
                 raise
         if not np.isnan(anova_f):
-            layout['annotations'].append({
-                'x': 0.5, 'y': 0.95, 'xref': 'paper',
-                'yanchor': 'bottom',
-                'yref': 'paper', 'showarrow': False,
-                'text': 'One-way ANOVA F: {:.4g} p-value: {:.4g}'.format(
-                    anova_f, anova_p)
-            })
+            layout['annotations'].append(
+                {
+                    'x': 0.5,
+                    'y': 0.95,
+                    'xref': 'paper',
+                    'yanchor': 'bottom',
+                    'yref': 'paper',
+                    'showarrow': False,
+                    'text': 'One-way ANOVA F: {:.4g} p-value: {:.4g}'.format(
+                        anova_f, anova_p
+                    ),
+                }
+            )
 
     layout = go.Layout(layout)
 
@@ -1382,40 +1511,39 @@ def plot_drc_params(df_params, fit_param,
 
 
 def _aggregate_by_drug(yvals, aggregate_drugs, replace_index=True):
-    return _aggregate_by_tag(yvals, aggregate_drugs, 'drug',
-                             replace_index=replace_index)
+    return _aggregate_by_tag(
+        yvals, aggregate_drugs, 'drug', replace_index=replace_index
+    )
 
 
-def _aggregate_by_cell_line(yvals, aggregate_cell_lines,
-                            replace_index=True):
-    return _aggregate_by_tag(yvals, aggregate_cell_lines,
-                             'cell_line', replace_index=replace_index)
+def _aggregate_by_cell_line(yvals, aggregate_cell_lines, replace_index=True):
+    return _aggregate_by_tag(
+        yvals, aggregate_cell_lines, 'cell_line', replace_index=replace_index
+    )
 
 
-def _aggregate_by_tag(yvals, aggregate_items, label_type,
-                      replace_index=True, add_counts=True):
+def _aggregate_by_tag(
+    yvals, aggregate_items, label_type, replace_index=True, add_counts=True
+):
     if aggregate_items in (None, False):
         return yvals
 
     if aggregate_items is True:
-        items = yvals.index.get_level_values(
-            level=label_type).unique().tolist()
-        aggregate_items = {
-            _create_label_max_items(items, 5): items
-        }
+        items = yvals.index.get_level_values(level=label_type).unique().tolist()
+        aggregate_items = {_create_label_max_items(items, 5): items}
 
     df_list = []
 
     label_type_tag = label_type + '_tag'
 
     for tag_name, names in aggregate_items.items():
-        yvals_tmp = yvals.loc[yvals.index.isin(
-            names, level=label_type), :].copy()
+        yvals_tmp = yvals.loc[yvals.index.isin(names, level=label_type), :].copy()
 
         # Add counts to the tag names
         if add_counts:
-            tag_name = '{} ({})'.format(tag_name, len(
-                yvals_tmp.index.get_level_values(label_type).unique()))
+            tag_name = '{} ({})'.format(
+                tag_name, len(yvals_tmp.index.get_level_values(label_type).unique())
+            )
 
         yvals_tmp.loc[:, label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
         df_list.append(yvals_tmp)
@@ -1436,16 +1564,21 @@ def _create_label_max_items(items, max_items=5):
     n = len(items)
     if n > max_items:
         items = items[0:max_items]
-    annotation_label = ", ".join(items)
+    annotation_label = ', '.join(items)
     if n > max_items:
-        annotation_label += " and {} more".format(n - len(items))
+        annotation_label += ' and {} more'.format(n - len(items))
     return annotation_label
 
 
-def plot_time_course(hts_pandas,
-                     log_yaxis=False, assay_name='Assay', title=None,
-                     subtitle=None, show_dip_fit=False,
-                     template=config.plotly_template):
+def plot_time_course(
+    hts_pandas,
+    log_yaxis=False,
+    assay_name='Assay',
+    title=None,
+    subtitle=None,
+    show_dip_fit=False,
+    template=config.plotly_template,
+):
     """
     Plot a dose response time course
 
@@ -1488,16 +1621,21 @@ def plot_time_course(hts_pandas,
     elif assay_name in df_assays_avail:
         assay = assay_name
     else:
-        raise ValueError('{} is not a valid assay. Options are {}'.format(
-            assay_name, df_assays_avail))
+        raise ValueError(
+            '{} is not a valid assay. Options are {}'.format(
+                assay_name, df_assays_avail
+            )
+        )
 
     if df_controls is not None:
         if 'dataset' in df_controls.index.names:
             dsets = df_controls.index.get_level_values('dataset').unique()
             if len(dsets) > 1:
-                raise ValueError('Multiple control datasets present. '
-                                 'Plotting a time course requires a single '
-                                 'dataset.')
+                raise ValueError(
+                    'Multiple control datasets present. '
+                    'Plotting a time course requires a single '
+                    'dataset.'
+                )
             df_controls = df_controls.loc[dsets[0]]
         df_controls = df_controls.loc[assay]
 
@@ -1507,9 +1645,11 @@ def plot_time_course(hts_pandas,
     df_vals = df_vals.loc[assay]
 
     if len(hts_pandas.drugs) > 1 or len(hts_pandas.cell_lines) > 1:
-        raise ValueError('Dataset has multiple drugs and/or cell lines. Time '
-                         'courses are currently only available for single '
-                         'drug/cell line combinations.')
+        raise ValueError(
+            'Dataset has multiple drugs and/or cell lines. Time '
+            'courses are currently only available for single '
+            'drug/cell line combinations.'
+        )
 
     traces = []
     traces_fits = []
@@ -1518,16 +1658,18 @@ def plot_time_course(hts_pandas,
         title = _make_title('Time course', df_doses)
     title = _combine_title_subtitle(title, subtitle)
 
-    colours = _sns_to_rgb(sns.color_palette(
-        "husl", len(df_doses.index.get_level_values(level='dose').unique())))
+    colours = _sns_to_rgb(
+        sns.color_palette(
+            'husl', len(df_doses.index.get_level_values(level='dose').unique())
+        )
+    )
 
     ctrl_color = 'white' if template == 'plotly_dark' else 'black'
 
     if show_dip_fit:
         if df_controls is not None:
             dip_rate_ctrl = ctrl_dip_rates(df_controls)
-            dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(
-                level='cell_line')
+            dip_rate_ctrl.index = dip_rate_ctrl.index.droplevel(level='cell_line')
         dip_rates = expt_dip_rates(df_doses, df_vals)
         dip_rates.reset_index(inplace=True)
         dip_rates.set_index('well_id', inplace=True)
@@ -1542,41 +1684,51 @@ def plot_time_course(hts_pandas,
                 timecourse = np.log2(timecourse)
                 t0_offset = timecourse.iloc[0]
                 timecourse -= t0_offset
-            x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
-                       timecourse.index.get_level_values('timepoint')]
-            traces.append(go.Scatter(
-                x=x_range,
-                y=timecourse,
-                mode='lines+markers',
-                line={'color': ctrl_color,
-                      'shape': 'spline',
-                      'dash': 'dot' if show_dip_fit else None},
-                marker={'size': 5},
-                name='Control',
-                legendgroup='__Control',
-                showlegend=is_first_control
-            ))
+            x_range = [
+                t.total_seconds() / SECONDS_IN_HOUR
+                for t in timecourse.index.get_level_values('timepoint')
+            ]
+            traces.append(
+                go.Scatter(
+                    x=x_range,
+                    y=timecourse,
+                    mode='lines+markers',
+                    line={
+                        'color': ctrl_color,
+                        'shape': 'spline',
+                        'dash': 'dot' if show_dip_fit else None,
+                    },
+                    marker={'size': 5},
+                    name='Control',
+                    legendgroup='__Control',
+                    showlegend=is_first_control,
+                )
+            )
             is_first_control = False
 
             if show_dip_fit and df_controls is not None:
                 dip_well = dip_rate_ctrl.loc[
-                    dip_rate_ctrl.index.get_level_values('well_id') == well_id]
+                    dip_rate_ctrl.index.get_level_values('well_id') == well_id
+                ]
                 minmax = [np.min(x_range), np.max(x_range)]
 
-                dip_points = [x * dip_well['dip_rate'] +
-                              dip_well['dip_y_intercept'] - t0_offset
-                              for x in minmax]
+                dip_points = [
+                    x * dip_well['dip_rate'] + dip_well['dip_y_intercept'] - t0_offset
+                    for x in minmax
+                ]
 
-                traces_fits.append(go.Scatter(
-                    x=minmax,
-                    y=dip_points,
-                    mode='lines',
-                    line={'color': ctrl_color},
-                    marker={'size': 5},
-                    name='DIP fit Control',
-                    legendgroup='__Control',
-                    showlegend=False
-                ))
+                traces_fits.append(
+                    go.Scatter(
+                        x=minmax,
+                        y=dip_points,
+                        mode='lines',
+                        line={'color': ctrl_color},
+                        marker={'size': 5},
+                        name='DIP fit Control',
+                        legendgroup='__Control',
+                        showlegend=False,
+                    )
+                )
 
     # Experiment (non-control)
     for dose, wells in df_doses.groupby(level='dose'):
@@ -1592,60 +1744,71 @@ def plot_time_course(hts_pandas,
                 timecourse = np.log2(timecourse)
                 t0_offset = timecourse.iloc[0]
                 timecourse -= t0_offset
-            x_range = [t.total_seconds() / SECONDS_IN_HOUR for t in
-                       timecourse.index.get_level_values('timepoint')]
-            dose_str = format_dose(dose, array_as_string=" &amp; ")
-            traces.append(go.Scatter(
-                x=x_range,
-                y=timecourse,
-                mode='lines+markers',
-                line={'color': this_colour,
-                      'shape': 'spline',
-                      'dash': 'dot' if show_dip_fit else None},
-                marker={'size': 5},
-                name=dose_str,
-                customdata=({'csvname': dose}, ),
-                legendgroup=dose_str,
-                showlegend=well_idx == 0
-            ))
+            x_range = [
+                t.total_seconds() / SECONDS_IN_HOUR
+                for t in timecourse.index.get_level_values('timepoint')
+            ]
+            dose_str = format_dose(dose, array_as_string=' &amp; ')
+            traces.append(
+                go.Scatter(
+                    x=x_range,
+                    y=timecourse,
+                    mode='lines+markers',
+                    line={
+                        'color': this_colour,
+                        'shape': 'spline',
+                        'dash': 'dot' if show_dip_fit else None,
+                    },
+                    marker={'size': 5},
+                    name=dose_str,
+                    customdata=({'csvname': dose},),
+                    legendgroup=dose_str,
+                    showlegend=well_idx == 0,
+                )
+            )
 
             if show_dip_fit:
                 dip_well = dip_rates.loc[well_id]
                 minmax = [dip_well['dip_first_timepoint'], np.max(x_range)]
-                dip_points = [x*dip_well['dip_rate'] +
-                              dip_well['dip_y_intercept'] - t0_offset
-                              for x in minmax]
+                dip_points = [
+                    x * dip_well['dip_rate'] + dip_well['dip_y_intercept'] - t0_offset
+                    for x in minmax
+                ]
 
-                traces_fits.append(go.Scatter(
-                    x=minmax,
-                    y=dip_points,
-                    mode='lines',
-                    line={'color': this_colour},
-                    marker={'size': 5},
-                    name=dose_str,
-                    customdata=({'csvname': 'DIP fit ' + dose_str}, ),
-                    legendgroup=dose_str,
-                    showlegend=False
-                ))
+                traces_fits.append(
+                    go.Scatter(
+                        x=minmax,
+                        y=dip_points,
+                        mode='lines',
+                        line={'color': this_colour},
+                        marker={'size': 5},
+                        name=dose_str,
+                        customdata=({'csvname': 'DIP fit ' + dose_str},),
+                        legendgroup=dose_str,
+                        showlegend=False,
+                    )
+                )
 
-    data = (traces + traces_fits)
+    data = traces + traces_fits
     if log_yaxis:
-        assay_name = "Change in log<sub>2</sub> {}".format(assay_name)
+        assay_name = 'Change in log<sub>2</sub> {}'.format(assay_name)
     max_time = df_vals.index.get_level_values('timepoint').max()
-    layout = go.Layout(title=title,
-                       xaxis={'title': 'Time (hours)',
-                              'range': (0, 120) if max_time <=
-                                       np.timedelta64(120, 'h') else None,
-                              'dtick': 12},
-                       yaxis={'title': assay_name,
-                              'range': (-2, 7) if log_yaxis else None},
-                       template=template
-                       )
+    layout = go.Layout(
+        title=title,
+        xaxis={
+            'title': 'Time (hours)',
+            'range': (0, 120) if max_time <= np.timedelta64(120, 'h') else None,
+            'dtick': 12,
+        },
+        yaxis={'title': assay_name, 'range': (-2, 7) if log_yaxis else None},
+        template=template,
+    )
     return go.Figure(data=data, layout=layout)
 
 
-def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
-                           template=config.plotly_template):
+def plot_ctrl_dip_by_plate(
+    df_controls, title=None, subtitle=None, template=config.plotly_template
+):
     """
 
     Parameters
@@ -1666,10 +1829,16 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
     """
     # Sort by median DIP rate
     df_controls = df_controls.copy()
-    df_controls['cl_median'] = df_controls['dip_rate'].groupby(
-        level=['cell_line'], observed=True).transform('median')
-    df_controls['plate_median'] = df_controls['dip_rate'].groupby(
-        level=['cell_line', 'plate'], observed=True).transform('median')
+    df_controls['cl_median'] = (
+        df_controls['dip_rate']
+        .groupby(level=['cell_line'], observed=True)
+        .transform('median')
+    )
+    df_controls['plate_median'] = (
+        df_controls['dip_rate']
+        .groupby(level=['cell_line', 'plate'], observed=True)
+        .transform('median')
+    )
     df_controls.sort_values(by=['cl_median', 'plate_median'], inplace=True)
 
     if title is None:
@@ -1679,8 +1848,9 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
         dataset_names = df_controls.index.get_level_values('dataset').unique()
 
         if len(dataset_names) != 1:
-            raise ValueError('This function can only plot controls from a '
-                             'single dataset')
+            raise ValueError(
+                'This function can only plot controls from a single dataset'
+            )
 
         if subtitle is None:
             subtitle = dataset_names[0]
@@ -1689,20 +1859,23 @@ def plot_ctrl_dip_by_plate(df_controls, title=None, subtitle=None,
 
     traces = []
     for grp, ctrl_dat in df_controls.groupby(level='cell_line'):
-        traces.append(go.Box(
-            x=ctrl_dat.index.get_level_values('plate').values,
-            y=ctrl_dat['dip_rate'].values,
-            name=grp
-        ))
+        traces.append(
+            go.Box(
+                x=ctrl_dat.index.get_level_values('plate').values,
+                y=ctrl_dat['dip_rate'].values,
+                name=grp,
+            )
+        )
 
-    layout = go.Layout(title=title,
-                       template=template,
-                       yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'})
+    layout = go.Layout(
+        title=title, template=template, yaxis={'title': 'DIP Rate (h<sup>-1</sup>)'}
+    )
     return go.Figure(data=traces, layout=layout)
 
 
-def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
-                                   template=config.plotly_template):
+def plot_ctrl_cell_counts_by_plate(
+    df_controls, title=None, subtitle=None, template=config.plotly_template
+):
     """
 
     Parameters
@@ -1729,16 +1902,22 @@ def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
     # Sort by median DIP rate
     df_controls = df_controls.copy()
 
-    df_controls = df_controls['value'].groupby(
-        level=['cell_line', 'plate']).apply(
-            lambda x: x.quantile(
-                q=(0, 0.25, 0.25, 0.5, 0.75, 0.75, 1))
-        ).reset_index(level=2, drop=True).to_frame()
+    df_controls = (
+        df_controls['value']
+        .groupby(level=['cell_line', 'plate'])
+        .apply(lambda x: x.quantile(q=(0, 0.25, 0.25, 0.5, 0.75, 0.75, 1)))
+        .reset_index(level=2, drop=True)
+        .to_frame()
+    )
 
-    df_controls['cl_median'] = df_controls['value'].groupby(
-        level=['cell_line']).transform(np.nanmedian)
-    df_controls['plate_median'] = df_controls['value'].groupby(
-        level=['cell_line', 'plate']).transform(np.nanmedian)
+    df_controls['cl_median'] = (
+        df_controls['value'].groupby(level=['cell_line']).transform(np.nanmedian)
+    )
+    df_controls['plate_median'] = (
+        df_controls['value']
+        .groupby(level=['cell_line', 'plate'])
+        .transform(np.nanmedian)
+    )
     df_controls.sort_values(by=['cl_median', 'plate_median'], inplace=True)
 
     if title is None:
@@ -1748,8 +1927,9 @@ def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
         dataset_names = df_controls.index.get_level_values('dataset').unique()
 
         if len(dataset_names) != 1:
-            raise ValueError('This function can only plot controls from a '
-                             'single dataset')
+            raise ValueError(
+                'This function can only plot controls from a single dataset'
+            )
 
         if subtitle is None:
             subtitle = dataset_names[0]
@@ -1758,22 +1938,30 @@ def plot_ctrl_cell_counts_by_plate(df_controls, title=None, subtitle=None,
 
     traces = []
     for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
-        traces.append(go.Box(
-            x=ctrl_dat.index.get_level_values('plate').values,
-            y=ctrl_dat['value'].values,
-            name=grp
-        ))
+        traces.append(
+            go.Box(
+                x=ctrl_dat.index.get_level_values('plate').values,
+                y=ctrl_dat['value'].values,
+                name=grp,
+            )
+        )
 
-    layout = go.Layout(title=title,
-                       template=template,
-                       xaxis={'type': 'category'},
-                       yaxis={'title': assay})
+    layout = go.Layout(
+        title=title,
+        template=template,
+        xaxis={'type': 'category'},
+        yaxis={'title': assay},
+    )
     return go.Figure(data=traces, layout=layout)
 
 
-def plot_plate_map(plate_data, color_by='dip_rates',
-                   missing_color='lightgray', subtitle=None,
-                   template=config.plotly_template):
+def plot_plate_map(
+    plate_data,
+    color_by='dip_rates',
+    missing_color='lightgray',
+    subtitle=None,
+    template=config.plotly_template,
+):
     """
 
     Parameters
@@ -1801,22 +1989,23 @@ def plot_plate_map(plate_data, color_by='dip_rates',
             subtitle += ' ({})'.format(plate_data.dataset_name)
     title = _combine_title_subtitle(maintitle, subtitle)
 
-    well_color_basis = np.array(getattr(plate_data, color_by),
-                                dtype=np.double)
+    well_color_basis = np.array(getattr(plate_data, color_by), dtype=np.double)
 
     well_max = np.nanmax(well_color_basis)
     well_min = np.nanmin(well_color_basis)
-    pos_pal = sns.light_palette("#f48000", as_cmap=True)
-    neg_pal = sns.light_palette("#3f83a3", as_cmap=True)
+    pos_pal = sns.light_palette('#f48000', as_cmap=True)
+    neg_pal = sns.light_palette('#3f83a3', as_cmap=True)
 
-    well_color = _sns_to_rgb([
-        missing_color
-        if np.isnan(val)
-        else pos_pal(val / well_max)
-        if val > 0
-        else neg_pal(val / well_min)
-        for val in well_color_basis
-    ])
+    well_color = _sns_to_rgb(
+        [
+            missing_color
+            if np.isnan(val)
+            else pos_pal(val / well_max)
+            if val > 0
+            else neg_pal(val / well_min)
+            for val in well_color_basis
+        ]
+    )
 
     cols = plate_data.width
     rows = plate_data.height
@@ -1827,49 +2016,45 @@ def plot_plate_map(plate_data, color_by='dip_rates',
     col_labels = [str(i + 1) for i in range(cols)]
     row_labels = [chr(ASCII_CAP_A + i) for i in range(rows)]
 
-    well_shapes = [{
-        'opacity': 1.0,
-        'xref': 'x',
-        'yref': 'y',
-        'fillcolor': well_color[well_num],
-        'x0': (well_num % cols),
-        'y0': rows - (well_num // cols),
-        'x1': (well_num % cols) + PLATE_MAP_WELL_DIAM,
-        'y1': rows - (well_num // cols) + PLATE_MAP_WELL_DIAM,
-        'type': 'circle',
-        'line': {
-            'color': 'darkgray',
-            'width': 0.5
+    well_shapes = [
+        {
+            'opacity': 1.0,
+            'xref': 'x',
+            'yref': 'y',
+            'fillcolor': well_color[well_num],
+            'x0': (well_num % cols),
+            'y0': rows - (well_num // cols),
+            'x1': (well_num % cols) + PLATE_MAP_WELL_DIAM,
+            'y1': rows - (well_num // cols) + PLATE_MAP_WELL_DIAM,
+            'type': 'circle',
+            'line': {'color': 'darkgray', 'width': 0.5},
         }
-    } for well_num in range(num_wells)]
+        for well_num in range(num_wells)
+    ]
 
     well_objs = go.Scatter(
         x=[(well_num % cols) + well_rad for well_num in range(num_wells)],
-        y=[rows - (well_num // cols) + well_rad for well_num in
-           range(num_wells)],
+        y=[rows - (well_num // cols) + well_rad for well_num in range(num_wells)],
         text='',
         hovertext=[
-            'Well {}{}<br>'
-            'DIP: {}<br>'
-            'Cell Line: {}<br>'
-            'Drug: {}<br>'
-            'Dose: {}'.format(
+            'Well {}{}<br>DIP: {}<br>Cell Line: {}<br>Drug: {}<br>Dose: {}'.format(
                 row_labels[well_num // cols],
                 col_labels[well_num % cols],
                 plate_data.dip_rates[well_num],
                 plate_data.cell_lines[well_num],
-                " &amp; ".join(
-                    ["(None)" if d is None else d for d in
-                        plate_data.drugs[well_num]])
-                if plate_data.drugs[well_num] else 'None',
-                " &amp; ".join(
-                    [format_dose(d) for d in
-                        plate_data.doses[well_num]])
-                if plate_data.doses[well_num] else 'N/A'
-                    )
-            for well_num in range(num_wells)],
+                ' &amp; '.join(
+                    ['(None)' if d is None else d for d in plate_data.drugs[well_num]]
+                )
+                if plate_data.drugs[well_num]
+                else 'None',
+                ' &amp; '.join([format_dose(d) for d in plate_data.doses[well_num]])
+                if plate_data.doses[well_num]
+                else 'N/A',
+            )
+            for well_num in range(num_wells)
+        ],
         hoverinfo='text',
-        mode='text'
+        mode='text',
     )
 
     label_color = 'white' if template == 'plotly_dark' else 'black'
@@ -1883,7 +2068,7 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         textfont=dict(
             color=label_color,
             # size=18,
-        )
+        ),
     )
 
     row_labels = go.Scatter(
@@ -1895,34 +2080,31 @@ def plot_plate_map(plate_data, color_by='dip_rates',
         textfont=dict(
             color=label_color,
             # size=18,
-        )
+        ),
     )
 
     data = (well_objs, col_labels, row_labels)
 
-    layout = go.Layout({
-        'xaxis': {
-            'showticklabels': False,
-            'showgrid': False,
-            'zeroline': False,
-        },
-        'yaxis': {
-            'showticklabels': False,
-            'showgrid': False,
-            'zeroline': False,
-            'scaleanchor': 'x'
-        },
-        'shapes': well_shapes,
-        'margin': {
-            'l': 0,
-            'r': 0,
-            'b': 0,
-            't': 50
-        },
-        'hovermode': 'closest',
-        'showlegend': False,
-        'title': title,
-        'template': template
-    })
+    layout = go.Layout(
+        {
+            'xaxis': {
+                'showticklabels': False,
+                'showgrid': False,
+                'zeroline': False,
+            },
+            'yaxis': {
+                'showticklabels': False,
+                'showgrid': False,
+                'zeroline': False,
+                'scaleanchor': 'x',
+            },
+            'shapes': well_shapes,
+            'margin': {'l': 0, 'r': 0, 'b': 0, 't': 50},
+            'hovermode': 'closest',
+            'showlegend': False,
+            'title': title,
+            'template': template,
+        }
+    )
 
     return go.Figure(data=data, layout=layout)

@@ -6,9 +6,11 @@ import numpy as np
 
 
 def test_dip_two_time_points():
-    csv = CSV_HEADER + \
-          '\ncl1,0.00013,drug1,plate1,0,1234,A1,M' + \
-          '\ncl1,0.00013,drug1,plate1,1,2468,A1,M'
+    csv = (
+        CSV_HEADER
+        + '\ncl1,0.00013,drug1,plate1,0,1234,A1,M'
+        + '\ncl1,0.00013,drug1,plate1,1,2468,A1,M'
+    )
     d = read_vanderbilt_hts(io.StringIO(csv), sep=',')
     ctrl_dip_data, expt_dip_data = dip_rates(d)
 

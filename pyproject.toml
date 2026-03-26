@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ['pytest', 'nbval', 'django', 'nbformat', 'flake8',
+test = ['pytest', 'nbval', 'django', 'nbformat', 'ruff',
         'codecov', 'pytest-cov']
 docs = ['sphinx', 'sphinx-rtd-theme', 'mock', 'nbsphinx',
         'ipykernel']
@@ -39,6 +39,11 @@ Homepage = "https://www.thunor.net"
 requires = ["setuptools", "versioneer"]
 build-backend = "setuptools.build_meta"
 
-[tool.flake8]
-extend-ignore = "E203"
-max-line-length = 88
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+extend-ignore = ["E203"]

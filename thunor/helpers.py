@@ -4,19 +4,22 @@ from collections.abc import Iterable
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
 from functools import reduce
+
 try:
     from django.utils.html import strip_tags
 except ImportError:
     strip_tags = None
 
 
-_SI_PREFIXES = collections.OrderedDict([
-    (1e-12, 'p'),
-    (1e-9, 'n'),
-    (1e-6, 'μ'),
-    (1e-3, 'm'),
-    (1, ''),
-])
+_SI_PREFIXES = collections.OrderedDict(
+    [
+        (1e-12, 'p'),
+        (1e-9, 'n'),
+        (1e-6, 'μ'),
+        (1e-3, 'm'),
+        (1, ''),
+    ]
+)
 
 
 def format_dose(num, sig_digits=12, array_as_string=None):
@@ -57,7 +60,8 @@ def format_dose(num, sig_digits=12, array_as_string=None):
         else:
             break
     return ('{0:.' + str(sig_digits) + 'g} {1}M').format(
-        num/multiplier, _SI_PREFIXES[multiplier])
+        num / multiplier, _SI_PREFIXES[multiplier]
+    )
 
 
 def _plotly_scatter_to_dataframe(plot_fig):
@@ -78,13 +82,18 @@ def _plotly_scatter_to_dataframe(plot_fig):
         if trace['x'] is None:
             continue
         for i in range(len(trace['x'])):
-            rows.append({
-                'trace_name': trace_name,
-                xaxis_name: trace['x'][i],
-                yaxis_name: trace['y'][i],
-                'point_label': strip_tags(trace['hovertext'][i].replace(
-                    '<br>', '\n')) if trace['hovertext'] is not None else None
-            })
+            rows.append(
+                {
+                    'trace_name': trace_name,
+                    xaxis_name: trace['x'][i],
+                    yaxis_name: trace['y'][i],
+                    'point_label': strip_tags(
+                        trace['hovertext'][i].replace('<br>', '\n')
+                    )
+                    if trace['hovertext'] is not None
+                    else None,
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -129,11 +138,12 @@ def plotly_to_dataframe(plot_fig):
                 yvals = pd.DataFrame(yvals)
                 yvals['__replicate__'] = yvals.groupby(level=0).cumcount()
                 yvals.reset_index(inplace=True)
-                ptable = yvals.pivot(columns='__replicate__',
-                                     index=index_name,
-                                     values=series_name)
-                ptable.rename(columns=lambda i: '{} {}'.format(trace_name, i),
-                              inplace=True)
+                ptable = yvals.pivot(
+                    columns='__replicate__', index=index_name, values=series_name
+                )
+                ptable.rename(
+                    columns=lambda i: '{} {}'.format(trace_name, i), inplace=True
+                )
                 series.extend(col for _, col in ptable.iteritems())
         else:
             series.append(pd.Series(yvals, index=xvals, name=trace_name))
@@ -146,6 +156,7 @@ def plotly_to_dataframe(plot_fig):
         # fall back on a (slower) merge, rather than trying to
         # concatenate them
         dflist = [pd.DataFrame(s) for s in series]
-        return reduce(lambda x, y: pd.merge(x, y, left_index=True,
-                                            right_index=True, how='outer'),
-                      dflist)
+        return reduce(
+            lambda x, y: pd.merge(x, y, left_index=True, right_index=True, how='outer'),
+            dflist,
+        )

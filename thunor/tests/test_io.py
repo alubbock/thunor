@@ -114,40 +114,44 @@ class TestCSV(unittest.TestCase):
 
 class TestCSVTwoDrugs(unittest.TestCase):
     def test_csv_two_drugs(self):
-        _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
-                   '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M,0.00010')
+        _check_csv(
+            CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+            '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M,0.00010'
+        )
 
     def test_csv_two_drugs_drug_conc_missing(self):
         with pytest.raises(thunor.io.PlateFileParseException):
-            _check_csv(CSV_HEADER + ',drug2,drug2.units'
-                       '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M')
+            _check_csv(
+                CSV_HEADER + ',drug2,drug2.units'
+                '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,drug2,M'
+            )
 
     def test_csv_two_drugs_drug2_blank_conc_specified(self):
         with pytest.raises(thunor.io.PlateFileParseException):
-            _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
-                       '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0.00010')
+            _check_csv(
+                CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+                '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0.00010'
+            )
 
     def test_csv_two_drugs_drug2_blank(self):
-        csv = _check_csv(CSV_HEADER + ',drug2,drug2.units,drug2.conc'
-                         '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0')
+        csv = _check_csv(
+            CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+            '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0'
+        )
         # Second drug should get dropped, since it's empty
         assert len(csv.doses.index.get_level_values('drug')[0]) == 1
         assert len(csv.doses.index.get_level_values('dose')[0]) == 1
 
 
 def test_read_incucyte():
-    ref = importlib.resources.files('thunor') / \
-        'testdata/test_incucyte_minimal.txt'
+    ref = importlib.resources.files('thunor') / 'testdata/test_incucyte_minimal.txt'
     with importlib.resources.as_file(ref) as filename:
         thunor.io.read_incucyte(filename)
 
 
 class TestPlateMap(unittest.TestCase):
     def _plate_map(self, expected_width, expected_height):
-        pm = thunor.io.PlateMap(
-            width=expected_width,
-            height=expected_height
-        )
+        pm = thunor.io.PlateMap(width=expected_width, height=expected_height)
         assert pm.width == expected_width
         assert pm.height == expected_height
         assert pm.num_wells == (expected_width * expected_height)

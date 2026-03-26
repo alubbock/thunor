@@ -20,18 +20,20 @@ WELL_FILE = 'v20.data.per_cpd_well.txt'
 def _load_compounds(directory):
     compounds = pd.read_csv(
         os.path.join(directory, COMPOUND_FILE),
-        sep='\t', index_col='master_cpd_id',
-        usecols=['master_cpd_id', 'cpd_name']
+        sep='\t',
+        index_col='master_cpd_id',
+        usecols=['master_cpd_id', 'cpd_name'],
     )
-    compounds['cpd_name'] = [(d, ) for d in compounds['cpd_name']]
+    compounds['cpd_name'] = [(d,) for d in compounds['cpd_name']]
     return compounds
 
 
 def _load_plates(directory):
     plates = pd.read_csv(
         os.path.join(directory, PLATE_FILE),
-        sep='\t', index_col=['assay_plate_barcode'],
-        usecols=['experiment_id', 'assay_plate_barcode', 'dmso_plate_avg_log2']
+        sep='\t',
+        index_col=['assay_plate_barcode'],
+        usecols=['experiment_id', 'assay_plate_barcode', 'dmso_plate_avg_log2'],
     )
     return plates
 
@@ -39,9 +41,10 @@ def _load_plates(directory):
 def _load_cell_lines(directory):
     cell_lines = pd.read_csv(
         os.path.join(directory, CELL_LINE_FILE),
-        sep='\t', index_col='master_ccl_id',
+        sep='\t',
+        index_col='master_ccl_id',
         usecols=['master_ccl_id', 'ccl_name'],
-        converters={'ccl_name': str}
+        converters={'ccl_name': str},
     )
     return cell_lines
 
@@ -50,7 +53,7 @@ def _load_experiments(directory):
     experiments = pd.read_csv(
         os.path.join(directory, EXPERIMENT_FILE),
         sep='\t',
-        usecols=['experiment_id', 'master_ccl_id']
+        usecols=['experiment_id', 'master_ccl_id'],
     )
     # Experiments have multiple runs, but the cell line doesn't change
     experiments = experiments.drop_duplicates()
@@ -62,11 +65,14 @@ def _load_wells(directory):
     wells = pd.read_csv(
         os.path.join(directory, WELL_FILE),
         sep='\t',
-        usecols=['experiment_id', 'assay_plate_barcode', 'raw_value_log2',
-                 'cpd_conc_umol', 'master_cpd_id'],
-        converters={
-            'cpd_conc_umol': float
-        }
+        usecols=[
+            'experiment_id',
+            'assay_plate_barcode',
+            'raw_value_log2',
+            'cpd_conc_umol',
+            'master_cpd_id',
+        ],
+        converters={'cpd_conc_umol': float},
     )
     # Add a "well number" for each measurement, reserving 0 for control well
     wells['well_num'] = wells.groupby('assay_plate_barcode').cumcount() + 1
@@ -84,13 +90,12 @@ def import_ctrp(directory):
     wells = _load_wells(directory)
 
     print('Constructing dataset...')
-    experiments = experiments.merge(cell_lines, left_on='master_ccl_id',
-                                    right_index=True)
-    wells = wells.merge(experiments, left_on='experiment_id',
-                        right_index=True)
+    experiments = experiments.merge(
+        cell_lines, left_on='master_ccl_id', right_index=True
+    )
+    wells = wells.merge(experiments, left_on='experiment_id', right_index=True)
 
-    wells = wells.merge(compounds, left_on='master_cpd_id',
-                        right_index=True)
+    wells = wells.merge(compounds, left_on='master_cpd_id', right_index=True)
 
     # assert wells.shape[0] == num_wells
 
@@ -99,33 +104,32 @@ def import_ctrp(directory):
     controls_list = []
     for plate in wells['assay_plate_barcode'].unique():
         plate_data = plates.loc[plate]
-        cell_line = str(experiments.loc[plate_data['experiment_id']][
-                            'ccl_name'])
-        controls_list.append({
-            'assay': ASSAY,
-            'cell_line': cell_line,
-            'plate': plate,
-            'well_id': '{}__{}'.format(plate, 0),
-            'timepoint': TIMEPOINT,
-            'value': plate_data['dmso_plate_avg_log2'],
-            'well_num': 0
-        })
+        cell_line = str(experiments.loc[plate_data['experiment_id']]['ccl_name'])
+        controls_list.append(
+            {
+                'assay': ASSAY,
+                'cell_line': cell_line,
+                'plate': plate,
+                'well_id': '{}__{}'.format(plate, 0),
+                'timepoint': TIMEPOINT,
+                'value': plate_data['dmso_plate_avg_log2'],
+                'well_num': 0,
+            }
+        )
     controls = pd.DataFrame(controls_list)
-    controls = controls.set_index(['assay', 'cell_line', 'plate', 'well_id',
-                                   'timepoint'])
+    controls = controls.set_index(
+        ['assay', 'cell_line', 'plate', 'well_id', 'timepoint']
+    )
 
     # Process doses and assays
     print('Processing assays...')
-    wells = wells.drop(columns=['master_ccl_id', 'master_cpd_id',
-                                'experiment_id'])
+    wells = wells.drop(columns=['master_ccl_id', 'master_cpd_id', 'experiment_id'])
     wells.columns = ['plate', 'value', 'dose', 'well_num', 'cell_line', 'drug']
     wells['dose'] *= WELL_CONVERSION
-    wells['dose'] = [(d, ) for d in wells['dose'].values]
-    wells['well_id'] = wells['plate'].astype(str) + '__' + wells[
-        'well_num'].astype(str)
+    wells['dose'] = [(d,) for d in wells['dose'].values]
+    wells['well_id'] = wells['plate'].astype(str) + '__' + wells['well_num'].astype(str)
 
-    doses = wells.loc[:, ['drug', 'cell_line', 'dose', 'well_id', 'plate',
-                          'well_num']]
+    doses = wells.loc[:, ['drug', 'cell_line', 'dose', 'well_id', 'plate', 'well_num']]
     doses = doses.set_index(['drug', 'cell_line', 'dose'])
 
     assays = wells.loc[:, ['well_id', 'value']]
@@ -136,8 +140,7 @@ def import_ctrp(directory):
     return HtsPandas(doses, assays, controls)
 
 
-def convert_ctrp(directory='.',
-                 output_file='ctrp_v2.h5'):
+def convert_ctrp(directory='.', output_file='ctrp_v2.h5'):
     """
     Convert CTRP v2.0 data to Thunor format
 

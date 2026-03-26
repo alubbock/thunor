@@ -21,6 +21,7 @@ import os
 import sys
 from packaging.version import Version
 import datetime
+
 sys.path.insert(0, os.path.abspath('../'))
 import thunor  # noqa: E402
 
@@ -58,9 +59,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Thunor Core'
-copyright = u'2017-' + str(datetime.datetime.now().year) + u' Alex Lubbock'
-author = u'Alex Lubbock'
+project = 'Thunor Core'
+copyright = '2017-' + str(datetime.datetime.now().year) + ' Alex Lubbock'
+author = 'Alex Lubbock'
 
 # The full version, including alpha/beta/rc tags.
 release = thunor.__version__
@@ -246,29 +247,25 @@ htmlhelp_basename = 'Thunordoc'
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-     # The paper size ('letterpaper' or 'a4paper').
-     #
-     # 'papersize': 'letterpaper',
-
-     # The font size ('10pt', '11pt' or '12pt').
-     #
-     # 'pointsize': '10pt',
-
-     # Additional stuff for the LaTeX preamble.
-     #
-     # 'preamble': '',
-
-     # Latex figure (float) alignment
-     #
-     # 'figure_align': 'htbp',
+    # The paper size ('letterpaper' or 'a4paper').
+    #
+    # 'papersize': 'letterpaper',
+    # The font size ('10pt', '11pt' or '12pt').
+    #
+    # 'pointsize': '10pt',
+    # Additional stuff for the LaTeX preamble.
+    #
+    # 'preamble': '',
+    # Latex figure (float) alignment
+    #
+    # 'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'Thunor.tex', u'Thunor Core Documentation',
-     u'Alex Lubbock', 'manual'),
+    (master_doc, 'Thunor.tex', 'Thunor Core Documentation', 'Alex Lubbock', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -308,10 +305,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'thunor', u'Thunor Core Documentation',
-     [author], 1)
-]
+man_pages = [(master_doc, 'thunor', 'Thunor Core Documentation', [author], 1)]
 
 # If true, show URL addresses after external links.
 #
@@ -324,16 +318,21 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Thunor', u'Thunor Core Documentation',
-     author, 'Thunor', 'Drug response calculations using the DIP rate',
-     'Miscellaneous'),
+    (
+        master_doc,
+        'Thunor',
+        'Thunor Core Documentation',
+        author,
+        'Thunor',
+        'Drug response calculations using the DIP rate',
+        'Miscellaneous',
+    ),
 ]
 
 
 def setup(app):
     app.add_js_file(
-        'https://cdnjs.cloudflare.com/ajax/libs/'
-        'require.js/2.1.10/require.min.js'
+        'https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js'
     )
 
 

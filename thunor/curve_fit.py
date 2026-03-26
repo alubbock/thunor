@@ -29,12 +29,14 @@ class AAFitWarning(ValueWarning):
 
 
 class DrugCombosNotImplementedError(NotImplementedError):
-    """ This function does not support drug combinations yet """
+    """This function does not support drug combinations yet"""
+
     pass
 
 
 class HillCurve(object):
-    """ Base class defining Hill/log-logistic curve functionality """
+    """Base class defining Hill/log-logistic curve functionality"""
+
     fit_bounds = (-np.inf, np.inf)
     null_response_fn = np.mean
     max_fit_evals = None
@@ -222,7 +224,8 @@ class HillCurveLL4(HillCurve):
         ic_frac = ic_num / 100.0
 
         icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
-                           1 / self.hill_slope)
+            1 / self.hill_slope
+        )
 
         # Overflow will lead to -inf, which we deal with here
         if np.isnan(icN) or np.isinf(icN):
@@ -273,10 +276,11 @@ class HillCurveLL4(HillCurve):
             # TODO: Calculate AUC for ascending curves
             return None
 
-        min_conc_hill = min_conc ** self.hill_slope
-        return (np.log10(
-            (self.ec50 ** self.hill_slope + min_conc_hill) / min_conc_hill) /
-                self.hill_slope) * ((e0 - emax) / e0)
+        min_conc_hill = min_conc**self.hill_slope
+        return (
+            np.log10((self.ec50**self.hill_slope + min_conc_hill) / min_conc_hill)
+            / self.hill_slope
+        ) * ((e0 - emax) / e0)
 
     def aa(self, min_conc, max_conc):
         """
@@ -308,12 +312,17 @@ class HillCurveLL4(HillCurve):
             min_conc = Decimal(min_conc)
             max_conc = Decimal(max_conc)
 
-            return np.float64(((ec50_hill + max_conc ** hill).log10()
-                               - (ec50_hill + min_conc ** hill).log10())
-                              / hill) * ((e0 - emax) / e0)
+            return np.float64(
+                (
+                    (ec50_hill + max_conc**hill).log10()
+                    - (ec50_hill + min_conc**hill).log10()
+                )
+                / hill
+            ) * ((e0 - emax) / e0)
         except Overflow:
-            warnings.warn('Overflow finding activity area '
-                          '(Hill coeff.: {:.4g})'.format(hill))
+            warnings.warn(
+                'Overflow finding activity area (Hill coeff.: {:.4g})'.format(hill)
+            )
             return None
 
     @property
@@ -333,12 +342,10 @@ class HillCurveLL4(HillCurve):
 
 
 class HillCurveLL3u(HillCurveLL4):
-    """ Three parameter log logistic curve, for viability data """
+    """Three parameter log logistic curve, for viability data"""
+
     # Constrain 0<=emax<=1, Hill slope +ve
-    fit_bounds = (
-        (0.0, 0.0, -np.inf),
-        (np.inf, 1.0, np.inf)
-    )
+    fit_bounds = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
     max_fit_evals = None
 
     @staticmethod
@@ -439,9 +446,14 @@ class HillCurveLL2(HillCurveLL3u):
         return self._popt_rel
 
 
-def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
-            null_rejection_threshold=0.05,
-            ctrl_dose_test=False):
+def fit_drc(
+    doses,
+    responses,
+    response_std_errs=None,
+    fit_cls=HillCurveLL4,
+    null_rejection_threshold=0.05,
+    ctrl_dose_test=False,
+):
     """
     Fit a dose response curve
 
@@ -483,22 +495,24 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         if response_std_errs is None:
             doses, responses = zip(*sorted(zip(doses, responses)))
         else:
-            doses, responses, response_std_errs = zip(*sorted(zip(
-                doses, responses, response_std_errs)))
+            doses, responses, response_std_errs = zip(
+                *sorted(zip(doses, responses, response_std_errs))
+            )
     except ValueError:
         # Occurs when doses/responses is empty
         return None
 
     curve_initial_guess = fit_cls.initial_guess(doses, responses)
     try:
-        popt, pcov = scipy.optimize.curve_fit(fit_cls.fit_fn,
-                                              doses,
-                                              responses,
-                                              bounds=fit_cls.fit_bounds,
-                                              p0=curve_initial_guess,
-                                              sigma=response_std_errs,
-                                              maxfev=fit_cls.max_fit_evals
-                                              )
+        popt, pcov = scipy.optimize.curve_fit(
+            fit_cls.fit_fn,
+            doses,
+            responses,
+            bounds=fit_cls.fit_bounds,
+            p0=curve_initial_guess,
+            sigma=response_std_errs,
+            maxfev=fit_cls.max_fit_evals,
+        )
     except RuntimeError:
         # Some numerical issue with curve fitting
         return None
@@ -508,7 +522,8 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
         # This occurs if there are fewer data points than parameters
         te_str = str(te)
         if 'Improper input:' in te_str or te_str.startswith(
-                'The number of func parameters'):
+            'The number of func parameters'
+        ):
             warnings.warn(te_str)
             return None
         else:
@@ -530,7 +545,7 @@ def fit_drc(doses, responses, response_std_errs=None, fit_cls=HillCurveLL4,
 
         df = len(doses) - len(popt)
 
-        f_ratio = (ssq_null-ssq_model)/(ssq_model/df)
+        f_ratio = (ssq_null - ssq_model) / (ssq_model / df)
         p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
 
         if p > null_rejection_threshold:
@@ -557,12 +572,17 @@ def _response_transform(y, c_val, d_val):
     return np.log((d_val - y) / (y - c_val))
 
 
-def _find_be_ll4(x, y, c_val, d_val, slope_scaling_factor=1,
-                 dose_transform=np.log,
-                 dose_inv_transform=np.exp):
+def _find_be_ll4(
+    x,
+    y,
+    c_val,
+    d_val,
+    slope_scaling_factor=1,
+    dose_transform=np.log,
+    dose_inv_transform=np.exp,
+):
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
-        dose_transform(x),
-        _response_transform(y, c_val, d_val)
+        dose_transform(x), _response_transform(y, c_val, d_val)
     )
     b_val = slope_scaling_factor * slope
     e_val = dose_inv_transform(-intercept / (slope_scaling_factor * b_val))
@@ -597,8 +617,9 @@ def _get_control_responses(ctrl_dip_data, dataset, cl_name, dip_grp):
     else:
         plates = []
 
-    ctrl_dip_data_cl = ctrl_dip_data_cl.loc[ctrl_dip_data_cl.index.isin(
-        plates, level='plate')]
+    ctrl_dip_data_cl = ctrl_dip_data_cl.loc[
+        ctrl_dip_data_cl.index.isin(plates, level='plate')
+    ]
 
     if ctrl_dip_data_cl.empty:
         return None
@@ -635,10 +656,12 @@ def aa_obs(responses, doses=None):
     return np.trapezoid(responses_shifted, np.log10(doses))
 
 
-def fit_params_minimal(ctrl_data, expt_data,
-                       fit_cls=HillCurveLL4,
-                       ctrl_dose_fn=lambda doses: np.min(doses) /
-                       CTRL_DOSE_DIVISOR):
+def fit_params_minimal(
+    ctrl_data,
+    expt_data,
+    fit_cls=HillCurveLL4,
+    ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
+):
     """
     Fit dose response curves to DIP or viability, and calculate statistics
 
@@ -681,8 +704,7 @@ def fit_params_minimal(ctrl_data, expt_data,
         expt_data = expt_data.reset_index(['drug', 'dose'])
         expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
         expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
-        expt_data.set_index(['drug', 'dose'], append=True,
-                            inplace=True)
+        expt_data.set_index(['drug', 'dose'], append=True, inplace=True)
         drugs = expt_data.index.get_level_values('drug').unique()
 
     if len(drugs) > 1 and len(cell_lines) == 1:
@@ -737,28 +759,34 @@ def fit_params_minimal(ctrl_data, expt_data,
             resp_expt = dip_grp['viability'].to_numpy()
             doses = doses_expt
             fit_obj = fit_drc(
-                doses_expt, resp_expt, response_std_errs=None,
+                doses_expt,
+                resp_expt,
+                response_std_errs=None,
                 null_rejection_threshold=None,
-                fit_cls=fit_cls
+                fit_cls=fit_cls,
             )
             aa_obs_val = aa_obs(resp_expt, doses_expt)
         else:
-            if dataset is None and ctrl_data is not None and \
-                    'dataset' in ctrl_data.index.names:
-                raise ValueError('Experimental data does not have "dataset" '
-                                 'in index, but control data does. Please '
-                                 'make sure "dataset" is in both dataframes, '
-                                 'or neither.')
+            if (
+                dataset is None
+                and ctrl_data is not None
+                and 'dataset' in ctrl_data.index.names
+            ):
+                raise ValueError(
+                    'Experimental data does not have "dataset" '
+                    'in index, but control data does. Please '
+                    'make sure "dataset" is in both dataframes, '
+                    'or neither.'
+                )
 
-            ctrl_dip_data_cl = \
-                _get_control_responses(ctrl_data, dataset, cl_name,
-                                       dip_grp)
+            ctrl_dip_data_cl = _get_control_responses(
+                ctrl_data, dataset, cl_name, dip_grp
+            )
             dip_ctrl = []
             dip_ctrl_std_err = []
             if ctrl_dip_data_cl is not None:
                 dip_ctrl = ctrl_dip_data_cl['dip_rate'].values
-                dip_ctrl_std_err = ctrl_dip_data_cl[
-                    'dip_fit_std_err'].values
+                dip_ctrl_std_err = ctrl_dip_data_cl['dip_fit_std_err'].values
 
             n_controls = len(dip_ctrl)
             ctrl_dose_val = ctrl_dose_fn(doses_expt)
@@ -766,15 +794,13 @@ def fit_params_minimal(ctrl_data, expt_data,
             doses = np.concatenate((doses_ctrl, doses_expt))
             resp_expt = dip_grp['dip_rate'].values
             dip_all = np.concatenate((dip_ctrl, resp_expt))
-            dip_std_errs = np.concatenate((
-                dip_ctrl_std_err,
-                dip_grp['dip_fit_std_err'].values))
+            dip_std_errs = np.concatenate(
+                (dip_ctrl_std_err, dip_grp['dip_fit_std_err'].values)
+            )
 
             try:
                 fit_obj = fit_drc(
-                    doses, dip_all, dip_std_errs,
-                    fit_cls=fit_cls,
-                    ctrl_dose_test=True
+                    doses, dip_all, dip_std_errs, fit_cls=fit_cls, ctrl_dose_test=True
                 )
             except KeyError:
                 fit_obj = None
@@ -799,7 +825,7 @@ def fit_params_minimal(ctrl_data, expt_data,
             min_dose_measured=min_dose_measured,
             max_dose_measured=max_dose_measured,
             emax_obs=np.min(resp_expt),
-            aa_obs=aa_obs_val
+            aa_obs=aa_obs_val,
         )
 
         fit_params.append(fit_data)
@@ -856,8 +882,9 @@ def _calc_aa(row):
     if not row.fit_obj:
         return None
 
-    return row.fit_obj.aa(min_conc=row.min_dose_measured,
-                          max_conc=row.max_dose_measured)
+    return row.fit_obj.aa(
+        min_conc=row.min_dose_measured, max_conc=row.max_dose_measured
+    )
 
 
 def _calc_auc(row):
@@ -876,17 +903,18 @@ def _calc_ec50(row):
     return ec50
 
 
-def _attach_extra_params(base_params,
-                         custom_ic_concentrations=frozenset(),
-                         custom_ec_concentrations=frozenset(),
-                         custom_e_values=frozenset(),
-                         custom_e_rel_values=frozenset(),
-                         include_aa=False,
-                         include_auc=False,
-                         include_hill=False,
-                         include_emax=False,
-                         include_einf=False
-                         ):
+def _attach_extra_params(
+    base_params,
+    custom_ic_concentrations=frozenset(),
+    custom_ec_concentrations=frozenset(),
+    custom_e_values=frozenset(),
+    custom_e_rel_values=frozenset(),
+    include_aa=False,
+    include_auc=False,
+    include_hill=False,
+    include_emax=False,
+    include_einf=False,
+):
     datasets = base_params.index.get_level_values('dataset_id').unique()
     if len(datasets) == 1 and datasets[0] == '':
         datasets = None
@@ -924,34 +952,35 @@ def _attach_extra_params(base_params,
             dr_name = index[index_names.index('drug')]
             group_name_components.append(str(dr_name))
 
-        return "\n".join(group_name_components)
+        return '\n'.join(group_name_components)
 
     base_params['label'] = base_params.index.map(_generate_label)
 
     for ic_num in custom_ic_concentrations:
         base_params['ic{:d}'.format(ic_num)] = base_params.apply(
-            _calc_ic, args=(ic_num,), axis=1)
+            _calc_ic, args=(ic_num,), axis=1
+        )
 
     if 50 in custom_ec_concentrations:
         base_params['ec50'] = base_params.apply(_calc_ec50, axis=1)
 
     if include_emax:
         base_params['emax'] = base_params.apply(
-            lambda row: None if not row.fit_obj else row.fit_obj.fit(
-                row.max_dose_measured),
-            axis=1)
+            lambda row: (
+                None if not row.fit_obj else row.fit_obj.fit(row.max_dose_measured)
+            ),
+            axis=1,
+        )
 
     if include_einf:
         base_params['einf'] = base_params.apply(
-            lambda row: None if not row.fit_obj else row.fit_obj.emax,
-            axis=1
+            lambda row: None if not row.fit_obj else row.fit_obj.emax, axis=1
         )
 
     is_viability = base_params._drmetric == 'viability'
 
     if not is_viability and include_emax:
-        divisor = base_params['fit_obj'].apply(lambda fo: fo.divisor if fo
-                                               else None)
+        divisor = base_params['fit_obj'].apply(lambda fo: fo.divisor if fo else None)
         base_params['emax_rel'] = base_params['emax'] / divisor
         base_params['emax_obs_rel'] = base_params['emax_obs'] / divisor
 
@@ -963,18 +992,18 @@ def _attach_extra_params(base_params,
 
     if include_hill:
         base_params['hill'] = base_params['fit_obj'].apply(
-            lambda fo: fo.hill_slope if fo else None)
+            lambda fo: fo.hill_slope if fo else None
+        )
 
     custom_ec_concentrations = set(custom_ec_concentrations)
     custom_ec_concentrations.discard(50)
-    custom_ec_concentrations = custom_ec_concentrations.union(
-        custom_e_values)
-    custom_ec_concentrations = custom_ec_concentrations.union(
-        custom_e_rel_values)
+    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_values)
+    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_rel_values)
 
     for ec_num in custom_ec_concentrations:
         base_params['ec{:d}'.format(ec_num)] = base_params.apply(
-            _calc_ec, args=(ec_num,), axis=1)
+            _calc_ec, args=(ec_num,), axis=1
+        )
 
     for e_num in custom_e_values:
         base_params['e{:d}'.format(e_num)] = base_params.apply(
@@ -989,8 +1018,7 @@ def _attach_extra_params(base_params,
     return base_params
 
 
-def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
-                            ctrl_dose_fn):
+def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data, ctrl_dose_fn):
     is_viability = df_params._drmetric == 'viability'
     data_list = []
     if 'dataset' not in expt_dip_data.index.names:
@@ -1000,16 +1028,15 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
         expt_dip_data.reset_index(inplace=True)
         expt_dip_data.set_index(['dataset'] + old_index_cols, inplace=True)
     for grp, dip_grp in expt_dip_data.groupby(
-            ['dataset', 'cell_line', 'drug'], sort=False):
+        ['dataset', 'cell_line', 'drug'], sort=False
+    ):
         # Assumes drug combinations have been ruled out by fit_params_minimal
-        doses_expt = [d[0] for d in dip_grp.index.get_level_values(
-            'dose').values]
-        fit_data = {'dataset_id': grp[0],
-                    'cell_line': grp[1], 'drug': grp[2][0]}
+        doses_expt = [d[0] for d in dip_grp.index.get_level_values('dose').values]
+        fit_data = {'dataset_id': grp[0], 'cell_line': grp[1], 'drug': grp[2][0]}
 
-        ctrl_dip_data_cl = \
-            _get_control_responses(ctrl_dip_data, grp[0], grp[1],
-                                   dip_grp)
+        ctrl_dip_data_cl = _get_control_responses(
+            ctrl_dip_data, grp[0], grp[1], dip_grp
+        )
         if ctrl_dip_data_cl is not None:
             if is_viability:
                 ctrl_dip_data_cl = ctrl_dip_data_cl.to_frame()
@@ -1028,19 +1055,15 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
             fit_data['viability_time'] = dip_grp['timepoint'].values
             fit_data['viability'] = pd.Series(
                 data=dip_grp['viability'].values,
-                index=[doses_expt, dip_grp.index.get_level_values(
-                    'well_id')]
+                index=[doses_expt, dip_grp.index.get_level_values('well_id')],
             )
-            fit_data['viability'].index.rename(['dose', 'well_id'],
-                                               inplace=True)
+            fit_data['viability'].index.rename(['dose', 'well_id'], inplace=True)
         else:
             fit_data['dip_expt'] = pd.Series(
                 data=dip_grp['dip_rate'].values,
-                index=[doses_expt,
-                       dip_grp.index.get_level_values('well_id')]
+                index=[doses_expt, dip_grp.index.get_level_values('well_id')],
             )
-            fit_data['dip_expt'].index.rename(['dose', 'well_id'],
-                                              inplace=True)
+            fit_data['dip_expt'].index.rename(['dose', 'well_id'], inplace=True)
 
         data_list.append(fit_data)
 
@@ -1057,9 +1080,12 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data,
     return df_params
 
 
-def fit_params(ctrl_data, expt_data,
-               fit_cls=HillCurveLL4,
-               ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR):
+def fit_params(
+    ctrl_data,
+    expt_data,
+    fit_cls=HillCurveLL4,
+    ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
+):
     """
     Fit dose response curves to DIP rates or viability data
 
@@ -1086,11 +1112,12 @@ def fit_params(ctrl_data, expt_data,
     pd.DataFrame
         DataFrame containing DIP rate curve fits and parameters
     """
-    base_params = fit_params_minimal(ctrl_data, expt_data, fit_cls,
-                                     ctrl_dose_fn)
+    base_params = fit_params_minimal(ctrl_data, expt_data, fit_cls, ctrl_dose_fn)
 
     return fit_params_from_base(
-        base_params, ctrl_data, expt_data,
+        base_params,
+        ctrl_data,
+        expt_data,
         ctrl_dose_fn=ctrl_dose_fn,
         custom_ic_concentrations={50},
         custom_ec_concentrations={50},
@@ -1099,38 +1126,46 @@ def fit_params(ctrl_data, expt_data,
         include_hill=True,
         include_emax=True,
         include_einf=True,
-        include_response_values=True
+        include_response_values=True,
     )
 
 
 def fit_params_from_base(
-        base_params,
-        ctrl_resp_data=None, expt_resp_data=None,
-        ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
-        custom_ic_concentrations=frozenset(),
-        custom_ec_concentrations=frozenset(),
-        custom_e_values=frozenset(),
-        custom_e_rel_values=frozenset(),
-        include_aa=False,
-        include_auc=False,
-        include_hill=False,
-        include_emax=False,
-        include_einf=False,
-        include_response_values=True):
+    base_params,
+    ctrl_resp_data=None,
+    expt_resp_data=None,
+    ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
+    custom_ic_concentrations=frozenset(),
+    custom_ec_concentrations=frozenset(),
+    custom_e_values=frozenset(),
+    custom_e_rel_values=frozenset(),
+    include_aa=False,
+    include_auc=False,
+    include_hill=False,
+    include_emax=False,
+    include_einf=False,
+    include_response_values=True,
+):
     """
     Attach additional parameters to basic set of fit parameters
     """
-    df_params = _attach_extra_params(base_params, custom_ic_concentrations,
-                                     custom_ec_concentrations,
-                                     custom_e_values, custom_e_rel_values,
-                                     include_aa,
-                                     include_auc,
-                                     include_hill,
-                                     include_emax, include_einf)
+    df_params = _attach_extra_params(
+        base_params,
+        custom_ic_concentrations,
+        custom_ec_concentrations,
+        custom_e_values,
+        custom_e_rel_values,
+        include_aa,
+        include_auc,
+        include_hill,
+        include_emax,
+        include_einf,
+    )
 
     if include_response_values:
-        df_params = _attach_response_values(df_params, ctrl_resp_data,
-                                            expt_resp_data, ctrl_dose_fn)
+        df_params = _attach_response_values(
+            df_params, ctrl_resp_data, expt_resp_data, ctrl_dose_fn
+        )
 
     return df_params
 
@@ -1154,8 +1189,13 @@ def is_param_truncated(df_params, param_name):
     """
     values = df_params[param_name].fillna(value=np.nan)
     return np.isclose(
-        values, df_params['max_dose_measured'],
-        atol=PARAM_EQUAL_ATOL, rtol=PARAM_EQUAL_RTOL) | np.isclose(
-        values, df_params['min_dose_measured'],
-        atol=PARAM_EQUAL_ATOL, rtol=PARAM_EQUAL_RTOL
+        values,
+        df_params['max_dose_measured'],
+        atol=PARAM_EQUAL_ATOL,
+        rtol=PARAM_EQUAL_RTOL,
+    ) | np.isclose(
+        values,
+        df_params['min_dose_measured'],
+        atol=PARAM_EQUAL_ATOL,
+        rtol=PARAM_EQUAL_RTOL,
     )
