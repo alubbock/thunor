@@ -11,7 +11,7 @@ dependencies = [
     'scipy',
     # pandas >=3 has a bug with HDFStore + compression + StringDtype
     # https://github.com/pandas-dev/pandas/issues/64180
-    'pandas <3',
+    'pandas <4',
     'plotly',
     'seaborn',
     'tables',
