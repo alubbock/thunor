@@ -427,8 +427,11 @@ def plot_drc(
                 ctrl_name = '{} {}'.format(fp.Index[0], ctrl_name)
 
             if is_viability:
-                # viability times are in nanoseconds - convert
-                hoverlabels = [_secs_to_str(int(x) / 1e9) for x in fp.viability_time]
+                # viability times - convert to seconds
+                hoverlabels = [
+                    _secs_to_str(pd.Timedelta(x).total_seconds())
+                    for x in fp.viability_time
+                ]
             else:
                 hoverlabels = repl_name
 
