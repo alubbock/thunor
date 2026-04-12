@@ -144,7 +144,7 @@ def plotly_to_dataframe(plot_fig):
                 ptable.rename(
                     columns=lambda i: '{} {}'.format(trace_name, i), inplace=True
                 )
-                series.extend(col for _, col in ptable.iteritems())
+                series.extend(col for _, col in ptable.items())
         else:
             series.append(pd.Series(yvals, index=xvals, name=trace_name))
 

@@ -126,3 +126,14 @@ class TestWithDataset(unittest.TestCase):
         plate_data = self.dataset.plate('HTS007_149-28A', include_dip_rates=True)
         res = plot_plate_map(plate_data)
         assert isinstance(plotly_to_dataframe(res), pd.DataFrame)
+
+    def test_plotly_to_dataframe_non_unique_index_series(self):
+        xvals = pd.Index([0, 0, 1, 1], name='dose')
+        yvals = pd.Series([0.1, 0.2, 0.3, 0.4], index=xvals, name='dip_rate')
+        fig = {'data': [{'type': 'bar', 'x': xvals, 'y': yvals, 'name': 't'}]}
+
+        df = plotly_to_dataframe(fig)
+
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ['t 0', 't 1']
+        assert list(df.index) == [0, 1]

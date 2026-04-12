@@ -945,8 +945,11 @@ def _stack_doses(df_doses, inplace=True):
     if not inplace:
         df_doses = df_doses.copy()
 
-    # Aggregate multi-drugs into single column and drop the separates
-    df_doses.reset_index(inplace=True)
+    # Aggregate multi-drugs into single column and drop the separates.
+    # Callers are responsible for promoting any meaningful index levels to
+    # columns before calling this function (see read_hdf).  Here we only
+    # need to discard whatever integer index is currently present.
+    df_doses.reset_index(drop=True, inplace=True)
     drug_cols = df_doses.filter(regex='^drug[0-9]+$', axis=1)
     dose_cols = df_doses.filter(regex='^dose[0-9]+$', axis=1)
     n_drugs = len(drug_cols.columns)
@@ -1021,6 +1024,9 @@ def read_hdf(filename_or_buffer):
         Thunor HTS dataset
     """
     hts_pandas = _read_hdf_unstacked(filename_or_buffer)
+    # _stack_doses expects drug/dose index levels to already be regular
+    # columns; promote the MultiIndex from the HDF5 file before stacking.
+    hts_pandas.doses.reset_index(inplace=True)
     _stack_doses(hts_pandas.doses, inplace=True)
 
     if 'dataset' in hts_pandas.doses.columns:

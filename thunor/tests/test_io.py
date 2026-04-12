@@ -5,17 +5,82 @@ import tempfile
 import io
 import pytest
 import os
+import pandas as pd
 
 
 CSV_HEADER = 'cell.line,drug1.conc,drug1,upid,time,cell.count,well,drug1.units'
 
 
+def _flatten_doses(doses):
+    """Return doses as a flat, deterministically sorted DataFrame.
+
+    Drops the 'dataset' index level when present (the CSV format has no
+    dataset concept) and resets the remaining MultiIndex to columns.
+
+    ``well_id`` is excluded: in HDF5 it is a numeric database primary key;
+    after a CSV round-trip it is reconstructed as ``"<plate>__<well_num>"``.
+    The pair ``(plate, well_num)`` is unique per row and stable across both
+    formats, so we sort by that to give a deterministic, format-agnostic order.
+    """
+    d = doses.copy()
+    if 'dataset' in d.index.names:
+        d = d.reset_index('dataset', drop=True)
+    d = d.reset_index().drop(columns='well_id')
+    return d.sort_values(['plate', 'well_num']).reset_index(drop=True)
+
+
+def _flatten_assays(assays, doses):
+    """Return assays in a flat, deterministically sorted DataFrame.
+
+    Joins assays with doses on ``well_id`` to replace the format-specific
+    ``well_id`` with the stable ``(plate, well_num)`` pair, then sorts by
+    ``(assay, plate, well_num, timepoint)`` for a format-agnostic comparison.
+    """
+    doses_flat = doses.reset_index()
+    if 'dataset' in doses_flat.columns:
+        doses_flat = doses_flat.drop(columns='dataset')
+    doses_flat = doses_flat[['plate', 'well_num', 'well_id']]
+    a = assays.reset_index().merge(doses_flat, on='well_id').drop(columns='well_id')
+    return a.sort_values(['assay', 'plate', 'well_num', 'timepoint']).reset_index(
+        drop=True
+    )
+
+
+def _flatten_controls(controls):
+    """Return controls in a flat, deterministically sorted DataFrame.
+
+    Drops the format-specific ``dataset`` and ``well_id`` index levels.
+    ``well_num`` is a data column in controls and is stable across formats.
+    """
+    c = controls.copy()
+    for lvl in ('dataset', 'well_id'):
+        if lvl in c.index.names:
+            c = c.reset_index(lvl, drop=True)
+    c = c.reset_index()
+    return c.sort_values(
+        ['assay', 'cell_line', 'plate', 'well_num', 'timepoint']
+    ).reset_index(drop=True)
+
+
 def _assert_datasets_equal(d1, d2):
     assert d1.cell_lines == d2.cell_lines
     assert d1.drugs == d2.drugs
-    assert d1.doses.shape[0] == d2.doses.shape[0]
-    assert d1.controls.shape[0] == d2.controls.shape[0]
-    assert d1.assays.shape[0] == d2.assays.shape[0]
+    # Use check_dtype=False / check_index_type=False so that comparisons
+    # between StringDtype and object dtype (e.g. after an HDF5 round-trip
+    # that normalises types) still pass.
+    kw = dict(check_dtype=False, check_index_type=False)
+    pd.testing.assert_frame_equal(
+        _flatten_doses(d1.doses), _flatten_doses(d2.doses), **kw
+    )
+    pd.testing.assert_frame_equal(
+        _flatten_assays(d1.assays, d1.doses), _flatten_assays(d2.assays, d2.doses), **kw
+    )
+    if d1.controls is None:
+        assert d2.controls is None
+    else:
+        pd.testing.assert_frame_equal(
+            _flatten_controls(d1.controls), _flatten_controls(d2.controls), **kw
+        )
 
 
 def _check_csv(csv_data):
