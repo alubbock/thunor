@@ -16,10 +16,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import mock
 import os
 import sys
 from packaging.version import Version
+from unittest import mock
 import datetime
 
 sys.path.insert(0, os.path.abspath('../'))
