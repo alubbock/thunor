@@ -251,7 +251,23 @@ class HtsPandas(object):
     """
     High throughput screen dataset
 
-    Represented internally using pandas dataframes
+    Internally, the dataset is stored as three aligned pandas DataFrames:
+
+    * ``doses`` — one row per experiment well, indexed by
+      ``(drug, cell_line, dose)``.  The ``well_id`` column links to
+      ``assays``.
+    * ``assays`` — one row per (well, timepoint) measurement, indexed by
+      ``(assay, well_id, timepoint)``.
+    * ``controls`` — one row per (control well, timepoint) measurement,
+      indexed by ``(assay, cell_line, plate, well_id, timepoint)``.
+
+    **Multi-dataset mode.**  When multiple datasets are combined (e.g. by
+    Thunor Web), a ``'dataset'`` level is prepended to the index of each
+    DataFrame.  All pipeline functions (:func:`~thunor.dip.dip_rates`,
+    :func:`~thunor.viability.viability`,
+    :func:`~thunor.curve_fit.fit_params`) detect this level automatically
+    and partition their work by dataset.  HDF5 files that were saved with
+    a ``'dataset'`` index level preserve it on load.
 
     Parameters
     ----------
