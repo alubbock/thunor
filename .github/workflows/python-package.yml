@@ -36,3 +36,5 @@ jobs:
         pytest --nbval --sanitize-with doc/pytest-sanitize.ini --cov=thunor
     - name: Upload coverage
       uses: codecov/codecov-action@v6
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
