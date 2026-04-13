@@ -1,7 +1,5 @@
 from datetime import timedelta
 
-SECONDS_IN_HOUR = 3600
-
 
 def viability(df_data, *, time_hrs=72, assay_name=None, include_controls=True):
     """
@@ -98,8 +96,8 @@ def viability(df_data, *, time_hrs=72, assay_name=None, include_controls=True):
     if len(timepoints) == 1:
         time = timepoints[0]
 
-    df._viability_time = time
-    df._viability_assay = assay_name
+    df.attrs['viability_time'] = time
+    df.attrs['viability_assay'] = assay_name
 
     if include_controls:
         return df, controls['value']
