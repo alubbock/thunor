@@ -1019,10 +1019,23 @@ def fit_params_minimal(
     ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
 ):
     """
-    Fit dose response curves to DIP or viability, and calculate statistics
+    Fit dose-response curves and return core fit parameters
 
-    This function only fits curves and stores basic fit parameters. Use
-    :func:`fit_params` for more statistics and parameters.
+    This is the first stage of a two-stage fitting pipeline:
+
+    1. :func:`fit_params_minimal` — fits the curve and returns one row per
+       drug/cell-line combination with the fitted curve object (``fit_obj``),
+       E0, Emax, and observed response range.  Fast; suitable when only a
+       subset of derived statistics is needed.
+    2. :func:`fit_params_from_base` — takes the output of stage 1 and
+       attaches any requested derived statistics (IC50, EC50, AUC, AA, Hill
+       slope, Emax, per-well response values).
+
+    :func:`fit_params` is a convenience wrapper that runs both stages with
+    the standard set of statistics (IC50, EC50, AUC, AA, Hill, Emax).  Use
+    :func:`fit_params_minimal` + :func:`fit_params_from_base` directly when
+    you need a different subset of statistics, or when the full set is not
+    required for every call (e.g. interactive dashboards).
 
     Parameters
     ----------
@@ -1031,17 +1044,19 @@ def fit_params_minimal(
         Set to None to not use control data.
     expt_data: pd.DataFrame
         Experiment (non-control) DIP rates from :func:`dip_rates` or
-        :func:`expt_dip_rates`
+        :func:`expt_dip_rates`, or viability data from :func:`viability`
     fit_cls: Class
-        Class to use for curve fitting (default: :func:`HillCurveLL4`)
+        Class to use for curve fitting (default: :class:`HillCurveLL4`)
     ctrl_dose_fn: function
         Function to use to set an effective "dose" (non-zero) for controls.
-        Takes the list of experiment doses as an argument.
+        Takes the array of experiment doses as an argument.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing DIP rate curve fits and parameters
+        DataFrame with one row per drug/cell-line combination, containing
+        ``fit_obj``, ``e0``, ``emax``, ``min_dose_measured``,
+        ``max_dose_measured``, and ``emax_obs``.
     """
     expt_data_orig = expt_data
 
@@ -1447,11 +1462,15 @@ def fit_params(
     ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
 ):
     """
-    Fit dose response curves to DIP rates or viability data
+    Fit dose-response curves and return the full set of statistics
 
-    This method computes parameters including IC50, EC50, AUC, AA,
-    Hill coefficient, and Emax. For a faster version,
-    see :func:`fit_params_minimal`.
+    Convenience wrapper that runs :func:`fit_params_minimal` followed by
+    :func:`fit_params_from_base` with IC50, EC50, AUC, activity area, Hill
+    slope, Emax, and per-well response values all enabled.  The result is
+    suitable for passing directly to any :mod:`thunor.plots` function.
+
+    Use :func:`fit_params_minimal` + :func:`fit_params_from_base` directly
+    when you need a different or smaller subset of statistics.
 
     Parameters
     ----------
@@ -1462,15 +1481,16 @@ def fit_params(
         Experiment (non-control) DIP rates from :func:`dip_rates` or
         :func:`expt_dip_rates`, or viability data from :func:`viability`
     fit_cls: Class
-        Class to use for curve fitting (default: :func:`HillCurveLL4`)
+        Class to use for curve fitting (default: :class:`HillCurveLL4`)
     ctrl_dose_fn: function
         Function to use to set an effective "dose" (non-zero) for controls.
-        Takes the list of experiment doses as an argument.
+        Takes the array of experiment doses as an argument.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing DIP rate curve fits and parameters
+        DataFrame with one row per drug/cell-line combination containing
+        IC50, EC50, AUC, AA, Hill slope, Emax, and per-well response values.
     """
     base_params = fit_params_minimal(ctrl_data, expt_data, fit_cls, ctrl_dose_fn)
 
@@ -1507,7 +1527,51 @@ def fit_params_from_base(
     include_response_values=True,
 ):
     """
-    Attach additional parameters to basic set of fit parameters
+    Attach derived statistics to core fit parameters
+
+    Second stage of the two-stage fitting pipeline; see
+    :func:`fit_params_minimal` for an overview.  Call this function to
+    select exactly which statistics to compute, avoiding unnecessary work
+    when only a subset is required.
+
+    Parameters
+    ----------
+    base_params: pd.DataFrame
+        Output of :func:`fit_params_minimal`.
+    ctrl_resp_data: pd.DataFrame or None
+        Control DIP rates or viability values (used to attach per-well
+        control response columns).  Pass ``None`` to omit control columns.
+    expt_resp_data: pd.DataFrame or None
+        Experiment DIP rates or viability values (used to attach per-well
+        experiment response columns).  Pass ``None`` to omit.
+    ctrl_dose_fn: function
+        Function mapping experiment dose array to an effective control dose
+        for visualisation (default: min dose / 10).
+    custom_ic_concentrations: set of int
+        Effect levels at which to compute IC values, e.g. ``{50}`` for IC50.
+    custom_ec_concentrations: set of int
+        Effect levels at which to compute EC values, e.g. ``{50}`` for EC50.
+    custom_e_values: set of float
+        Doses at which to evaluate the fitted curve (absolute response).
+    custom_e_rel_values: set of float
+        Doses at which to evaluate the fitted curve (relative response).
+    include_aa: bool
+        Include activity area (default: False).
+    include_auc: bool
+        Include area under the curve (default: False).
+    include_hill: bool
+        Include Hill slope (default: False).
+    include_emax: bool
+        Include Emax at the highest measured dose (default: False).
+    include_einf: bool
+        Include Einf (asymptotic Emax from the fitted curve; default: False).
+    include_response_values: bool
+        Attach per-well DIP rate or viability columns (default: True).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``base_params`` with additional columns for the requested statistics.
     """
     df_params = _attach_extra_params(
         base_params,
