@@ -3,7 +3,7 @@ from datetime import timedelta
 SECONDS_IN_HOUR = 3600
 
 
-def viability(df_data, time_hrs=72, assay_name=None, include_controls=True):
+def viability(df_data, *, time_hrs=72, assay_name=None, include_controls=True):
     """
     Calculate viability at the specified time point
 
