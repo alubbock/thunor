@@ -7,9 +7,8 @@ import itertools
 import io
 import pathlib
 import re
-from .dip import _choose_dip_assay, dip_rates
+from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 
-SECONDS_IN_HOUR = 3600
 ZERO_TIMEDELTA = timedelta(0)
 ASCII_A = 65
 ALPHABET_LENGTH = 26
