@@ -582,7 +582,8 @@ def read_vanderbilt_hts(
     """
     Read a Vanderbilt HTS format file
 
-    See the wiki for a file format description
+    See :doc:`/vanderbilt_hts_format` for a full description of the file
+    format, including column definitions and an example.
 
     Parameters
     ----------
@@ -825,9 +826,10 @@ def read_vanderbilt_hts(
 
 def write_vanderbilt_hts(df_data, filename, plate_width=24, plate_height=16, sep=None):
     """
-    Read a Vanderbilt HTS format file
+    Write a Vanderbilt HTS format file
 
-    See the wiki for a file format description
+    See :doc:`/vanderbilt_hts_format` for a full description of the file
+    format, including column definitions and an example.
 
     Parameters
     ----------
