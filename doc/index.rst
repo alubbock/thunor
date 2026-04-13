@@ -21,7 +21,7 @@ web interface, Thunor Web), and further help see the `Thunor website`_.
 Quickstart
 ----------
 
-::
+.. code-block:: python
 
     from thunor.io import read_hdf
     from thunor.dip import dip_rates
