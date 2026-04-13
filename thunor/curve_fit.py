@@ -3,7 +3,6 @@ import scipy.optimize
 import scipy.stats
 from abc import abstractmethod
 import pandas as pd
-from decimal import Decimal, Overflow
 import warnings
 
 PARAM_EQUAL_ATOL = 1e-16
@@ -38,6 +37,8 @@ class HillCurve(object):
     """Base class defining Hill/log-logistic curve functionality"""
 
     fit_bounds = (-np.inf, np.inf)
+    curve_fit_kwargs = {}
+    curve_fit_kwargs_log = {}
     null_response_fn = np.mean
     max_fit_evals = None
 
@@ -134,6 +135,13 @@ class HillCurveLL4(HillCurve):
         self._popt_rel = None
 
     @classmethod
+    def undo_dose_scale(cls, popt, dose_scale):
+        """Undo dose scaling on linear-space popt (EC50 is at index 3)."""
+        popt = np.array(popt, dtype=float)
+        popt[3] *= dose_scale
+        return popt
+
+    @classmethod
     def fit_fn(cls, x, b, c, d, e):
         """
         Four parameter log-logistic function ("Hill curve")
@@ -157,6 +165,53 @@ class HillCurveLL4(HillCurve):
             Array of "y" values using the supplied curve fit parameters on "x"
         """
         return c + (d - c) / (1 + np.exp(b * (np.log(x) - np.log(e))))
+
+    @classmethod
+    def fit_fn_log(cls, x, b, c, d, log_e):
+        """LL4 Hill curve with log-transformed EC50 (log_e = log(e)).
+
+        Using log(EC50) as the optimisation parameter removes the positivity
+        constraint on e, enabling the faster Levenberg-Marquardt solver.
+        """
+        return c + (d - c) / (1.0 + np.exp(b * (np.log(x) - log_e)))
+
+    @classmethod
+    def jac_fn_log(cls, x, b, c, d, log_e):
+        """Analytic Jacobian of LL4 w.r.t. (b, c, d, log_e).
+
+        Avoids ~4 finite-difference evaluations per optimiser step.
+        """
+        log_x = np.log(x)
+        s = np.exp(b * (log_x - log_e))
+        denom = 1.0 + s
+        denom_sq = denom * denom
+
+        j_b = -(d - c) * s * (log_x - log_e) / denom_sq
+        j_c = s / denom  # = 1 - 1/denom
+        j_d = 1.0 / denom
+        j_log_e = (d - c) * b * s / denom_sq
+
+        jac = np.column_stack((j_b, j_c, j_d, j_log_e))
+        jac[np.isnan(jac)] = 0.0
+        return jac
+
+    @classmethod
+    def initial_guess_log(cls, x, y, dose_scale=1.0):
+        """Initial guess in log-EC50 space, accounting for dose scaling."""
+        b, c, d, e = cls.initial_guess(x, y)
+        with np.errstate(divide='ignore'):
+            log_e = np.log(e / dose_scale)
+        return b, c, d, log_e
+
+    @classmethod
+    def transform_popt_from_log(cls, popt, dose_scale=1.0):
+        """Back-transform popt from log-EC50 space to linear EC50."""
+        popt = np.array(popt, dtype=float)
+        popt[3] = np.exp(popt[3]) * dose_scale
+        return popt
+
+    # Bounds in log-EC50 space: no bound on log_e (was e > 0)
+    fit_bounds_log = (-np.inf, np.inf)
 
     @classmethod
     def initial_guess(cls, x, y):
@@ -223,9 +278,10 @@ class HillCurveLL4(HillCurve):
 
         ic_frac = ic_num / 100.0
 
-        icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
-            1 / self.hill_slope
-        )
+        with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
+            icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
+                1 / self.hill_slope
+            )
 
         # Overflow will lead to -inf, which we deal with here
         if np.isnan(icN) or np.isinf(icN):
@@ -276,11 +332,15 @@ class HillCurveLL4(HillCurve):
             # TODO: Calculate AUC for ascending curves
             return None
 
-        min_conc_hill = min_conc**self.hill_slope
-        return (
-            np.log10((self.ec50**self.hill_slope + min_conc_hill) / min_conc_hill)
-            / self.hill_slope
-        ) * ((e0 - emax) / e0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            min_conc_hill = min_conc**self.hill_slope
+            result = (
+                np.log10((self.ec50**self.hill_slope + min_conc_hill) / min_conc_hill)
+                / self.hill_slope
+            ) * ((e0 - emax) / e0)
+        if np.isnan(result) or np.isinf(result):
+            return None
+        return result
 
     def aa(self, min_conc, max_conc):
         """
@@ -306,24 +366,33 @@ class HillCurveLL4(HillCurve):
             # TODO: Calculate AA for ascending curves
             return None
 
-        hill = Decimal(self.hill_slope)
-        try:
-            ec50_hill = Decimal(self.ec50) ** hill
-            min_conc = Decimal(min_conc)
-            max_conc = Decimal(max_conc)
+        hill = self.hill_slope
+        ec50 = self.ec50
+        log_ec50 = np.log10(ec50)
 
-            return np.float64(
-                (
-                    (ec50_hill + max_conc**hill).log10()
-                    - (ec50_hill + min_conc**hill).log10()
-                )
+        # Use log-space arithmetic to avoid overflow from ec50**hill or conc**hill.
+        # log10(ec50^h + x^h) = h*log10(ec50) + log10(1 + (x/ec50)^h)
+        #                      = h*log10(ec50) + log10(1 + 10^(h*(log10(x)-log10(ec50))))
+        # The ec50^h terms cancel in the difference, leaving:
+        # aa = [log10(1 + 10^r_max) - log10(1 + 10^r_min)] / hill * (e0-emax)/e0
+        # where r = hill * (log10(x) - log10(ec50))
+        def _log10_1p_pow10(r):
+            # log10(1 + 10^r), numerically stable for large |r|
+            if r > 100.0:
+                return r  # 10^r >> 1
+            return np.log10(1.0 + 10.0**r)
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            r_max = hill * (np.log10(max_conc) - log_ec50)
+            r_min = hill * (np.log10(min_conc) - log_ec50)
+            result = (
+                (_log10_1p_pow10(r_max) - _log10_1p_pow10(r_min))
                 / hill
-            ) * ((e0 - emax) / e0)
-        except Overflow:
-            warnings.warn(
-                'Overflow finding activity area (Hill coeff.: {:.4g})'.format(hill)
+                * ((e0 - emax) / e0)
             )
+        if np.isnan(result) or np.isinf(result):
             return None
+        return result
 
     @property
     def divisor(self):
@@ -346,6 +415,11 @@ class HillCurveLL3u(HillCurveLL4):
 
     # Constrain 0<=emax<=1, Hill slope +ve
     fit_bounds = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
+    curve_fit_kwargs = {'method': 'dogbox'}
+    # In log-EC50 space: bounds only on b (slope ≥ 0) and c (0 ≤ emax ≤ 1);
+    # no bound needed on log_e since exp(log_e) > 0 always
+    fit_bounds_log = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
+    curve_fit_kwargs_log = {'method': 'dogbox', 'x_scale': 'jac'}
     max_fit_evals = None
 
     @staticmethod
@@ -376,6 +450,27 @@ class HillCurveLL3u(HillCurveLL4):
         return super(HillCurveLL3u, cls).fit_fn(x, b, c, 1.0, e)
 
     @classmethod
+    def fit_fn_log(cls, x, b, c, log_e):
+        """LL3u Hill curve with log-transformed EC50."""
+        return c + (1.0 - c) / (1.0 + np.exp(b * (np.log(x) - log_e)))
+
+    @classmethod
+    def jac_fn_log(cls, x, b, c, log_e):
+        """Analytic Jacobian of LL3u w.r.t. (b, c, log_e)."""
+        log_x = np.log(x)
+        s = np.exp(b * (log_x - log_e))
+        denom = 1.0 + s
+        denom_sq = denom * denom
+
+        j_b = -(1.0 - c) * s * (log_x - log_e) / denom_sq
+        j_c = s / denom
+        j_log_e = (1.0 - c) * b * s / denom_sq
+
+        jac = np.column_stack((j_b, j_c, j_log_e))
+        jac[np.isnan(jac)] = 0.0
+        return jac
+
+    @classmethod
     def initial_guess(cls, x, y):
         hill, emax, _, ec50 = super().initial_guess(x, y)
         if emax < 0.0:
@@ -383,6 +478,26 @@ class HillCurveLL3u(HillCurveLL4):
         elif emax > 1.0:
             emax = 1.0
         return hill, emax, ec50
+
+    @classmethod
+    def initial_guess_log(cls, x, y, dose_scale=1.0):
+        b, c, e = cls.initial_guess(x, y)
+        with np.errstate(divide='ignore'):
+            log_e = np.log(e / dose_scale)
+        return b, c, log_e
+
+    @classmethod
+    def transform_popt_from_log(cls, popt, dose_scale=1.0):
+        popt = np.array(popt, dtype=float)
+        popt[2] = np.exp(popt[2]) * dose_scale
+        return popt
+
+    @classmethod
+    def undo_dose_scale(cls, popt, dose_scale):
+        """Undo dose scaling on linear-space popt (EC50 is at index 2)."""
+        popt = np.array(popt, dtype=float)
+        popt[2] *= dose_scale
+        return popt
 
     @property
     def ec50(self):
@@ -401,6 +516,11 @@ class HillCurveLL3u(HillCurveLL4):
 
 
 class HillCurveLL2(HillCurveLL3u):
+    fit_bounds = ((0.0, -np.inf), (np.inf, np.inf))
+    # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
+    fit_bounds_log = (-np.inf, np.inf)
+    curve_fit_kwargs_log = {}
+
     @classmethod
     def fit_fn(cls, x, b, e):
         """
@@ -423,9 +543,49 @@ class HillCurveLL2(HillCurveLL3u):
         return super(HillCurveLL3u, cls).fit_fn(x, b, 0.0, 1.0, e)
 
     @classmethod
+    def fit_fn_log(cls, x, b, log_e):
+        """LL2 Hill curve with log-transformed EC50."""
+        return 1.0 / (1.0 + np.exp(b * (np.log(x) - log_e)))
+
+    @classmethod
+    def jac_fn_log(cls, x, b, log_e):
+        """Analytic Jacobian of LL2 w.r.t. (b, log_e)."""
+        log_x = np.log(x)
+        s = np.exp(b * (log_x - log_e))
+        denom = 1.0 + s
+        denom_sq = denom * denom
+
+        j_b = -s * (log_x - log_e) / denom_sq
+        j_log_e = b * s / denom_sq
+
+        jac = np.column_stack((j_b, j_log_e))
+        jac[np.isnan(jac)] = 0.0
+        return jac
+
+    @classmethod
     def initial_guess(cls, x, y):
         b, _, _, e = super(HillCurveLL3u, cls).initial_guess(x, y)
         return b, e
+
+    @classmethod
+    def initial_guess_log(cls, x, y, dose_scale=1.0):
+        b, e = cls.initial_guess(x, y)
+        with np.errstate(divide='ignore'):
+            log_e = np.log(e / dose_scale)
+        return b, log_e
+
+    @classmethod
+    def transform_popt_from_log(cls, popt, dose_scale=1.0):
+        popt = np.array(popt, dtype=float)
+        popt[1] = np.exp(popt[1]) * dose_scale
+        return popt
+
+    @classmethod
+    def undo_dose_scale(cls, popt, dose_scale):
+        """Undo dose scaling on linear-space popt (EC50 is at index 1)."""
+        popt = np.array(popt, dtype=float)
+        popt[1] *= dose_scale
+        return popt
 
     @property
     def ec50(self):
@@ -444,6 +604,71 @@ class HillCurveLL2(HillCurveLL3u):
         if self._popt_rel is None:
             self._popt_rel = self.popt.copy()
         return self._popt_rel
+
+
+def _sanitise_initial_guess(p0, fit_bounds, scaled_doses, use_log_path, fit_cls):
+    """Clip initial guess parameters to lie within fit bounds and sensible
+    ranges.
+
+    Prevents two common failure modes:
+    1. Negative Hill slope (b) for bounded models (LL3u/LL2) raising
+       ``ValueError: Initial guess is outside provided bounds``.
+    2. Wildly extrapolated EC50 (log_e far outside dose range) causing
+       Levenberg-Marquardt maxfev exhaustion.
+    """
+    p0 = list(p0)
+
+    # --- Clip each element to within its bounds ---
+    lb, ub = fit_bounds
+    if np.ndim(lb) == 0:
+        lb = np.full(len(p0), lb)
+    if np.ndim(ub) == 0:
+        ub = np.full(len(p0), ub)
+    lb = np.asarray(lb, dtype=float)
+    ub = np.asarray(ub, dtype=float)
+
+    for i in range(len(p0)):
+        if np.isnan(p0[i]) or np.isinf(p0[i]):
+            p0[i] = 0.5 * (lb[i] + ub[i]) if np.isfinite(lb[i] + ub[i]) else 0.0
+        if np.isfinite(lb[i]) and p0[i] < lb[i]:
+            p0[i] = lb[i]
+        if np.isfinite(ub[i]) and p0[i] > ub[i]:
+            p0[i] = ub[i]
+
+    # --- Fix degenerate Hill slope ---
+    # b = 0 makes the gradient w.r.t. EC50 vanish → solver stalls.
+    # For bounded models (b ≥ 0 lower bound), use 1.0 as a safe default.
+    b_idx = 0  # Hill slope is always the first parameter
+    if np.isfinite(lb[b_idx]) and lb[b_idx] >= 0.0 and p0[b_idx] < 0.01:
+        p0[b_idx] = 1.0
+
+    # --- Clamp EC50 / log_e to ±1 decade beyond measured dose range ---
+    positive_doses = scaled_doses[scaled_doses > 0]
+    if len(positive_doses) > 0:
+        log_min = np.log(np.min(positive_doses))
+        log_max = np.log(np.max(positive_doses))
+        margin = np.log(10.0)  # 1 decade
+        log_lo = log_min - margin
+        log_hi = log_max + margin
+
+        if use_log_path:
+            # log_e is the last parameter
+            e_idx = len(p0) - 1
+            if p0[e_idx] < log_lo:
+                p0[e_idx] = log_lo
+            elif p0[e_idx] > log_hi:
+                p0[e_idx] = log_hi
+        else:
+            # EC50 in linear space is the last parameter
+            e_idx = len(p0) - 1
+            e_lo = np.exp(log_lo)
+            e_hi = np.exp(log_hi)
+            if p0[e_idx] < e_lo:
+                p0[e_idx] = e_lo
+            elif p0[e_idx] > e_hi:
+                p0[e_idx] = e_hi
+
+    return p0
 
 
 def fit_drc(
@@ -502,22 +727,88 @@ def fit_drc(
         # Occurs when doses/responses is empty
         return None
 
-    curve_initial_guess = fit_cls.initial_guess(doses, responses)
-    try:
-        popt, pcov = scipy.optimize.curve_fit(
-            fit_cls.fit_fn,
-            doses,
-            responses,
-            bounds=fit_cls.fit_bounds,
-            p0=curve_initial_guess,
-            sigma=response_std_errs,
-            maxfev=fit_cls.max_fit_evals,
+    doses = np.asarray(doses, dtype=float)
+    responses = np.asarray(responses, dtype=float)
+
+    # Decide whether to use the log-EC50 parameterisation.
+    #
+    # The log-EC50 transform has two benefits:
+    #   1. Removes the positivity bound on EC50, enabling the faster
+    #      Levenberg-Marquardt solver when all other bounds are also absent.
+    #   2. Provides an analytic Jacobian (avoids ~4 finite-difference evals
+    #      per optimiser step).
+    #
+    # Path selection per curve class:
+    #
+    #   LL4 (fully unbounded): log path + Python fn + no Jacobian.
+    #     Log-transform removes all bounds → scipy uses LM (unconstrained),
+    #     which is faster than TRF on this problem.
+    #
+    #   LL3u / LL2 (bounded b and/or c): log path + Python fn + Python Jacobian.
+    #     These classes still have bounds, so TRF is always used.  The analytic
+    #     Jacobian reduces TRF iterations and dominates any other optimisation.
+    #
+    #   Fallback (no log variant defined): linear path, plain Python fn.
+    has_log_variant = hasattr(fit_cls, 'fit_fn_log')
+    use_log_path = has_log_variant
+
+    if use_log_path:
+        fit_fn = fit_cls.fit_fn_log
+        # LL4 uses LM (unconstrained); Jacobian not needed and adds overhead
+        jac_fn = None if fit_cls is HillCurveLL4 else fit_cls.jac_fn_log
+        fit_bounds = fit_cls.fit_bounds_log
+        curve_fit_kwargs = fit_cls.curve_fit_kwargs_log
+    else:
+        fit_fn = fit_cls.fit_fn
+        jac_fn = None
+        fit_bounds = fit_cls.fit_bounds
+        curve_fit_kwargs = fit_cls.curve_fit_kwargs
+
+    # Dose-scale normalisation: centre doses on a log scale to reduce
+    # floating-point precision issues across extreme concentration ranges.
+    # Mirrors the approach in the synergy package.  Only applied on the log
+    # path where the required back-transform methods are available.
+    can_dose_scale = use_log_path and hasattr(fit_cls, 'transform_popt_from_log')
+    if can_dose_scale:
+        positive_doses = doses[doses > 0]
+        dose_scale = (
+            np.exp(np.median(np.log(positive_doses)))
+            if len(positive_doses) > 0
+            else 1.0
         )
+    else:
+        dose_scale = 1.0
+    scaled_doses = doses / dose_scale
+
+    if use_log_path:
+        curve_initial_guess = fit_cls.initial_guess_log(
+            scaled_doses, responses, dose_scale=1.0
+        )
+    else:
+        curve_initial_guess = fit_cls.initial_guess(scaled_doses, responses)
+
+    curve_initial_guess = _sanitise_initial_guess(
+        curve_initial_guess, fit_bounds, scaled_doses, use_log_path, fit_cls
+    )
+
+    popt = None
+    try:
+        with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+            popt, pcov = scipy.optimize.curve_fit(
+                fit_fn,
+                scaled_doses,
+                responses,
+                bounds=fit_bounds,
+                p0=curve_initial_guess,
+                sigma=response_std_errs,
+                maxfev=fit_cls.max_fit_evals,
+                jac=jac_fn,
+                **curve_fit_kwargs,
+            )
     except RuntimeError:
-        # Some numerical issue with curve fitting
-        return None
+        pass  # fall through to fallback or return None below
     except ValueError:
-        return None
+        pass  # fall through to fallback (e.g. degenerate data)
     except TypeError as te:
         # This occurs if there are fewer data points than parameters
         te_str = str(te)
@@ -529,9 +820,56 @@ def fit_drc(
         else:
             raise
 
-    if any(np.isnan(popt)):
-        # Ditto
+    # If log-EC50 fit did not converge, retry with the original linear-EC50
+    # parameterisation (no Jacobian, but handles degenerate cases better).
+    if popt is None and use_log_path:
+        fallback_guess = fit_cls.initial_guess(scaled_doses, responses)
+        fallback_guess = _sanitise_initial_guess(
+            fallback_guess,
+            fit_cls.fit_bounds,
+            scaled_doses,
+            use_log_path=False,
+            fit_cls=fit_cls,
+        )
+        try:
+            with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+                popt, pcov = scipy.optimize.curve_fit(
+                    fit_cls.fit_fn,
+                    scaled_doses,
+                    responses,
+                    bounds=fit_cls.fit_bounds,
+                    p0=fallback_guess,
+                    sigma=response_std_errs,
+                    maxfev=fit_cls.max_fit_evals,
+                    **fit_cls.curve_fit_kwargs,
+                )
+        except RuntimeError:
+            return None
+        except ValueError:
+            return None
+        except TypeError as te:
+            te_str = str(te)
+            if 'Improper input:' in te_str or te_str.startswith(
+                'The number of func parameters'
+            ):
+                warnings.warn(te_str)
+                return None
+            else:
+                raise
+        # Fallback popt is in linear EC50 + scaled-dose space; undo dose scale
+        if hasattr(fit_cls, 'undo_dose_scale') and dose_scale != 1.0:
+            popt = fit_cls.undo_dose_scale(popt, dose_scale)
+        use_log_path = False  # popt is already in linear space
+
+    if popt is None or any(np.isnan(popt)):
         return None
+
+    # Back-transform from log-EC50 space and undo dose scaling
+    if use_log_path:
+        popt = fit_cls.transform_popt_from_log(popt, dose_scale=dose_scale)
+    elif dose_scale != 1.0 and hasattr(fit_cls, 'undo_dose_scale'):
+        # Linear-space primary fit: undo dose scaling
+        popt = fit_cls.undo_dose_scale(popt, dose_scale)
 
     fit_obj = fit_cls(popt)
 
@@ -545,7 +883,8 @@ def fit_drc(
 
         df = len(doses) - len(popt)
 
-        f_ratio = (ssq_null - ssq_model) / (ssq_model / df)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            f_ratio = (ssq_null - ssq_model) / (ssq_model / df)
         p = 1 - scipy.stats.f.cdf(f_ratio, 1, df)
 
         if p > null_rejection_threshold:
@@ -553,6 +892,14 @@ def fit_drc(
 
     if fit_obj.ec50 < np.min(doses):
         # Reject fit if EC50 less than min dose
+        return None
+
+    if fit_cls is not HillCurveLL4 and fit_obj.ec50 > 10.0 * np.max(doses):
+        # Reject fit if EC50 more than a decade above max dose — the curve's
+        # transition lies well beyond the measured range.  A 10x margin keeps
+        # borderline fits where the drug effect is partially observed.
+        # Only for constrained models (LL3u/LL2); LL4 fits with EC50 above
+        # the dose range can still characterise the observed partial response.
         return None
 
     if ctrl_dose_test:
@@ -841,32 +1188,6 @@ def fit_params_minimal(
     return df_params
 
 
-def _calc_ic(row, ic_num):
-    if row.fit_obj is None:
-        return None
-
-    ic_n = row.fit_obj.ic(ic_num=ic_num)
-    if ic_n is None:
-        return None
-
-    ic_n = np.min((ic_n, row.max_dose_measured))
-    ic_n = np.max((ic_n, row.min_dose_measured))
-    return ic_n
-
-
-def _calc_ec(row, ec_num):
-    if row.fit_obj is None:
-        return None
-
-    ec_n = row.fit_obj.ec(ec_num=ec_num)
-    if ec_n is None:
-        return None
-
-    ec_n = np.min((ec_n, row.max_dose_measured))
-    ec_n = np.max((ec_n, row.min_dose_measured))
-    return ec_n
-
-
 def _calc_e(row, ec_lbl, relative=False):
     if row.fit_obj is None:
         return None
@@ -876,31 +1197,6 @@ def _calc_e(row, ec_lbl, relative=False):
         return None
 
     return row.fit_obj.fit_rel(ec_val) if relative else row.fit_obj.fit(ec_val)
-
-
-def _calc_aa(row):
-    if not row.fit_obj:
-        return None
-
-    return row.fit_obj.aa(
-        min_conc=row.min_dose_measured, max_conc=row.max_dose_measured
-    )
-
-
-def _calc_auc(row):
-    if not row.fit_obj:
-        return None
-
-    return row.fit_obj.auc(min_conc=row.min_dose_measured)
-
-
-def _calc_ec50(row):
-    if not row.fit_obj or row.fit_obj.ec50 is None:
-        return None
-
-    ec50 = np.min((row.fit_obj.ec50, row.max_dose_measured))
-    ec50 = np.max((ec50, row.min_dose_measured))
-    return ec50
 
 
 def _attach_extra_params(
@@ -956,61 +1252,116 @@ def _attach_extra_params(
 
     base_params['label'] = base_params.index.map(_generate_label)
 
-    for ic_num in custom_ic_concentrations:
-        base_params['ic{:d}'.format(ic_num)] = base_params.apply(
-            _calc_ic, args=(ic_num,), axis=1
-        )
-
-    if 50 in custom_ec_concentrations:
-        base_params['ec50'] = base_params.apply(_calc_ec50, axis=1)
-
-    if include_emax:
-        base_params['emax'] = base_params.apply(
-            lambda row: (
-                None if not row.fit_obj else row.fit_obj.fit(row.max_dose_measured)
-            ),
-            axis=1,
-        )
-
-    if include_einf:
-        base_params['einf'] = base_params.apply(
-            lambda row: None if not row.fit_obj else row.fit_obj.emax, axis=1
-        )
-
     is_viability = base_params._drmetric == 'viability'
+
+    # Determine which per-row columns are needed
+    need_ec50 = 50 in custom_ec_concentrations
+    ic_nums = sorted(custom_ic_concentrations)
+    custom_ec_concentrations = set(custom_ec_concentrations)
+    custom_ec_concentrations.discard(50)
+    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_values)
+    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_rel_values)
+    ec_nums = sorted(custom_ec_concentrations)
+    e_nums = sorted(custom_e_values)
+    e_rel_nums = sorted(custom_e_rel_values)
+
+    need_any = (
+        ic_nums
+        or need_ec50
+        or include_emax
+        or include_einf
+        or include_aa
+        or include_auc
+        or include_hill
+        or ec_nums
+    )
+
+    if need_any:
+        fit_objs = base_params['fit_obj'].to_numpy()
+        max_doses = base_params['max_dose_measured'].to_numpy()
+        min_doses = base_params['min_dose_measured'].to_numpy()
+        n = len(fit_objs)
+
+        # Pre-allocate output lists
+        ic_cols = {num: [None] * n for num in ic_nums}
+        ec50_col = [None] * n if need_ec50 else None
+        emax_col = [None] * n if include_emax else None
+        einf_col = [None] * n if include_einf else None
+        aa_col = [None] * n if include_aa else None
+        auc_col = [None] * n if include_auc else None
+        hill_col = [None] * n if include_hill else None
+        ec_cols = {num: [None] * n for num in ec_nums}
+
+        for i in range(n):
+            fo = fit_objs[i]
+            if not fo:
+                continue
+            max_d = max_doses[i]
+            min_d = min_doses[i]
+
+            for ic_num in ic_nums:
+                ic_v = fo.ic(ic_num=ic_num)
+                if ic_v is not None:
+                    ic_cols[ic_num][i] = float(min(max(ic_v, min_d), max_d))
+
+            if need_ec50 and fo.ec50 is not None:
+                ec50_col[i] = float(min(max(fo.ec50, min_d), max_d))
+
+            if include_emax:
+                emax_col[i] = fo.fit(max_d)
+
+            if include_einf:
+                einf_col[i] = fo.emax
+
+            if include_aa:
+                aa_col[i] = fo.aa(min_conc=min_d, max_conc=max_d)
+
+            if include_auc:
+                auc_col[i] = fo.auc(min_conc=min_d)
+
+            if include_hill:
+                hill_col[i] = fo.hill_slope
+
+            for ec_num in ec_nums:
+                ec_v = fo.ec(ec_num=ec_num)
+                if ec_v is not None:
+                    ec_cols[ec_num][i] = float(min(max(ec_v, min_d), max_d))
+
+        for ic_num in ic_nums:
+            base_params['ic{:d}'.format(ic_num)] = ic_cols[ic_num]
+
+        if need_ec50:
+            base_params['ec50'] = ec50_col
+
+        if include_emax:
+            base_params['emax'] = emax_col
+
+        if include_einf:
+            base_params['einf'] = einf_col
+
+        if include_aa:
+            base_params['aa'] = aa_col
+
+        if include_auc:
+            base_params['auc'] = auc_col
+
+        if include_hill:
+            base_params['hill'] = hill_col
+
+        for ec_num in ec_nums:
+            base_params['ec{:d}'.format(ec_num)] = ec_cols[ec_num]
 
     if not is_viability and include_emax:
         divisor = base_params['fit_obj'].apply(lambda fo: fo.divisor if fo else None)
         base_params['emax_rel'] = base_params['emax'] / divisor
         base_params['emax_obs_rel'] = base_params['emax_obs'] / divisor
 
-    if include_aa:
-        base_params['aa'] = base_params.apply(_calc_aa, axis=1)
-
-    if include_auc:
-        base_params['auc'] = base_params.apply(_calc_auc, axis=1)
-
-    if include_hill:
-        base_params['hill'] = base_params['fit_obj'].apply(
-            lambda fo: fo.hill_slope if fo else None
-        )
-
-    custom_ec_concentrations = set(custom_ec_concentrations)
-    custom_ec_concentrations.discard(50)
-    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_values)
-    custom_ec_concentrations = custom_ec_concentrations.union(custom_e_rel_values)
-
-    for ec_num in custom_ec_concentrations:
-        base_params['ec{:d}'.format(ec_num)] = base_params.apply(
-            _calc_ec, args=(ec_num,), axis=1
-        )
-
-    for e_num in custom_e_values:
+    for e_num in e_nums:
         base_params['e{:d}'.format(e_num)] = base_params.apply(
             _calc_e, args=('ec{:d}'.format(e_num), False), axis=1
         )
 
-    for e_num in custom_e_rel_values:
+    for e_num in e_rel_nums:
         base_params['e{:d}_rel'.format(e_num)] = base_params.apply(
             _calc_e, args=('ec{:d}'.format(e_num), True), axis=1
         )

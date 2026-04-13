@@ -8,4 +8,11 @@ def test_fit_drc_3_data_points():
 
 def test_fit_drc_4_data_points():
     # 4 parameter fit with 4 data points - this should work
-    assert isinstance(fit_drc([1, 2, 3, 4], [5, 6, 7, 8]), HillCurveLL4)
+    # Use sigmoidal data with EC50 within dose range
+    assert isinstance(
+        fit_drc(
+            [1, 2, 3, 4],
+            [0.8759, 0.6488, 0.4689, 0.3528],
+        ),
+        HillCurveLL4,
+    )
