@@ -791,20 +791,26 @@ def fit_drc(
         curve_initial_guess, fit_bounds, scaled_doses, use_log_path, fit_cls
     )
 
+    param_count = len(curve_initial_guess)
+    if len(scaled_doses) < param_count:
+        return None
+
     popt = None
     try:
-        with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
-            popt, pcov = scipy.optimize.curve_fit(
-                fit_fn,
-                scaled_doses,
-                responses,
-                bounds=fit_bounds,
-                p0=curve_initial_guess,
-                sigma=response_std_errs,
-                maxfev=fit_cls.max_fit_evals,
-                jac=jac_fn,
-                **curve_fit_kwargs,
-            )
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', scipy.optimize.OptimizeWarning)
+            with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+                popt, pcov = scipy.optimize.curve_fit(
+                    fit_fn,
+                    scaled_doses,
+                    responses,
+                    bounds=fit_bounds,
+                    p0=curve_initial_guess,
+                    sigma=response_std_errs,
+                    maxfev=fit_cls.max_fit_evals,
+                    jac=jac_fn,
+                    **curve_fit_kwargs,
+                )
     except RuntimeError:
         pass  # fall through to fallback or return None below
     except ValueError:
@@ -815,7 +821,6 @@ def fit_drc(
         if 'Improper input:' in te_str or te_str.startswith(
             'The number of func parameters'
         ):
-            warnings.warn(te_str)
             return None
         else:
             raise
@@ -832,17 +837,22 @@ def fit_drc(
             fit_cls=fit_cls,
         )
         try:
-            with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
-                popt, pcov = scipy.optimize.curve_fit(
-                    fit_cls.fit_fn,
-                    scaled_doses,
-                    responses,
-                    bounds=fit_cls.fit_bounds,
-                    p0=fallback_guess,
-                    sigma=response_std_errs,
-                    maxfev=fit_cls.max_fit_evals,
-                    **fit_cls.curve_fit_kwargs,
-                )
+            if len(scaled_doses) < len(fallback_guess):
+                return None
+
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', scipy.optimize.OptimizeWarning)
+                with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+                    popt, pcov = scipy.optimize.curve_fit(
+                        fit_cls.fit_fn,
+                        scaled_doses,
+                        responses,
+                        bounds=fit_cls.fit_bounds,
+                        p0=fallback_guess,
+                        sigma=response_std_errs,
+                        maxfev=fit_cls.max_fit_evals,
+                        **fit_cls.curve_fit_kwargs,
+                    )
         except RuntimeError:
             return None
         except ValueError:
@@ -852,7 +862,6 @@ def fit_drc(
             if 'Improper input:' in te_str or te_str.startswith(
                 'The number of func parameters'
             ):
-                warnings.warn(te_str)
                 return None
             else:
                 raise

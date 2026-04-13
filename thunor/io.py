@@ -711,9 +711,11 @@ def read_vanderbilt_hts(
     # Check for duplicate drugs in any row
     if len(drug_nums) == 2:
         # Ignore rows where both concentrations are zero
+        has_drug1 = df['drug1'].fillna('').astype(str) != ''
         dup_drugs = df.loc[
-            ((df['drug1.conc'] != 0) | (df['drug2.conc'] != 0)) & df['drug1']
-            == df['drug2'],
+            ((df['drug1.conc'] != 0) | (df['drug2.conc'] != 0))
+            & has_drug1
+            & (df['drug1'] == df['drug2']),
             :,
         ]
         if not dup_drugs.empty:
