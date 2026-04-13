@@ -7,6 +7,7 @@ import itertools
 import io
 import pathlib
 import re
+import warnings
 from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 
 ZERO_TIMEDELTA = timedelta(0)
@@ -936,6 +937,7 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
     with pd.HDFStore(filepath, 'w', complib='zlib', complevel=9, **extra_kwargs) as hdf:
         hdf.root._v_attrs.generator = package_name
         hdf.root._v_attrs.generator_version = __version__
+        hdf.root._v_attrs.schema_version = 1
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
         hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
@@ -1053,7 +1055,26 @@ def _read_hdf_unstacked(filename_or_buffer):
                 'driver_core_image': filename_or_buffer,
             }
         )
+    _CURRENT_SCHEMA_VERSION = 1
     with pd.HDFStore(**hdf_kwargs) as hdf:
+        schema_version = getattr(hdf.root._v_attrs, 'schema_version', None)
+        if schema_version is None:
+            warnings.warn(
+                'This HDF5 file has no schema_version attribute and may have been '
+                'written by an older version of thunor. If you encounter errors, '
+                'try re-exporting the data using the current version.',
+                UserWarning,
+                stacklevel=3,
+            )
+        elif schema_version > _CURRENT_SCHEMA_VERSION:
+            warnings.warn(
+                f'This HDF5 file uses schema version {schema_version}, but this '
+                f'version of thunor only supports up to version '
+                f'{_CURRENT_SCHEMA_VERSION}. Upgrade thunor to avoid compatibility '
+                f'issues.',
+                UserWarning,
+                stacklevel=3,
+            )
         df_assays = hdf['assays']
         try:
             df_controls = hdf['controls']
