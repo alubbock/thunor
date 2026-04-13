@@ -483,8 +483,6 @@ def _read_vanderbilt_hts_single_df(
     """
     Read a Vanderbilt HTS format file as a single dataframe
 
-    See the wiki for a file format description
-
     Parameters
     ----------
     file_or_source: str or object

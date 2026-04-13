@@ -13,7 +13,8 @@ forcing fake drug annotations onto untreated wells.
 
 Use :func:`thunor.io.read_hdf` when you want to preserve the full internal data
 model, and :func:`thunor.io.read_vanderbilt_hts` when importing tabular plate
-exports.
+exports. For a full description of the Vanderbilt HTS file format, including
+column definitions and an example, see :doc:`../vanderbilt_hts_format`.
 
 .. automodule:: thunor.io
     :members:
