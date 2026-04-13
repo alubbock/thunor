@@ -13,16 +13,12 @@ multi-panelled plot system ([demo](https://demo.thunor.net)).
 
 ## Implementation
 
-Thunor is written in pure Python and is compatible with Python 3 only.
-It makes extensive use of [pandas](http://pandas.pydata.org/) and
+Thunor makes extensive use of [pandas](http://pandas.pydata.org/) and
 [plotly](http://plot.ly/python/).
 
 ## Installation
 
-Thunor Core's Python version support aims to match that of pandas,
-which is currently 3.11-3.14.
-
-Install Thunor Core using `pip`:
+Thunor Core requires Python 3.11 or later. Install using `pip`:
 
 ```
 pip install thunor
@@ -32,25 +28,21 @@ pip install thunor
 
 The Thunor Core documentation is available [online](https://core.thunor.net),
 or you can build it locally for offline use. To do so, clone this git
-repository and change into the `thunor` directory.
-
-To build documentation locally, you'll need a few software dependencies:
+repository, then run:
 
     pip install -e '.[docs]'
-
-Then, you can build the documentation like so:
-
     cd doc
     make html
 
-After the build completes, open _build/html/index.html in your web browser.
+After the build completes, open `_build/html/index.html` in your web browser.
 
 ## Tutorial
 
-Like the docs, you can also view the [tutorial](https://core.thunor.net/en/latest/tutorial.html) online.
-To work through the tutorial locally, build the documentation as per the previous section. You can then open the file with Jupyter Notebook:
+The [tutorial](https://core.thunor.net/en/latest/tutorial.html) is available online.
+To work through it locally, install the package and open the notebook directly:
 
-    jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 doc/tutorial.ipynb
+    pip install thunor
+    jupyter notebook doc/tutorial.ipynb
 
 ## Citation
 

@@ -1,8 +1,6 @@
 Installation
 ============
 
-To install Thunor, you can use pip:
+Thunor Core requires Python 3.11 or later. Install using pip:
 
     :command:`pip install thunor`
-
-Please note that Python 3 is required (not compatible with Python 2.7).
