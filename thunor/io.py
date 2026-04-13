@@ -578,7 +578,7 @@ def _select_csv_separator(file_or_buf):
 
 
 def read_vanderbilt_hts(
-    file_or_source, plate_width=24, plate_height=16, sep=None, _unstacked=False
+    file_or_source, *, plate_width=24, plate_height=16, sep=None, _unstacked=False
 ):
     """
     Read a Vanderbilt HTS format file
@@ -624,7 +624,8 @@ def read_vanderbilt_hts(
             'time',
             'cell.count',
             'drug1.conc',
-            'drug1.unitsdrug2.conc',
+            'drug1.units',
+            'drug2.conc',
             'drug2.units',
         }
     )
