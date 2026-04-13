@@ -7,9 +7,9 @@ import itertools
 import io
 import pathlib
 import re
-from .dip import _choose_dip_assay, dip_rates
+import warnings
+from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 
-SECONDS_IN_HOUR = 3600
 ZERO_TIMEDELTA = timedelta(0)
 ASCII_A = 65
 ALPHABET_LENGTH = 26
@@ -305,8 +305,8 @@ class HtsPandas(object):
         if drugs is not None:
             drugs = [(drug,) if isinstance(drug, str) else drug for drug in drugs]
 
-        doses = self.doses.copy()
-        controls = self.controls.copy() if self.controls is not None else None
+        doses = self.doses
+        controls = self.controls
         if plate is not None:
             if isinstance(plate, str):
                 plate = [
@@ -314,7 +314,7 @@ class HtsPandas(object):
                 ]
 
             if 'plate' in doses.columns:
-                doses.set_index('plate', append=True, inplace=True)
+                doses = doses.set_index('plate', append=True)
 
             doses = doses[doses.index.isin(plate, level='plate')]
             if controls is not None:
@@ -330,14 +330,15 @@ class HtsPandas(object):
         if drugs is not None:
             doses = doses.iloc[doses.index.isin(drugs, level='drug'), :]
 
+        doses = doses.copy()
         doses.index = doses.index.remove_unused_levels()
         if controls is not None:
+            controls = controls.copy()
             controls.index = controls.index.remove_unused_levels()
 
-        assays = self.assays.copy()
-        assays = assays.iloc[
-            assays.index.isin(doses['well_id'].unique(), level='well_id'), :
-        ]
+        assays = self.assays.iloc[
+            self.assays.index.isin(doses['well_id'].unique(), level='well_id'), :
+        ].copy()
 
         return self.__class__(doses, assays, controls)
 
@@ -577,7 +578,7 @@ def _select_csv_separator(file_or_buf):
 
 
 def read_vanderbilt_hts(
-    file_or_source, plate_width=24, plate_height=16, sep=None, _unstacked=False
+    file_or_source, *, plate_width=24, plate_height=16, sep=None, _unstacked=False
 ):
     """
     Read a Vanderbilt HTS format file
@@ -623,7 +624,8 @@ def read_vanderbilt_hts(
             'time',
             'cell.count',
             'drug1.conc',
-            'drug1.unitsdrug2.conc',
+            'drug1.units',
+            'drug2.conc',
             'drug2.units',
         }
     )
@@ -935,6 +937,7 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
     with pd.HDFStore(filepath, 'w', complib='zlib', complevel=9, **extra_kwargs) as hdf:
         hdf.root._v_attrs.generator = package_name
         hdf.root._v_attrs.generator_version = __version__
+        hdf.root._v_attrs.schema_version = 1
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
         hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
@@ -1052,7 +1055,26 @@ def _read_hdf_unstacked(filename_or_buffer):
                 'driver_core_image': filename_or_buffer,
             }
         )
+    _CURRENT_SCHEMA_VERSION = 1
     with pd.HDFStore(**hdf_kwargs) as hdf:
+        schema_version = getattr(hdf.root._v_attrs, 'schema_version', None)
+        if schema_version is None:
+            warnings.warn(
+                'This HDF5 file has no schema_version attribute and may have been '
+                'written by an older version of thunor. If you encounter errors, '
+                'try re-exporting the data using the current version.',
+                UserWarning,
+                stacklevel=3,
+            )
+        elif schema_version > _CURRENT_SCHEMA_VERSION:
+            warnings.warn(
+                f'This HDF5 file uses schema version {schema_version}, but this '
+                f'version of thunor only supports up to version '
+                f'{_CURRENT_SCHEMA_VERSION}. Upgrade thunor to avoid compatibility '
+                f'issues.',
+                UserWarning,
+                stacklevel=3,
+            )
         df_assays = hdf['assays']
         try:
             df_controls = hdf['controls']

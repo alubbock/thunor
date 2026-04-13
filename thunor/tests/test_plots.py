@@ -58,7 +58,7 @@ class TestWithDataset(unittest.TestCase):
 
         df = pd.concat([df1, df2])
 
-        df._drmetric = self.fit_params._drmetric
+        df.attrs.update(self.fit_params.attrs)
 
         plot_drc_params(df, fit_param='ec50', multi_dataset=True)
 
