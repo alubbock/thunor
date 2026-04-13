@@ -1939,7 +1939,7 @@ def plot_ctrl_cell_counts_by_plate(
     title = _combine_title_subtitle(title, subtitle)
 
     traces = []
-    for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
+    for grp, ctrl_dat in df_controls.groupby(level='cell_line'):
         traces.append(
             go.Box(
                 x=ctrl_dat.index.get_level_values('plate').values,
