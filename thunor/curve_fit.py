@@ -508,6 +508,7 @@ class HillCurveLL3u(HillCurveLL4):
 
 
 class HillCurveLL2(HillCurveLL3u):
+    fit_bounds = ((0.0, -np.inf), (np.inf, np.inf))
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
     curve_fit_kwargs_log = {}
