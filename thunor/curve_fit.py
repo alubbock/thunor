@@ -332,11 +332,15 @@ class HillCurveLL4(HillCurve):
             # TODO: Calculate AUC for ascending curves
             return None
 
-        min_conc_hill = min_conc**self.hill_slope
-        return (
-            np.log10((self.ec50**self.hill_slope + min_conc_hill) / min_conc_hill)
-            / self.hill_slope
-        ) * ((e0 - emax) / e0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            min_conc_hill = min_conc**self.hill_slope
+            result = (
+                np.log10((self.ec50**self.hill_slope + min_conc_hill) / min_conc_hill)
+                / self.hill_slope
+            ) * ((e0 - emax) / e0)
+        if np.isnan(result) or np.isinf(result):
+            return None
+        return result
 
     def aa(self, min_conc, max_conc):
         """
@@ -378,13 +382,17 @@ class HillCurveLL4(HillCurve):
                 return r  # 10^r >> 1
             return np.log10(1.0 + 10.0**r)
 
-        r_max = hill * (np.log10(max_conc) - log_ec50)
-        r_min = hill * (np.log10(min_conc) - log_ec50)
-        return (
-            (_log10_1p_pow10(r_max) - _log10_1p_pow10(r_min))
-            / hill
-            * ((e0 - emax) / e0)
-        )
+        with np.errstate(divide='ignore', invalid='ignore'):
+            r_max = hill * (np.log10(max_conc) - log_ec50)
+            r_min = hill * (np.log10(min_conc) - log_ec50)
+            result = (
+                (_log10_1p_pow10(r_max) - _log10_1p_pow10(r_min))
+                / hill
+                * ((e0 - emax) / e0)
+            )
+        if np.isnan(result) or np.isinf(result):
+            return None
+        return result
 
     @property
     def divisor(self):
@@ -1180,32 +1188,6 @@ def fit_params_minimal(
     return df_params
 
 
-def _calc_ic(row, ic_num):
-    if row.fit_obj is None:
-        return None
-
-    ic_n = row.fit_obj.ic(ic_num=ic_num)
-    if ic_n is None:
-        return None
-
-    ic_n = np.min((ic_n, row.max_dose_measured))
-    ic_n = np.max((ic_n, row.min_dose_measured))
-    return ic_n
-
-
-def _calc_ec(row, ec_num):
-    if row.fit_obj is None:
-        return None
-
-    ec_n = row.fit_obj.ec(ec_num=ec_num)
-    if ec_n is None:
-        return None
-
-    ec_n = np.min((ec_n, row.max_dose_measured))
-    ec_n = np.max((ec_n, row.min_dose_measured))
-    return ec_n
-
-
 def _calc_e(row, ec_lbl, relative=False):
     if row.fit_obj is None:
         return None
@@ -1215,31 +1197,6 @@ def _calc_e(row, ec_lbl, relative=False):
         return None
 
     return row.fit_obj.fit_rel(ec_val) if relative else row.fit_obj.fit(ec_val)
-
-
-def _calc_aa(row):
-    if not row.fit_obj:
-        return None
-
-    return row.fit_obj.aa(
-        min_conc=row.min_dose_measured, max_conc=row.max_dose_measured
-    )
-
-
-def _calc_auc(row):
-    if not row.fit_obj:
-        return None
-
-    return row.fit_obj.auc(min_conc=row.min_dose_measured)
-
-
-def _calc_ec50(row):
-    if not row.fit_obj or row.fit_obj.ec50 is None:
-        return None
-
-    ec50 = np.min((row.fit_obj.ec50, row.max_dose_measured))
-    ec50 = np.max((ec50, row.min_dose_measured))
-    return ec50
 
 
 def _attach_extra_params(
