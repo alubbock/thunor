@@ -31,6 +31,9 @@ docs = ['sphinx', 'sphinx-rtd-theme', 'nbsphinx', 'ipykernel']
 [project.urls]
 Homepage = "https://www.thunor.net"
 
+[tool.setuptools.package-data]
+thunor = ["testdata/*"]
+
 [build-system]
 requires = ["setuptools", "versioneer"]
 build-backend = "setuptools.build_meta"
