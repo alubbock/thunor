@@ -1,10 +1,10 @@
 Introduction
 ============
 
-Thunor Core is a Python package for managing and viewing high
-throughput screen data. It can calculate and visualize both single-timepoint
-viability calculations, and the multi-timepoint drug-induced proliferation
-rate (DIP rate) metric, which is a dynamic measure of drug response.
+Thunor Core is a Python package for managing, analysing, and visualising
+high throughput screen (HTS) data. It supports both single-timepoint
+viability and the multi-timepoint drug-induced proliferation (DIP) rate
+metric, a dynamic measure of drug response.
 
 For further information on Thunor, related projects (including a
 web interface, Thunor Web), and further help see the `Thunor website`_.
@@ -15,6 +15,8 @@ web interface, Thunor Web), and further help see the `Thunor website`_.
 
    self
    installation
+   vanderbilt_hts_format
+   implementation
    tutorial.ipynb
    modules/index
 
@@ -33,7 +35,11 @@ Quickstart
     fp = fit_params(ctrl_dip_data, expt_dip_data)
     plot_drc(fp).show()
 
-See the :doc:`tutorial` for a full worked example with an included dataset.
+See the :doc:`tutorial` for a full worked example using ``hts007``, a bundled
+dataset of 27 drugs on 8 breast cancer cell lines.
+
+If you want to understand the package internals, data structures, or fitting
+workflow, see :doc:`implementation`.
 
 Indices and tables
 ==================

@@ -483,8 +483,6 @@ def _read_vanderbilt_hts_single_df(
     """
     Read a Vanderbilt HTS format file as a single dataframe
 
-    See the wiki for a file format description
-
     Parameters
     ----------
     file_or_source: str or object
@@ -584,7 +582,8 @@ def read_vanderbilt_hts(
     """
     Read a Vanderbilt HTS format file
 
-    See the wiki for a file format description
+    See :doc:`/vanderbilt_hts_format` for a full description of the file
+    format, including column definitions and an example.
 
     Parameters
     ----------
@@ -829,9 +828,10 @@ def read_vanderbilt_hts(
 
 def write_vanderbilt_hts(df_data, filename, plate_width=24, plate_height=16, sep=None):
     """
-    Read a Vanderbilt HTS format file
+    Write a Vanderbilt HTS format file
 
-    See the wiki for a file format description
+    See :doc:`/vanderbilt_hts_format` for a full description of the file
+    format, including column definitions and an example.
 
     Parameters
     ----------
