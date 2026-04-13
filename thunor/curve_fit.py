@@ -27,8 +27,8 @@ class AAFitWarning(ValueWarning):
     pass
 
 
-class DrugCombosNotImplementedError(NotImplementedError):
-    """This function does not support drug combinations yet"""
+class DrugCombosWarning(UserWarning):
+    """Warning issued when drug combination wells are skipped during fitting"""
 
     pass
 
@@ -1054,14 +1054,27 @@ def fit_params_minimal(
 
     has_drug_combos = drugs.map(len).max() > 1
     if has_drug_combos:
-        raise DrugCombosNotImplementedError()
-    else:
-        # TODO: Support drug combos
-        expt_data = expt_data.reset_index(['drug', 'dose'])
-        expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
-        expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
-        expt_data.set_index(['drug', 'dose'], append=True, inplace=True)
+        combo_mask = expt_data.index.get_level_values('drug').map(len) > 1
+        n_combo = int(combo_mask.sum())
+        warnings.warn(
+            f'{n_combo} combination well(s) skipped; drug combination curve '
+            f'fitting is not yet implemented.',
+            DrugCombosWarning,
+            stacklevel=2,
+        )
+        expt_data = expt_data[~combo_mask]
+        if expt_data.empty:
+            raise ValueError(
+                'No single-drug experiment wells remain after skipping combination wells'
+            )
         drugs = expt_data.index.get_level_values('drug').unique()
+
+    # Unwrap single-drug tuples
+    expt_data = expt_data.reset_index(['drug', 'dose'])
+    expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
+    expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
+    expt_data.set_index(['drug', 'dose'], append=True, inplace=True)
+    drugs = expt_data.index.get_level_values('drug').unique()
 
     if len(drugs) > 1 and len(cell_lines) == 1:
         group_by = ['drug']
