@@ -15,6 +15,7 @@ web interface, Thunor Web), and further help see the `Thunor website`_.
 
    self
    installation
+   implementation
    tutorial.ipynb
    modules/index
 
@@ -34,6 +35,9 @@ Quickstart
     plot_drc(fp).show()
 
 See the :doc:`tutorial` for a full worked example with an included dataset.
+
+If you want to understand the package internals, data structures, or fitting
+workflow, see :doc:`implementation`.
 
 Indices and tables
 ==================
