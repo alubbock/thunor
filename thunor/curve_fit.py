@@ -402,8 +402,8 @@ class HillCurveLL4(HillCurve):
     def popt_rel(self):
         if self._popt_rel is None:
             self._popt_rel = self.popt.copy()
-            self.popt_rel[2] /= self.divisor
-            self.popt_rel[1] /= self.divisor
+            self._popt_rel[2] /= self.divisor
+            self._popt_rel[1] /= self.divisor
         return self._popt_rel
 
     def fit_rel(self, x):
