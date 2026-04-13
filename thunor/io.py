@@ -13,6 +13,7 @@ from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 ZERO_TIMEDELTA = timedelta(0)
 ASCII_A = 65
 ALPHABET_LENGTH = 26
+WELL_ID_SEP = '__'
 
 
 STANDARD_PLATE_SIZES = (96, 384, 1536)
@@ -284,17 +285,18 @@ class HtsPandas(object):
 
     def filter(self, cell_lines=None, drugs=None, plate=None):
         """
-        Filter by cell lines and/or drugs
+        Return a filtered copy of this dataset
 
-        "None" means "no filter"
+        ``None`` means no filter on that dimension.
 
         Parameters
         ----------
         cell_lines: Iterable, optional
-            List of cell lines to filter on
+            Cell line names to keep
         drugs: Iterable, optional
-            List of drugs to filter on
-        plate: Iterable, optional
+            Drug names (strings) or drug tuples to keep
+        plate: str or Iterable, optional
+            Plate identifier(s) to keep
 
         Returns
         -------
@@ -758,7 +760,7 @@ def read_vanderbilt_hts(
         df_doses = df_doses.assign(
             well=list(
                 [
-                    '{}__{}'.format(a_, b_)
+                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
                     for a_, b_ in zip(df_doses['upid'], df_doses['well'])
                 ]
             )
@@ -796,7 +798,7 @@ def read_vanderbilt_hts(
         df_controls = df_controls.assign(
             well=list(
                 [
-                    '{}__{}'.format(a_, b_)
+                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
                     for a_, b_ in zip(df_controls['upid'], df_controls['well'])
                 ]
             )
@@ -818,7 +820,9 @@ def read_vanderbilt_hts(
     # df_vals
     df_vals = df[['time', 'cell.count']]
     df_vals = df_vals[expt_rows]
-    df_vals.index = ['{}__{}'.format(a_, b_) for a_, b_ in df_vals.index.tolist()]
+    df_vals.index = [
+        '{}{}{}'.format(a_, WELL_ID_SEP, b_) for a_, b_ in df_vals.index.tolist()
+    ]
     df_vals.index.name = 'well_id'
     df_vals.columns = ['timepoint', 'value']
     df_vals['assay'] = assay_name
