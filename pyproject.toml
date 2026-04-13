@@ -25,10 +25,8 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-test = ['pytest', 'nbval', 'django', 'nbformat', 'ruff',
-        'codecov', 'pytest-cov']
-docs = ['sphinx', 'sphinx-rtd-theme', 'mock', 'nbsphinx',
-        'ipykernel']
+test = ['pytest', 'nbval', 'ruff', 'pytest-cov']
+docs = ['sphinx', 'sphinx-rtd-theme', 'nbsphinx', 'ipykernel']
 
 [project.urls]
 Homepage = "https://www.thunor.net"

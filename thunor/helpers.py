@@ -1,14 +1,30 @@
 # -*- coding: utf-8 -*-
 import collections
 from collections.abc import Iterable
+from html.parser import HTMLParser
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
 from functools import reduce
 
-try:
-    from django.utils.html import strip_tags
-except ImportError:
-    strip_tags = None
+
+class _TagStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+
+    def handle_data(self, data):
+        self._parts.append(data)
+
+    def get_data(self):
+        return ''.join(self._parts)
+
+
+def _strip_tags(text):
+    if text is None:
+        return ''
+    s = _TagStripper()
+    s.feed(text)
+    return s.get_data()
 
 
 _SI_PREFIXES = collections.OrderedDict(
@@ -65,20 +81,17 @@ def format_dose(num, sig_digits=12, array_as_string=None):
 
 
 def _plotly_scatter_to_dataframe(plot_fig):
-    if strip_tags is None:
-        raise ImportError('This function requires django')
-
     rows = []
     try:
-        xaxis_name = strip_tags(plot_fig['layout']['xaxis']['title']['text'])
+        xaxis_name = _strip_tags(plot_fig['layout']['xaxis']['title']['text'])
     except KeyError:
         xaxis_name = 'x'
     try:
-        yaxis_name = strip_tags(plot_fig['layout']['yaxis']['title']['text'])
+        yaxis_name = _strip_tags(plot_fig['layout']['yaxis']['title']['text'])
     except KeyError:
         yaxis_name = 'y'
     for trace in plot_fig['data']:
-        trace_name = strip_tags(trace['name'])
+        trace_name = _strip_tags(trace['name'])
         if trace['x'] is None:
             continue
         for i in range(len(trace['x'])):
@@ -87,7 +100,7 @@ def _plotly_scatter_to_dataframe(plot_fig):
                     'trace_name': trace_name,
                     xaxis_name: trace['x'][i],
                     yaxis_name: trace['y'][i],
-                    'point_label': strip_tags(
+                    'point_label': _strip_tags(
                         trace['hovertext'][i].replace('<br>', '\n')
                     )
                     if trace['hovertext'] is not None

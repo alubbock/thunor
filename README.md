@@ -19,9 +19,10 @@ It makes extensive use of [pandas](http://pandas.pydata.org/) and
 
 ## Installation
 
-Thunor Core is tested against the three most recent stable releases
-of Python (currently 3.10-3.12), so one of these versions is
-recommended. Install Thunor Core using `pip`:
+Thunor Core's Python version support aims to match that of pandas,
+which is currently 3.11-3.14.
+
+Install Thunor Core using `pip`:
 
 ```
 pip install thunor
@@ -36,8 +37,6 @@ repository and change into the `thunor` directory.
 To build documentation locally, you'll need a few software dependencies:
 
     pip install -e '.[docs]'
-
-You'll also need to install [pandoc](https://pandoc.org/installing.html).
 
 Then, you can build the documentation like so:
 
