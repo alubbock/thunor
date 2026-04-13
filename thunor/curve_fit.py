@@ -37,6 +37,8 @@ class HillCurve(object):
     """Base class defining Hill/log-logistic curve functionality"""
 
     fit_bounds = (-np.inf, np.inf)
+    curve_fit_kwargs = {}
+    curve_fit_kwargs_log = {}
     null_response_fn = np.mean
     max_fit_evals = None
 
@@ -276,9 +278,10 @@ class HillCurveLL4(HillCurve):
 
         ic_frac = ic_num / 100.0
 
-        icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
-            1 / self.hill_slope
-        )
+        with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
+            icN = self.ec50 * (ic_frac / (1 - ic_frac - (emax / e0))) ** (
+                1 / self.hill_slope
+            )
 
         # Overflow will lead to -inf, which we deal with here
         if np.isnan(icN) or np.isinf(icN):
@@ -404,9 +407,11 @@ class HillCurveLL3u(HillCurveLL4):
 
     # Constrain 0<=emax<=1, Hill slope +ve
     fit_bounds = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
+    curve_fit_kwargs = {'method': 'dogbox'}
     # In log-EC50 space: bounds only on b (slope ≥ 0) and c (0 ≤ emax ≤ 1);
     # no bound needed on log_e since exp(log_e) > 0 always
     fit_bounds_log = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
+    curve_fit_kwargs_log = {'method': 'dogbox', 'x_scale': 'jac'}
     max_fit_evals = None
 
     @staticmethod
@@ -505,6 +510,7 @@ class HillCurveLL3u(HillCurveLL4):
 class HillCurveLL2(HillCurveLL3u):
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
+    curve_fit_kwargs_log = {}
 
     @classmethod
     def fit_fn(cls, x, b, e):
@@ -589,6 +595,71 @@ class HillCurveLL2(HillCurveLL3u):
         if self._popt_rel is None:
             self._popt_rel = self.popt.copy()
         return self._popt_rel
+
+
+def _sanitise_initial_guess(p0, fit_bounds, scaled_doses, use_log_path, fit_cls):
+    """Clip initial guess parameters to lie within fit bounds and sensible
+    ranges.
+
+    Prevents two common failure modes:
+    1. Negative Hill slope (b) for bounded models (LL3u/LL2) raising
+       ``ValueError: Initial guess is outside provided bounds``.
+    2. Wildly extrapolated EC50 (log_e far outside dose range) causing
+       Levenberg-Marquardt maxfev exhaustion.
+    """
+    p0 = list(p0)
+
+    # --- Clip each element to within its bounds ---
+    lb, ub = fit_bounds
+    if np.ndim(lb) == 0:
+        lb = np.full(len(p0), lb)
+    if np.ndim(ub) == 0:
+        ub = np.full(len(p0), ub)
+    lb = np.asarray(lb, dtype=float)
+    ub = np.asarray(ub, dtype=float)
+
+    for i in range(len(p0)):
+        if np.isnan(p0[i]) or np.isinf(p0[i]):
+            p0[i] = 0.5 * (lb[i] + ub[i]) if np.isfinite(lb[i] + ub[i]) else 0.0
+        if np.isfinite(lb[i]) and p0[i] < lb[i]:
+            p0[i] = lb[i]
+        if np.isfinite(ub[i]) and p0[i] > ub[i]:
+            p0[i] = ub[i]
+
+    # --- Fix degenerate Hill slope ---
+    # b = 0 makes the gradient w.r.t. EC50 vanish → solver stalls.
+    # For bounded models (b ≥ 0 lower bound), use 1.0 as a safe default.
+    b_idx = 0  # Hill slope is always the first parameter
+    if np.isfinite(lb[b_idx]) and lb[b_idx] >= 0.0 and p0[b_idx] < 0.01:
+        p0[b_idx] = 1.0
+
+    # --- Clamp EC50 / log_e to ±1 decade beyond measured dose range ---
+    positive_doses = scaled_doses[scaled_doses > 0]
+    if len(positive_doses) > 0:
+        log_min = np.log(np.min(positive_doses))
+        log_max = np.log(np.max(positive_doses))
+        margin = np.log(10.0)  # 1 decade
+        log_lo = log_min - margin
+        log_hi = log_max + margin
+
+        if use_log_path:
+            # log_e is the last parameter
+            e_idx = len(p0) - 1
+            if p0[e_idx] < log_lo:
+                p0[e_idx] = log_lo
+            elif p0[e_idx] > log_hi:
+                p0[e_idx] = log_hi
+        else:
+            # EC50 in linear space is the last parameter
+            e_idx = len(p0) - 1
+            e_lo = np.exp(log_lo)
+            e_hi = np.exp(log_hi)
+            if p0[e_idx] < e_lo:
+                p0[e_idx] = e_lo
+            elif p0[e_idx] > e_hi:
+                p0[e_idx] = e_hi
+
+    return p0
 
 
 def fit_drc(
@@ -677,10 +748,12 @@ def fit_drc(
         # LL4 uses LM (unconstrained); Jacobian not needed and adds overhead
         jac_fn = None if fit_cls is HillCurveLL4 else fit_cls.jac_fn_log
         fit_bounds = fit_cls.fit_bounds_log
+        curve_fit_kwargs = fit_cls.curve_fit_kwargs_log
     else:
         fit_fn = fit_cls.fit_fn
         jac_fn = None
         fit_bounds = fit_cls.fit_bounds
+        curve_fit_kwargs = fit_cls.curve_fit_kwargs
 
     # Dose-scale normalisation: centre doses on a log scale to reduce
     # floating-point precision issues across extreme concentration ranges.
@@ -705,6 +778,10 @@ def fit_drc(
     else:
         curve_initial_guess = fit_cls.initial_guess(scaled_doses, responses)
 
+    curve_initial_guess = _sanitise_initial_guess(
+        curve_initial_guess, fit_bounds, scaled_doses, use_log_path, fit_cls
+    )
+
     popt = None
     try:
         with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
@@ -717,11 +794,12 @@ def fit_drc(
                 sigma=response_std_errs,
                 maxfev=fit_cls.max_fit_evals,
                 jac=jac_fn,
+                **curve_fit_kwargs,
             )
     except RuntimeError:
         pass  # fall through to fallback or return None below
     except ValueError:
-        return None
+        pass  # fall through to fallback (e.g. degenerate data)
     except TypeError as te:
         # This occurs if there are fewer data points than parameters
         te_str = str(te)
@@ -737,6 +815,13 @@ def fit_drc(
     # parameterisation (no Jacobian, but handles degenerate cases better).
     if popt is None and use_log_path:
         fallback_guess = fit_cls.initial_guess(scaled_doses, responses)
+        fallback_guess = _sanitise_initial_guess(
+            fallback_guess,
+            fit_cls.fit_bounds,
+            scaled_doses,
+            use_log_path=False,
+            fit_cls=fit_cls,
+        )
         try:
             with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
                 popt, pcov = scipy.optimize.curve_fit(
@@ -747,6 +832,7 @@ def fit_drc(
                     p0=fallback_guess,
                     sigma=response_std_errs,
                     maxfev=fit_cls.max_fit_evals,
+                    **fit_cls.curve_fit_kwargs,
                 )
         except RuntimeError:
             return None
@@ -797,6 +883,14 @@ def fit_drc(
 
     if fit_obj.ec50 < np.min(doses):
         # Reject fit if EC50 less than min dose
+        return None
+
+    if fit_cls is not HillCurveLL4 and fit_obj.ec50 > 10.0 * np.max(doses):
+        # Reject fit if EC50 more than a decade above max dose — the curve's
+        # transition lies well beyond the measured range.  A 10x margin keeps
+        # borderline fits where the drug effect is partially observed.
+        # Only for constrained models (LL3u/LL2); LL4 fits with EC50 above
+        # the dose range can still characterise the observed partial response.
         return None
 
     if ctrl_dose_test:
