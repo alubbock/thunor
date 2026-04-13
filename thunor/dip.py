@@ -49,9 +49,10 @@ def dip_rates(df_data, selector_fn=tyson1):
 
     Returns
     -------
-    list
-        Two entry list, giving control DIP rates and experiment
-        (non-control) DIP rates (both as Pandas DataFrames)
+    tuple
+        Two-entry tuple of (ctrl_dip_rates, expt_dip_rates). Either entry
+        may be None if no control or experiment wells are present.
+        Non-None entries are Pandas DataFrames.
     """
     if df_data.controls is None or df_data.controls.empty:
         ctrl_dips = None
