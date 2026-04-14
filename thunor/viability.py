@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+__all__ = ['viability']
+
 
 def viability(df_data, *, time_hrs=72, assay_name=None, include_controls=True):
     """

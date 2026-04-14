@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import collections
+
+__all__ = ['format_dose', 'plotly_to_dataframe']
 from collections.abc import Iterable
 from html.parser import HTMLParser
 import pandas as pd

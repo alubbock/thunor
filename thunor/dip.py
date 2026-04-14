@@ -5,6 +5,15 @@ import pandas as pd
 SECONDS_IN_HOUR = 3600.0
 DIP_ASSAYS = ('Cell count', 'lum:Lum')
 
+__all__ = [
+    'SECONDS_IN_HOUR',
+    'dip_rates',
+    'expt_dip_rates',
+    'ctrl_dip_rates',
+    'adjusted_r_squared',
+    'tyson1',
+]
+
 
 def _choose_dip_assay(assay_names):
     for assay in DIP_ASSAYS:

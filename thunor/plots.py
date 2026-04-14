@@ -13,8 +13,21 @@ import pandas as pd
 from collections.abc import Iterable
 
 
+__all__ = [
+    'CannotPlotError',
+    'plot_drc',
+    'plot_drug_combination_heatmap',
+    'plot_drc_params',
+    'plot_time_course',
+    'plot_ctrl_dip_by_plate',
+    'plot_ctrl_cell_counts_by_plate',
+    'plot_plate_map',
+    'plot_two_dataset_param_scatter',
+]
+
+
 class CannotPlotError(ValueError):
-    pass
+    """Raised when a plot cannot be generated from the supplied data"""
 
 
 def _activity_area_units(**kwargs):
