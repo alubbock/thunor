@@ -5,7 +5,7 @@ import numpy as np
 import seaborn as sns
 from . import config
 from .helpers import format_dose
-from .dip import ctrl_dip_rates, expt_dip_rates
+from .dip import SECONDS_IN_HOUR, ctrl_dip_rates, expt_dip_rates
 from .curve_fit import HillCurveNull, is_param_truncated
 import scipy.stats
 import re
@@ -31,7 +31,6 @@ def _auc_units(**kwargs):
         return ''
 
 
-SECONDS_IN_HOUR = 3600.0
 NS_IN_SEC = 1e9
 PLATE_MAP_WELL_DIAM = 0.95
 ASCII_CAP_A = 65
@@ -242,12 +241,10 @@ def plot_drc(
     # Shapes used for replicate markers
     shapes = ['circle', 'circle-open']
 
-    try:
-        is_viability = (
-            'viability' in fit_params.columns or fit_params._drmetric == 'viability'
-        )
-    except AttributeError:
-        is_viability = False
+    is_viability = (
+        'viability' in fit_params.columns
+        or fit_params.attrs.get('drmetric') == 'viability'
+    )
 
     if is_viability:
         # Only "absolute" (non-transformed y-axis) makes sense for viability
@@ -255,7 +252,7 @@ def plot_drc(
 
     if is_viability:
         yaxis_title = '{:g} hr viability'.format(
-            fit_params._viability_time.total_seconds() / SECONDS_IN_HOUR
+            fit_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR
         )
     else:
         yaxis_title = 'DIP rate'
@@ -700,11 +697,11 @@ def plot_two_dataset_param_scatter(
         subtitle = ' &amp; '.join(str(d) for d in datasets)
     title = _combine_title_subtitle(title, subtitle)
 
-    if df_params._drmetric == 'dip':
+    if df_params.attrs.get('drmetric') == 'dip':
         dr_metric = 'DIP'
     else:
         dr_metric = '{:g} hr viability'.format(
-            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR
+            df_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR
         )
 
     df_params = df_params.loc[:, [fit_param, 'max_dose_measured', 'min_dose_measured']]
@@ -1015,11 +1012,12 @@ def plot_drc_params(
         yaxis_title = '{} ({})'.format(yaxis_param_name, yaxis_units)
     else:
         yaxis_title = yaxis_param_name
-    if df_params._drmetric in ('dip', 'compare'):
+    if df_params.attrs.get('drmetric') in ('dip', 'compare'):
         yaxis_title = 'DIP {}'.format(yaxis_title)
     else:
         yaxis_title = '{:g} hr viability {}'.format(
-            df_params._viability_time.total_seconds() / SECONDS_IN_HOUR, yaxis_title
+            df_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR,
+            yaxis_title,
         )
 
     layout = dict(
@@ -1057,11 +1055,12 @@ def plot_drc_params(
             xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
         else:
             xaxis_title = xaxis_param_name
-        if df_params._drmetric == 'dip':
+        if df_params.attrs.get('drmetric') == 'dip':
             xaxis_title = 'DIP {}'.format(xaxis_title)
         else:
             xaxis_title = '{:g} hr viability {}'.format(
-                df_params._viability_time.total_seconds() / SECONDS_IN_HOUR, xaxis_title
+                df_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR,
+                xaxis_title,
             )
 
         range_bounded_params = set()
@@ -1940,7 +1939,7 @@ def plot_ctrl_cell_counts_by_plate(
     title = _combine_title_subtitle(title, subtitle)
 
     traces = []
-    for grp, ctrl_dat in df_controls.groupby(level=['cell_line']):
+    for grp, ctrl_dat in df_controls.groupby(level='cell_line'):
         traces.append(
             go.Box(
                 x=ctrl_dat.index.get_level_values('plate').values,

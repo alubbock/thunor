@@ -27,8 +27,16 @@ class AAFitWarning(ValueWarning):
     pass
 
 
-class DrugCombosNotImplementedError(NotImplementedError):
-    """This function does not support drug combinations yet"""
+class DrugCombosWarning(UserWarning):
+    """
+    Warning issued when drug combination wells are skipped during fitting
+
+    :func:`fit_params_minimal` currently fits single-drug dose-response curves
+    only.  Combination wells (where the ``drug`` tuple has length > 1) are
+    filtered out and this warning is issued.  Future versions will support
+    combination fitting via a dedicated code path; the skip-and-warn behaviour
+    is intentional and will not change when that support lands.
+    """
 
     pass
 
@@ -321,8 +329,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Area under the curve (AUC) value
+        float or None
+            Area under the curve (AUC) value, or ``None`` for stimulatory
+            responses (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -355,8 +364,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Activity area value
+        float or None
+            Activity area value, or ``None`` for stimulatory responses
+            (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -402,8 +412,8 @@ class HillCurveLL4(HillCurve):
     def popt_rel(self):
         if self._popt_rel is None:
             self._popt_rel = self.popt.copy()
-            self.popt_rel[2] /= self.divisor
-            self.popt_rel[1] /= self.divisor
+            self._popt_rel[2] /= self.divisor
+            self._popt_rel[1] /= self.divisor
         return self._popt_rel
 
     def fit_rel(self, x):
@@ -520,6 +530,8 @@ class HillCurveLL2(HillCurveLL3u):
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
     curve_fit_kwargs_log = {}
+    # Fully unbounded fit uses LM solver, which requires an integer maxfev
+    max_fit_evals = 0
 
     @classmethod
     def fit_fn(cls, x, b, e):
@@ -1069,14 +1081,27 @@ def fit_params_minimal(
 
     has_drug_combos = drugs.map(len).max() > 1
     if has_drug_combos:
-        raise DrugCombosNotImplementedError()
-    else:
-        # TODO: Support drug combos
-        expt_data = expt_data.reset_index(['drug', 'dose'])
-        expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
-        expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
-        expt_data.set_index(['drug', 'dose'], append=True, inplace=True)
+        combo_mask = expt_data.index.get_level_values('drug').map(len) > 1
+        n_combo = int(combo_mask.sum())
+        warnings.warn(
+            f'{n_combo} combination well(s) skipped; drug combination curve '
+            f'fitting is not yet implemented.',
+            DrugCombosWarning,
+            stacklevel=2,
+        )
+        expt_data = expt_data[~combo_mask]
+        if expt_data.empty:
+            raise ValueError(
+                'No single-drug experiment wells remain after skipping combination wells'
+            )
         drugs = expt_data.index.get_level_values('drug').unique()
+
+    # Unwrap single-drug tuples
+    expt_data = expt_data.reset_index(['drug', 'dose'])
+    expt_data['drug'] = expt_data['drug'].apply(lambda x: x[0])
+    expt_data['dose'] = expt_data['dose'].apply(lambda x: x[0])
+    expt_data.set_index(['drug', 'dose'], append=True, inplace=True)
+    drugs = expt_data.index.get_level_values('drug').unique()
 
     if len(drugs) > 1 and len(cell_lines) == 1:
         group_by = ['drug']
@@ -1204,10 +1229,9 @@ def fit_params_minimal(
     df_params = pd.DataFrame(fit_params)
     df_params.set_index(['dataset_id', 'cell_line', 'drug'], inplace=True)
 
-    df_params._drmetric = 'viability' if is_viability else 'dip'
+    df_params.attrs['drmetric'] = 'viability' if is_viability else 'dip'
     if is_viability:
-        df_params._viability_time = expt_data_orig._viability_time
-        df_params._viability_assay = expt_data_orig._viability_assay
+        df_params.attrs.update(expt_data_orig.attrs)
 
     return df_params
 
@@ -1276,7 +1300,7 @@ def _attach_extra_params(
 
     base_params['label'] = base_params.index.map(_generate_label)
 
-    is_viability = base_params._drmetric == 'viability'
+    is_viability = base_params.attrs.get('drmetric') == 'viability'
 
     # Determine which per-row columns are needed
     need_ec50 = 50 in custom_ec_concentrations
@@ -1394,7 +1418,7 @@ def _attach_extra_params(
 
 
 def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data, ctrl_dose_fn):
-    is_viability = df_params._drmetric == 'viability'
+    is_viability = df_params.attrs.get('drmetric') == 'viability'
     data_list = []
     if 'dataset' not in expt_dip_data.index.names:
         expt_dip_data = expt_dip_data.copy()
@@ -1447,10 +1471,7 @@ def _attach_response_values(df_params, ctrl_dip_data, expt_dip_data, ctrl_dose_f
     df_params_old = df_params
     df_params = pd.concat([df, df_params], axis=1)
 
-    df_params._drmetric = df_params_old._drmetric
-    if is_viability:
-        df_params._viability_time = df_params_old._viability_time
-        df_params._viability_assay = df_params_old._viability_assay
+    df_params.attrs.update(df_params_old.attrs)
 
     return df_params
 
@@ -1512,8 +1533,8 @@ def fit_params(
 
 def fit_params_from_base(
     base_params,
-    ctrl_resp_data=None,
-    expt_resp_data=None,
+    ctrl_data=None,
+    expt_data=None,
     ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
     custom_ic_concentrations=frozenset(),
     custom_ec_concentrations=frozenset(),
@@ -1588,7 +1609,7 @@ def fit_params_from_base(
 
     if include_response_values:
         df_params = _attach_response_values(
-            df_params, ctrl_resp_data, expt_resp_data, ctrl_dose_fn
+            df_params, ctrl_data, expt_data, ctrl_dose_fn
         )
 
     return df_params

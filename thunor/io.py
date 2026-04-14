@@ -7,12 +7,13 @@ import itertools
 import io
 import pathlib
 import re
-from .dip import _choose_dip_assay, dip_rates
+import warnings
+from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 
-SECONDS_IN_HOUR = 3600
 ZERO_TIMEDELTA = timedelta(0)
 ASCII_A = 65
 ALPHABET_LENGTH = 26
+WELL_ID_SEP = '__'
 
 
 STANDARD_PLATE_SIZES = (96, 384, 1536)
@@ -250,7 +251,23 @@ class HtsPandas(object):
     """
     High throughput screen dataset
 
-    Represented internally using pandas dataframes
+    Internally, the dataset is stored as three aligned pandas DataFrames:
+
+    * ``doses`` — one row per experiment well, indexed by
+      ``(drug, cell_line, dose)``.  The ``well_id`` column links to
+      ``assays``.
+    * ``assays`` — one row per (well, timepoint) measurement, indexed by
+      ``(assay, well_id, timepoint)``.
+    * ``controls`` — one row per (control well, timepoint) measurement,
+      indexed by ``(assay, cell_line, plate, well_id, timepoint)``.
+
+    **Multi-dataset mode.**  When multiple datasets are combined (e.g. by
+    Thunor Web), a ``'dataset'`` level is prepended to the index of each
+    DataFrame.  All pipeline functions (:func:`~thunor.dip.dip_rates`,
+    :func:`~thunor.viability.viability`,
+    :func:`~thunor.curve_fit.fit_params`) detect this level automatically
+    and partition their work by dataset.  HDF5 files that were saved with
+    a ``'dataset'`` index level preserve it on load.
 
     Parameters
     ----------
@@ -284,17 +301,18 @@ class HtsPandas(object):
 
     def filter(self, cell_lines=None, drugs=None, plate=None):
         """
-        Filter by cell lines and/or drugs
+        Return a filtered copy of this dataset
 
-        "None" means "no filter"
+        ``None`` means no filter on that dimension.
 
         Parameters
         ----------
         cell_lines: Iterable, optional
-            List of cell lines to filter on
+            Cell line names to keep
         drugs: Iterable, optional
-            List of drugs to filter on
-        plate: Iterable, optional
+            Drug names (strings) or drug tuples to keep
+        plate: str or Iterable, optional
+            Plate identifier(s) to keep
 
         Returns
         -------
@@ -305,8 +323,8 @@ class HtsPandas(object):
         if drugs is not None:
             drugs = [(drug,) if isinstance(drug, str) else drug for drug in drugs]
 
-        doses = self.doses.copy()
-        controls = self.controls.copy() if self.controls is not None else None
+        doses = self.doses
+        controls = self.controls
         if plate is not None:
             if isinstance(plate, str):
                 plate = [
@@ -314,7 +332,7 @@ class HtsPandas(object):
                 ]
 
             if 'plate' in doses.columns:
-                doses.set_index('plate', append=True, inplace=True)
+                doses = doses.set_index('plate', append=True)
 
             doses = doses[doses.index.isin(plate, level='plate')]
             if controls is not None:
@@ -330,14 +348,15 @@ class HtsPandas(object):
         if drugs is not None:
             doses = doses.iloc[doses.index.isin(drugs, level='drug'), :]
 
+        doses = doses.copy()
         doses.index = doses.index.remove_unused_levels()
         if controls is not None:
+            controls = controls.copy()
             controls.index = controls.index.remove_unused_levels()
 
-        assays = self.assays.copy()
-        assays = assays.iloc[
-            assays.index.isin(doses['well_id'].unique(), level='well_id'), :
-        ]
+        assays = self.assays.iloc[
+            self.assays.index.isin(doses['well_id'].unique(), level='well_id'), :
+        ].copy()
 
         return self.__class__(doses, assays, controls)
 
@@ -353,7 +372,21 @@ class HtsPandas(object):
         )
 
     def doses_unstacked(self):
-        """Split multiple drugs/doses into separate columns"""
+        """
+        Return the doses DataFrame with drug/dose tuples split into numbered columns
+
+        Converts the internal stacked representation (``drug``, ``dose`` tuple
+        index levels) into the flat ``drug1``, ``dose1``, ``drug2``, ``dose2``,
+        … column layout used in HDF5 files and required by external tools such
+        as the synergy package for combination-dose matrices.
+
+        Returns
+        -------
+        pd.DataFrame
+            Doses DataFrame indexed by ``(drug1, cell_line, dose1)`` for
+            single-drug datasets, or by ``(drug1, drug2, cell_line, dose1,
+            dose2)`` for combination datasets.
+        """
         # If already unstacked, just return
         if 'drug1' in self.doses.index.names:
             return self.doses
@@ -577,7 +610,7 @@ def _select_csv_separator(file_or_buf):
 
 
 def read_vanderbilt_hts(
-    file_or_source, plate_width=24, plate_height=16, sep=None, _unstacked=False
+    file_or_source, *, plate_width=24, plate_height=16, sep=None, _unstacked=False
 ):
     """
     Read a Vanderbilt HTS format file
@@ -623,7 +656,8 @@ def read_vanderbilt_hts(
             'time',
             'cell.count',
             'drug1.conc',
-            'drug1.unitsdrug2.conc',
+            'drug1.units',
+            'drug2.conc',
             'drug2.units',
         }
     )
@@ -756,7 +790,7 @@ def read_vanderbilt_hts(
         df_doses = df_doses.assign(
             well=list(
                 [
-                    '{}__{}'.format(a_, b_)
+                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
                     for a_, b_ in zip(df_doses['upid'], df_doses['well'])
                 ]
             )
@@ -794,7 +828,7 @@ def read_vanderbilt_hts(
         df_controls = df_controls.assign(
             well=list(
                 [
-                    '{}__{}'.format(a_, b_)
+                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
                     for a_, b_ in zip(df_controls['upid'], df_controls['well'])
                 ]
             )
@@ -816,7 +850,9 @@ def read_vanderbilt_hts(
     # df_vals
     df_vals = df[['time', 'cell.count']]
     df_vals = df_vals[expt_rows]
-    df_vals.index = ['{}__{}'.format(a_, b_) for a_, b_ in df_vals.index.tolist()]
+    df_vals.index = [
+        '{}{}{}'.format(a_, WELL_ID_SEP, b_) for a_, b_ in df_vals.index.tolist()
+    ]
     df_vals.index.name = 'well_id'
     df_vals.columns = ['timepoint', 'value']
     df_vals['assay'] = assay_name
@@ -935,6 +971,7 @@ def write_hdf(df_data, filename, dataset_format='fixed'):
     with pd.HDFStore(filepath, 'w', complib='zlib', complevel=9, **extra_kwargs) as hdf:
         hdf.root._v_attrs.generator = package_name
         hdf.root._v_attrs.generator_version = __version__
+        hdf.root._v_attrs.schema_version = 1
         hdf.put('doses', df_data.doses_unstacked(), format=dataset_format)
         hdf.put('assays', df_data.assays, format=dataset_format)
         if df_data.controls is not None:
@@ -955,14 +992,23 @@ def _stack_doses(df_doses, inplace=True):
     drug_cols = df_doses.filter(regex='^drug[0-9]+$', axis=1)
     dose_cols = df_doses.filter(regex='^dose[0-9]+$', axis=1)
     n_drugs = len(drug_cols.columns)
-    assert n_drugs == len(dose_cols.columns)
+    if n_drugs != len(dose_cols.columns):
+        raise ValueError(
+            f'Mismatched drug/dose columns: found {n_drugs} drug column(s) '
+            f'but {len(dose_cols.columns)} dose column(s)'
+        )
 
     if n_drugs > 1:
-        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        drug_df = df_doses.filter(regex='^drug[0-9]+$', axis=1)
+        dose_df = df_doses.filter(regex='^dose[0-9]+$', axis=1)
+        # Drop NaN drug entries (blank drug2 on single-drug rows) from tuples so
+        # that single-drug rows yield length-1 tuples and are not mistaken for
+        # combinations by downstream combo detection logic.
+        df_doses['drug'] = drug_df.apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
-        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        df_doses['dose'] = dose_df.where(pd.notna(drug_df.values)).apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
     else:
         lbl_drug = 'drug' if n_drugs == 0 else 'drug1'
@@ -1052,7 +1098,26 @@ def _read_hdf_unstacked(filename_or_buffer):
                 'driver_core_image': filename_or_buffer,
             }
         )
+    _CURRENT_SCHEMA_VERSION = 1
     with pd.HDFStore(**hdf_kwargs) as hdf:
+        schema_version = getattr(hdf.root._v_attrs, 'schema_version', None)
+        if schema_version is None:
+            warnings.warn(
+                'This HDF5 file has no schema_version attribute and may have been '
+                'written by an older version of thunor. If you encounter errors, '
+                'try re-exporting the data using the current version.',
+                UserWarning,
+                stacklevel=3,
+            )
+        elif schema_version > _CURRENT_SCHEMA_VERSION:
+            warnings.warn(
+                f'This HDF5 file uses schema version {schema_version}, but this '
+                f'version of thunor only supports up to version '
+                f'{_CURRENT_SCHEMA_VERSION}. Upgrade thunor to avoid compatibility '
+                f'issues.',
+                UserWarning,
+                stacklevel=3,
+            )
         df_assays = hdf['assays']
         try:
             df_controls = hdf['controls']
