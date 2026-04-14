@@ -329,8 +329,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Area under the curve (AUC) value
+        float or None
+            Area under the curve (AUC) value, or ``None`` for stimulatory
+            responses (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -363,8 +364,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Activity area value
+        float or None
+            Activity area value, or ``None`` for stimulatory responses
+            (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -1509,8 +1511,8 @@ def fit_params(
 
 def fit_params_from_base(
     base_params,
-    ctrl_resp_data=None,
-    expt_resp_data=None,
+    ctrl_data=None,
+    expt_data=None,
     ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
     custom_ic_concentrations=frozenset(),
     custom_ec_concentrations=frozenset(),
@@ -1541,7 +1543,7 @@ def fit_params_from_base(
 
     if include_response_values:
         df_params = _attach_response_values(
-            df_params, ctrl_resp_data, expt_resp_data, ctrl_dose_fn
+            df_params, ctrl_data, expt_data, ctrl_dose_fn
         )
 
     return df_params
