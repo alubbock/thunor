@@ -372,7 +372,21 @@ class HtsPandas(object):
         )
 
     def doses_unstacked(self):
-        """Split multiple drugs/doses into separate columns"""
+        """
+        Return the doses DataFrame with drug/dose tuples split into numbered columns
+
+        Converts the internal stacked representation (``drug``, ``dose`` tuple
+        index levels) into the flat ``drug1``, ``dose1``, ``drug2``, ``dose2``,
+        … column layout used in HDF5 files and required by external tools such
+        as the synergy package for combination-dose matrices.
+
+        Returns
+        -------
+        pd.DataFrame
+            Doses DataFrame indexed by ``(drug1, cell_line, dose1)`` for
+            single-drug datasets, or by ``(drug1, drug2, cell_line, dose1,
+            dose2)`` for combination datasets.
+        """
         # If already unstacked, just return
         if 'drug1' in self.doses.index.names:
             return self.doses
@@ -985,11 +999,16 @@ def _stack_doses(df_doses, inplace=True):
         )
 
     if n_drugs > 1:
-        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        drug_df = df_doses.filter(regex='^drug[0-9]+$', axis=1)
+        dose_df = df_doses.filter(regex='^dose[0-9]+$', axis=1)
+        # Drop NaN drug entries (blank drug2 on single-drug rows) from tuples so
+        # that single-drug rows yield length-1 tuples and are not mistaken for
+        # combinations by downstream combo detection logic.
+        df_doses['drug'] = drug_df.apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
-        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        df_doses['dose'] = dose_df.where(pd.notna(drug_df.values)).apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
     else:
         lbl_drug = 'drug' if n_drugs == 0 else 'drug1'
