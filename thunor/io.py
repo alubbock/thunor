@@ -23,9 +23,23 @@ ANNOTATION_MSG = (
     + 'drug concentrations) must either all be present or all be absent.'
 )
 
+__all__ = [
+    'WELL_ID_SEP',
+    'STANDARD_PLATE_SIZES',
+    'PlateFileParseException',
+    'PlateMap',
+    'PlateData',
+    'HtsPandas',
+    'read_vanderbilt_hts',
+    'write_vanderbilt_hts',
+    'read_hdf',
+    'write_hdf',
+    'read_incucyte',
+]
+
 
 class PlateFileParseException(Exception):
-    pass
+    """Raised when a plate data file cannot be parsed"""
 
 
 class PlateMap(object):
@@ -1135,6 +1149,23 @@ def _read_hdf_unstacked(filename_or_buffer):
 
 
 def read_incucyte(filename_or_buffer, plate_width=24, plate_height=16):
+    """
+    Read an Incucyte Zoom exported file
+
+    Parameters
+    ----------
+    filename_or_buffer: str or file-like object
+        Path to an Incucyte Zoom TSV export file, or a file-like object
+    plate_width: int
+        Width of the microtiter plate in wells (default: 24, for 384-well plate)
+    plate_height: int
+        Height of the microtiter plate in wells (default: 16, for 384-well plate)
+
+    Returns
+    -------
+    HtsPandas
+        HTS Dataset containing the data read from the file
+    """
     LABEL_STR = 'Label: '
     CELL_TYPE_STR = 'Cell Type: '
     TSV_START_STR = 'Date Time\tElapsed\t'

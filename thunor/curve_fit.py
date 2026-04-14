@@ -5,6 +5,24 @@ from abc import abstractmethod
 import pandas as pd
 import warnings
 
+__all__ = [
+    'ValueWarning',
+    'AUCFitWarning',
+    'AAFitWarning',
+    'DrugCombosWarning',
+    'HillCurve',
+    'HillCurveNull',
+    'HillCurveLL4',
+    'HillCurveLL3u',
+    'HillCurveLL2',
+    'fit_drc',
+    'fit_params_minimal',
+    'fit_params_from_base',
+    'fit_params',
+    'is_param_truncated',
+    'aa_obs',
+]
+
 PARAM_EQUAL_ATOL = 1e-16
 PARAM_EQUAL_RTOL = 1e-12
 # Curve fitting E0 tolerance parameters
@@ -16,15 +34,15 @@ CTRL_DOSE_DIVISOR = 10.0
 
 
 class ValueWarning(UserWarning):
-    pass
+    """Base warning for computed values that may be unreliable"""
 
 
 class AUCFitWarning(ValueWarning):
-    pass
+    """Warning issued when an AUC value may be unreliable"""
 
 
 class AAFitWarning(ValueWarning):
-    pass
+    """Warning issued when an activity area value may be unreliable"""
 
 
 class DrugCombosWarning(UserWarning):
@@ -91,6 +109,8 @@ class HillCurve(object):
 
 
 class HillCurveNull(HillCurve):
+    """Flat (no-effect) curve returned when the null hypothesis cannot be rejected"""
+
     @classmethod
     def fit_fn(cls, x, ymean):
         return ymean
@@ -136,6 +156,8 @@ class HillCurveNull(HillCurve):
 
 
 class HillCurveLL4(HillCurve):
+    """Four-parameter log-logistic Hill curve (E0, Emax, EC50, hill slope)"""
+
     max_fit_evals = 10000
 
     def __init__(self, popt):
@@ -526,6 +548,8 @@ class HillCurveLL3u(HillCurveLL4):
 
 
 class HillCurveLL2(HillCurveLL3u):
+    """Two-parameter log-logistic Hill curve; E0 fixed at 1, Emax fixed at 0"""
+
     fit_bounds = ((0.0, -np.inf), (np.inf, np.inf))
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
