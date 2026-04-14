@@ -321,8 +321,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Area under the curve (AUC) value
+        float or None
+            Area under the curve (AUC) value, or ``None`` for stimulatory
+            responses (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -355,8 +356,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Activity area value
+        float or None
+            Activity area value, or ``None`` for stimulatory responses
+            (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
