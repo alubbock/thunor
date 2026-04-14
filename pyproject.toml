@@ -42,8 +42,13 @@ Homepage = "https://www.thunor.net"
 thunor = ["testdata/*"]
 
 [build-system]
-requires = ["setuptools", "versioneer"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+norecursedirs = ["doc/_build"]
 
 [tool.ruff]
 line-length = 88
