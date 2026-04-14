@@ -28,7 +28,15 @@ class AAFitWarning(ValueWarning):
 
 
 class DrugCombosWarning(UserWarning):
-    """Warning issued when drug combination wells are skipped during fitting"""
+    """
+    Warning issued when drug combination wells are skipped during fitting
+
+    :func:`fit_params_minimal` currently fits single-drug dose-response curves
+    only.  Combination wells (where the ``drug`` tuple has length > 1) are
+    filtered out and this warning is issued.  Future versions will support
+    combination fitting via a dedicated code path; the skip-and-warn behaviour
+    is intentional and will not change when that support lands.
+    """
 
     pass
 
