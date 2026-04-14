@@ -372,7 +372,21 @@ class HtsPandas(object):
         )
 
     def doses_unstacked(self):
-        """Split multiple drugs/doses into separate columns"""
+        """
+        Return the doses DataFrame with drug/dose tuples split into numbered columns
+
+        Converts the internal stacked representation (``drug``, ``dose`` tuple
+        index levels) into the flat ``drug1``, ``dose1``, ``drug2``, ``dose2``,
+        … column layout used in HDF5 files and required by external tools such
+        as the synergy package for combination-dose matrices.
+
+        Returns
+        -------
+        pd.DataFrame
+            Doses DataFrame indexed by ``(drug1, cell_line, dose1)`` for
+            single-drug datasets, or by ``(drug1, drug2, cell_line, dose1,
+            dose2)`` for combination datasets.
+        """
         # If already unstacked, just return
         if 'drug1' in self.doses.index.names:
             return self.doses
