@@ -1,6 +1,12 @@
 Thunor Changelog
 ================
 
+Changes since v0.1.15 are documented in
+[GitHub Releases](https://github.com/alubbock/thunor/releases).
+Historical entries below are preserved for reference.
+
+---
+
 ## v0.1.15 2019-03-28
 
 ### Bugfixes
