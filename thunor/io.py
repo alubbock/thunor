@@ -981,11 +981,16 @@ def _stack_doses(df_doses, inplace=True):
     assert n_drugs == len(dose_cols.columns)
 
     if n_drugs > 1:
-        df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        drug_df = df_doses.filter(regex='^drug[0-9]+$', axis=1)
+        dose_df = df_doses.filter(regex='^dose[0-9]+$', axis=1)
+        # Drop NaN drug entries (blank drug2 on single-drug rows) from tuples so
+        # that single-drug rows yield length-1 tuples and are not mistaken for
+        # combinations by downstream combo detection logic.
+        df_doses['drug'] = drug_df.apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
-        df_doses['dose'] = df_doses.filter(regex='^dose[0-9]+$', axis=1).apply(
-            tuple, axis=1
+        df_doses['dose'] = dose_df.where(pd.notna(drug_df.values)).apply(
+            lambda row: tuple(v for v in row if pd.notna(v)), axis=1
         )
     else:
         lbl_drug = 'drug' if n_drugs == 0 else 'drug1'

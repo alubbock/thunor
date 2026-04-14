@@ -520,6 +520,8 @@ class HillCurveLL2(HillCurveLL3u):
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
     curve_fit_kwargs_log = {}
+    # Fully unbounded fit uses LM solver, which requires an integer maxfev
+    max_fit_evals = 0
 
     @classmethod
     def fit_fn(cls, x, b, e):
