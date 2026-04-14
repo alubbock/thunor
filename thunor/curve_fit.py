@@ -28,7 +28,15 @@ class AAFitWarning(ValueWarning):
 
 
 class DrugCombosWarning(UserWarning):
-    """Warning issued when drug combination wells are skipped during fitting"""
+    """
+    Warning issued when drug combination wells are skipped during fitting
+
+    :func:`fit_params_minimal` currently fits single-drug dose-response curves
+    only.  Combination wells (where the ``drug`` tuple has length > 1) are
+    filtered out and this warning is issued.  Future versions will support
+    combination fitting via a dedicated code path; the skip-and-warn behaviour
+    is intentional and will not change when that support lands.
+    """
 
     pass
 
@@ -321,8 +329,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Area under the curve (AUC) value
+        float or None
+            Area under the curve (AUC) value, or ``None`` for stimulatory
+            responses (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -355,8 +364,9 @@ class HillCurveLL4(HillCurve):
 
         Returns
         -------
-        float
-            Activity area value
+        float or None
+            Activity area value, or ``None`` for stimulatory responses
+            (Emax > E0) which are not yet supported.
         """
         emax = self.emax
         if not isinstance(emax, float):
@@ -520,6 +530,8 @@ class HillCurveLL2(HillCurveLL3u):
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
     curve_fit_kwargs_log = {}
+    # Fully unbounded fit uses LM solver, which requires an integer maxfev
+    max_fit_evals = 0
 
     @classmethod
     def fit_fn(cls, x, b, e):
@@ -1501,8 +1513,8 @@ def fit_params(
 
 def fit_params_from_base(
     base_params,
-    ctrl_resp_data=None,
-    expt_resp_data=None,
+    ctrl_data=None,
+    expt_data=None,
     ctrl_dose_fn=lambda doses: np.min(doses) / CTRL_DOSE_DIVISOR,
     custom_ic_concentrations=frozenset(),
     custom_ec_concentrations=frozenset(),
@@ -1533,7 +1545,7 @@ def fit_params_from_base(
 
     if include_response_values:
         df_params = _attach_response_values(
-            df_params, ctrl_resp_data, expt_resp_data, ctrl_dose_fn
+            df_params, ctrl_data, expt_data, ctrl_dose_fn
         )
 
     return df_params

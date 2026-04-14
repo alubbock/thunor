@@ -208,6 +208,14 @@ class TestCSVTwoDrugs(unittest.TestCase):
         assert len(csv.doses.index.get_level_values('dose')[0]) == 1
 
 
+def test_stack_doses_mismatched_columns_raises():
+    df = pd.DataFrame(
+        {'drug1': ['drugA'], 'dose1': [1e-6], 'dose2': [1e-7], 'cell_line': ['cl1']}
+    )
+    with pytest.raises(ValueError, match='Mismatched drug/dose columns'):
+        thunor.io._stack_doses(df)
+
+
 def test_read_incucyte():
     ref = importlib.resources.files('thunor') / 'testdata/test_incucyte_minimal.txt'
     with importlib.resources.as_file(ref) as filename:
