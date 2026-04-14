@@ -978,7 +978,11 @@ def _stack_doses(df_doses, inplace=True):
     drug_cols = df_doses.filter(regex='^drug[0-9]+$', axis=1)
     dose_cols = df_doses.filter(regex='^dose[0-9]+$', axis=1)
     n_drugs = len(drug_cols.columns)
-    assert n_drugs == len(dose_cols.columns)
+    if n_drugs != len(dose_cols.columns):
+        raise ValueError(
+            f'Mismatched drug/dose columns: found {n_drugs} drug column(s) '
+            f'but {len(dose_cols.columns)} dose column(s)'
+        )
 
     if n_drugs > 1:
         df_doses['drug'] = df_doses.filter(regex='^drug[0-9]+$', axis=1).apply(
