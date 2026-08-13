@@ -1,7 +1,9 @@
-import pandas as pd
-from datetime import timedelta
-from ..io import HtsPandas, write_hdf
 import os
+from datetime import timedelta
+
+import pandas as pd
+
+from ..io import HtsPandas, write_hdf
 
 # The data are 72 hour viability
 TIMEPOINT = timedelta(hours=72)
@@ -110,7 +112,7 @@ def import_ctrp(directory):
                 'assay': ASSAY,
                 'cell_line': cell_line,
                 'plate': plate,
-                'well_id': '{}__{}'.format(plate, 0),
+                'well_id': f'{plate}__{0}',
                 'timepoint': TIMEPOINT,
                 'value': plate_data['dmso_plate_avg_log2'],
                 'well_num': 0,

@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 import collections
 
 __all__ = ['format_dose', 'plotly_to_dataframe']
 from collections.abc import Iterable
+from functools import reduce
 from html.parser import HTMLParser
+
 import pandas as pd
 from pandas.core.indexes.base import InvalidIndexError
-from functools import reduce
 
 
 class _TagStripper(HTMLParser):
@@ -72,7 +72,7 @@ def format_dose(num, sig_digits=12, array_as_string=None):
 
     # TODO: Replace this with bisect
     multiplier = 1
-    for i in _SI_PREFIXES.keys():
+    for i in _SI_PREFIXES:
         if num >= i:
             multiplier = i
         else:
@@ -157,7 +157,8 @@ def plotly_to_dataframe(plot_fig):
                     columns='__replicate__', index=index_name, values=series_name
                 )
                 ptable.rename(
-                    columns=lambda i: '{} {}'.format(trace_name, i), inplace=True
+                    columns=lambda i, trace_name=trace_name: f'{trace_name} {i}',
+                    inplace=True,
                 )
                 series.extend(col for _, col in ptable.items())
         else:

@@ -1,16 +1,16 @@
 import numpy as np
-import scipy.stats
 import pandas as pd
+import scipy.stats
 
 SECONDS_IN_HOUR = 3600.0
 DIP_ASSAYS = ('Cell count', 'lum:Lum')
 
 __all__ = [
     'SECONDS_IN_HOUR',
+    'adjusted_r_squared',
+    'ctrl_dip_rates',
     'dip_rates',
     'expt_dip_rates',
-    'ctrl_dip_rates',
-    'adjusted_r_squared',
     'tyson1',
 ]
 
@@ -281,7 +281,7 @@ def _expt_dip(df_timecourses, selector_fn):
     for i in range(n_total - 2):
         x = t_hours[i:]
         y = assay_vals[i:]
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(x, y)
+        slope, intercept, r_value, _p_value, std_err = scipy.stats.linregress(x, y)
 
         n = len(x)
         adj_r_sq = adjusted_r_squared(r_value, n, 1)
@@ -398,7 +398,7 @@ def _ctrl_dip(df_timecourse):
         / SECONDS_IN_HOUR
     )
 
-    ctrl_slope, ctrl_intercept, ctrl_r, ctrl_p, ctrl_std_err = scipy.stats.linregress(
+    ctrl_slope, ctrl_intercept, _ctrl_r, _ctrl_p, ctrl_std_err = scipy.stats.linregress(
         t_hours, np.log2(np.array(df_timecourse))
     )
 

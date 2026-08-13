@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Thunor documentation build configuration file, created by
 # sphinx-quickstart on Mon Feb 19 20:35:20 2018.
@@ -16,14 +15,15 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import datetime
 import os
 import sys
-from packaging.version import Version
 from unittest import mock
-import datetime
+
+from packaging.version import Version
 
 sys.path.insert(0, os.path.abspath('../'))
-import thunor  # noqa: E402
+import thunor
 
 # -- General configuration ------------------------------------------------
 
@@ -60,7 +60,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Thunor Core'
-copyright = '2017-' + str(datetime.datetime.now().year) + ' Alex Lubbock'
+copyright = '2017-' + str(datetime.datetime.now(tz=datetime.UTC).year) + ' Alex Lubbock'
 author = 'Alex Lubbock'
 
 # The full version, including alpha/beta/rc tags.

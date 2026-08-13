@@ -1,4 +1,5 @@
 import pytest
+
 from thunor.helpers import _strip_tags
 
 

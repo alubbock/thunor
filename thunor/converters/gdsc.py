@@ -1,7 +1,9 @@
-import pandas as pd
-import numpy as np
-from datetime import timedelta
 import collections
+from datetime import timedelta
+
+import numpy as np
+import pandas as pd
+
 from ..io import HtsPandas, write_hdf
 
 # The data are 72 hour viability
@@ -22,8 +24,8 @@ def _ctrl_well(df, num_controls):
     well_vals = {}
     for row in df.itertuples():
         for i in range(num_controls):
-            well_id = '{}__{}'.format(row.BARCODE, i)
-            ctrl_val = getattr(row, 'control{}'.format(i + 1))
+            well_id = f'{row.BARCODE}__{i}'
+            ctrl_val = getattr(row, f'control{i + 1}')
             if ctrl_val == 'qc_fail' or np.isnan(ctrl_val):
                 continue
             if well_id in well_vals:
@@ -92,8 +94,8 @@ def import_gdsc(drug_list_file, screen_data_file):
         start_well = plate_counter[row.BARCODE]
         for i, conc in enumerate(concs):
             well_num = i + START_WELL_EXPT + start_well
-            well_id = '{}__{}'.format(row.BARCODE, well_num)
-            well_val = getattr(row, 'raw{}'.format(i + 1))
+            well_id = f'{row.BARCODE}__{well_num}'
+            well_val = getattr(row, f'raw{i + 1}')
             doses_list.append(
                 {
                     'drug': (row.DRUG_NAME,),

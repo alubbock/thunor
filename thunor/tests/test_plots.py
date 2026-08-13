@@ -1,18 +1,20 @@
-import unittest
 import importlib
-import thunor.io
-import thunor.dip
-import thunor.viability
+import unittest
+
+import pandas as pd
+
 import thunor.curve_fit
+import thunor.dip
+import thunor.io
+import thunor.viability
+from thunor.helpers import plotly_to_dataframe
 from thunor.plots import (
-    plot_time_course,
+    plot_ctrl_dip_by_plate,
     plot_drc,
     plot_drc_params,
     plot_plate_map,
-    plot_ctrl_dip_by_plate,
+    plot_time_course,
 )
-from thunor.helpers import plotly_to_dataframe
-import pandas as pd
 
 
 class TestWithDataset(unittest.TestCase):

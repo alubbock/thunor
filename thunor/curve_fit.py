@@ -1,26 +1,28 @@
+import warnings
+from abc import abstractmethod
+from typing import ClassVar
+
 import numpy as np
+import pandas as pd
 import scipy.optimize
 import scipy.stats
-from abc import abstractmethod
-import pandas as pd
-import warnings
 
 __all__ = [
-    'ValueWarning',
-    'AUCFitWarning',
     'AAFitWarning',
+    'AUCFitWarning',
     'DrugCombosWarning',
     'HillCurve',
-    'HillCurveNull',
-    'HillCurveLL4',
-    'HillCurveLL3u',
     'HillCurveLL2',
-    'fit_drc',
-    'fit_params_minimal',
-    'fit_params_from_base',
-    'fit_params',
-    'is_param_truncated',
+    'HillCurveLL3u',
+    'HillCurveLL4',
+    'HillCurveNull',
+    'ValueWarning',
     'aa_obs',
+    'fit_drc',
+    'fit_params',
+    'fit_params_from_base',
+    'fit_params_minimal',
+    'is_param_truncated',
 ]
 
 PARAM_EQUAL_ATOL = 1e-16
@@ -56,15 +58,13 @@ class DrugCombosWarning(UserWarning):
     is intentional and will not change when that support lands.
     """
 
-    pass
 
-
-class HillCurve(object):
+class HillCurve:
     """Base class defining Hill/log-logistic curve functionality"""
 
     fit_bounds = (-np.inf, np.inf)
-    curve_fit_kwargs = {}
-    curve_fit_kwargs_log = {}
+    curve_fit_kwargs: ClassVar[dict] = {}
+    curve_fit_kwargs_log: ClassVar[dict] = {}
     null_response_fn = np.mean
     max_fit_evals = None
 
@@ -161,7 +161,7 @@ class HillCurveLL4(HillCurve):
     max_fit_evals = 10000
 
     def __init__(self, popt):
-        super(HillCurveLL4, self).__init__(popt)
+        super().__init__(popt)
         self._popt_rel = None
 
     @classmethod
@@ -447,11 +447,11 @@ class HillCurveLL3u(HillCurveLL4):
 
     # Constrain 0<=emax<=1, Hill slope +ve
     fit_bounds = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
-    curve_fit_kwargs = {'method': 'dogbox'}
+    curve_fit_kwargs: ClassVar[dict] = {'method': 'dogbox'}
     # In log-EC50 space: bounds only on b (slope ≥ 0) and c (0 ≤ emax ≤ 1);
     # no bound needed on log_e since exp(log_e) > 0 always
     fit_bounds_log = ((0.0, 0.0, -np.inf), (np.inf, 1.0, np.inf))
-    curve_fit_kwargs_log = {'method': 'dogbox', 'x_scale': 'jac'}
+    curve_fit_kwargs_log: ClassVar[dict] = {'method': 'dogbox', 'x_scale': 'jac'}
     max_fit_evals = None
 
     @staticmethod
@@ -479,7 +479,7 @@ class HillCurveLL3u(HillCurveLL4):
         np.ndarray
             Array of "y" values using the supplied curve fit parameters on "x"
         """
-        return super(HillCurveLL3u, cls).fit_fn(x, b, c, 1.0, e)
+        return super().fit_fn(x, b, c, 1.0, e)
 
     @classmethod
     def fit_fn_log(cls, x, b, c, log_e):
@@ -553,7 +553,7 @@ class HillCurveLL2(HillCurveLL3u):
     fit_bounds = ((0.0, -np.inf), (np.inf, np.inf))
     # LL2 has no bounds at all in linear space; log-EC50 space is also unbounded
     fit_bounds_log = (-np.inf, np.inf)
-    curve_fit_kwargs_log = {}
+    curve_fit_kwargs_log: ClassVar[dict] = {}
     # Fully unbounded fit uses LM solver, which requires an integer maxfev
     max_fit_evals = 0
 
@@ -836,7 +836,7 @@ def fit_drc(
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', scipy.optimize.OptimizeWarning)
             with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
-                popt, pcov = scipy.optimize.curve_fit(
+                popt, _pcov = scipy.optimize.curve_fit(
                     fit_fn,
                     scaled_doses,
                     responses,
@@ -879,7 +879,7 @@ def fit_drc(
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', scipy.optimize.OptimizeWarning)
                 with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
-                    popt, pcov = scipy.optimize.curve_fit(
+                    popt, _pcov = scipy.optimize.curve_fit(
                         fit_cls.fit_fn,
                         scaled_doses,
                         responses,
@@ -973,7 +973,7 @@ def _find_be_ll4(
     dose_transform=np.log,
     dose_inv_transform=np.exp,
 ):
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+    slope, intercept, _r_value, _p_value, _std_err = scipy.stats.linregress(
         dose_transform(x), _response_transform(y, c_val, d_val)
     )
     b_val = slope_scaling_factor * slope
@@ -1237,16 +1237,16 @@ def fit_params_minimal(
         max_dose_measured = np.max(doses)
         min_dose_measured = np.min(doses)
 
-        fit_data = dict(
-            dataset_id=dataset if dataset is not None else '',
-            cell_line=cl_name,
-            drug=dr_name,
-            fit_obj=fit_obj,
-            min_dose_measured=min_dose_measured,
-            max_dose_measured=max_dose_measured,
-            emax_obs=np.min(resp_expt),
-            aa_obs=aa_obs_val,
-        )
+        fit_data = {
+            'dataset_id': dataset if dataset is not None else '',
+            'cell_line': cl_name,
+            'drug': dr_name,
+            'fit_obj': fit_obj,
+            'min_dose_measured': min_dose_measured,
+            'max_dose_measured': max_dose_measured,
+            'emax_obs': np.min(resp_expt),
+            'aa_obs': aa_obs_val,
+        }
 
         fit_params.append(fit_data)
 
@@ -1400,7 +1400,7 @@ def _attach_extra_params(
                     ec_cols[ec_num][i] = float(min(max(ec_v, min_d), max_d))
 
         for ic_num in ic_nums:
-            base_params['ic{:d}'.format(ic_num)] = ic_cols[ic_num]
+            base_params[f'ic{ic_num:d}'] = ic_cols[ic_num]
 
         if need_ec50:
             base_params['ec50'] = ec50_col
@@ -1421,7 +1421,7 @@ def _attach_extra_params(
             base_params['hill'] = hill_col
 
         for ec_num in ec_nums:
-            base_params['ec{:d}'.format(ec_num)] = ec_cols[ec_num]
+            base_params[f'ec{ec_num:d}'] = ec_cols[ec_num]
 
     if not is_viability and include_emax:
         divisor = base_params['fit_obj'].apply(lambda fo: fo.divisor if fo else None)
@@ -1429,13 +1429,13 @@ def _attach_extra_params(
         base_params['emax_obs_rel'] = base_params['emax_obs'] / divisor
 
     for e_num in e_nums:
-        base_params['e{:d}'.format(e_num)] = base_params.apply(
-            _calc_e, args=('ec{:d}'.format(e_num), False), axis=1
+        base_params[f'e{e_num:d}'] = base_params.apply(
+            _calc_e, args=(f'ec{e_num:d}', False), axis=1
         )
 
     for e_num in e_rel_nums:
-        base_params['e{:d}_rel'.format(e_num)] = base_params.apply(
-            _calc_e, args=('ec{:d}'.format(e_num), True), axis=1
+        base_params[f'e{e_num:d}_rel'] = base_params.apply(
+            _calc_e, args=(f'ec{e_num:d}', True), axis=1
         )
 
     return base_params

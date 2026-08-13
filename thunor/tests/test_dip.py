@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 
 import thunor.dip
-from .test_io import CSV_HEADER
 from thunor.dip import dip_rates
-from thunor.io import read_vanderbilt_hts, read_hdf
+from thunor.io import read_hdf, read_vanderbilt_hts
+
+from .test_io import CSV_HEADER
 
 
 def test_dip_two_time_points():
