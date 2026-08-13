@@ -1,12 +1,13 @@
-import thunor.io
-import unittest
 import importlib
-import tempfile
 import io
-import pytest
 import os
-import pandas as pd
+import tempfile
+import unittest
 
+import pandas as pd
+import pytest
+
+import thunor.io
 
 CSV_HEADER = 'cell.line,drug1.conc,drug1,upid,time,cell.count,well,drug1.units'
 
@@ -68,7 +69,7 @@ def _assert_datasets_equal(d1, d2):
     # Use check_dtype=False / check_index_type=False so that comparisons
     # between StringDtype and object dtype (e.g. after an HDF5 round-trip
     # that normalises types) still pass.
-    kw = dict(check_dtype=False, check_index_type=False)
+    kw = {'check_dtype': False, 'check_index_type': False}
     pd.testing.assert_frame_equal(
         _flatten_doses(d1.doses), _flatten_doses(d2.doses), **kw
     )

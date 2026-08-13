@@ -1,13 +1,15 @@
-from . import __name__ as package_name
-from . import __version__
-import pandas as pd
-import numpy as np
-from datetime import timedelta, datetime
-import itertools
 import io
+import itertools
 import pathlib
 import re
 import warnings
+from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
+
+from . import __name__ as package_name
+from . import __version__
 from .dip import SECONDS_IN_HOUR, _choose_dip_assay, dip_rates
 
 ZERO_TIMEDELTA = timedelta(0)
@@ -24,17 +26,17 @@ ANNOTATION_MSG = (
 )
 
 __all__ = [
-    'WELL_ID_SEP',
     'STANDARD_PLATE_SIZES',
+    'WELL_ID_SEP',
+    'HtsPandas',
+    'PlateData',
     'PlateFileParseException',
     'PlateMap',
-    'PlateData',
-    'HtsPandas',
-    'read_vanderbilt_hts',
-    'write_vanderbilt_hts',
     'read_hdf',
-    'write_hdf',
     'read_incucyte',
+    'read_vanderbilt_hts',
+    'write_hdf',
+    'write_vanderbilt_hts',
 ]
 
 
@@ -42,7 +44,7 @@ class PlateFileParseException(Exception):
     """Raised when a plate data file cannot be parsed"""
 
 
-class PlateMap(object):
+class PlateMap:
     """
     Representation of a High Throughput Screening plate
 
@@ -116,9 +118,7 @@ class PlateMap(object):
         str
             Name for this well, e.g. A1
         """
-        return '{}{}'.format(
-            chr(65 + (well_id // self.width)), (well_id % self.width) + 1
-        )
+        return f'{chr(65 + (well_id // self.width))}{(well_id % self.width) + 1}'
 
     def well_name_to_id(self, well_name, raise_error=True):
         """
@@ -153,23 +153,19 @@ class PlateMap(object):
 
             if row_num < 0 or row_num > (self.height - 1):
                 raise ValueError(
-                    'Unable to parse well name {} for plate with {} rows'.format(
-                        well_name, self.height
-                    )
+                    f'Unable to parse well name {well_name} for plate with {self.height} rows'
                 )
 
             col_num = int(well_name[col_num_start:]) - 1
             if col_num < 0 or col_num > (self.width - 1):
                 raise ValueError(
-                    'Unable to parse well name {} for plate with {} cols'.format(
-                        well_name, self.width
-                    )
+                    f'Unable to parse well name {well_name} for plate with {self.width} cols'
                 )
 
             return row_num * self.width + col_num
         except ValueError:
             if raise_error:
-                raise ValueError('Invalid well name: {}'.format(well_name))
+                raise ValueError(f'Invalid well name: {well_name}')
             else:
                 return -1
 
@@ -234,12 +230,20 @@ class PlateData(PlateMap):
         height=16,
         dataset_name=None,
         plate_name=None,
-        cell_lines=[],
-        drugs=[],
-        doses=[],
-        dip_rates=[],
+        cell_lines=None,
+        drugs=None,
+        doses=None,
+        dip_rates=None,
     ):
-        super(PlateData, self).__init__(width=width, height=height)
+        if dip_rates is None:
+            dip_rates = []
+        if doses is None:
+            doses = []
+        if drugs is None:
+            drugs = []
+        if cell_lines is None:
+            cell_lines = []
+        super().__init__(width=width, height=height)
         self.dataset_name = dataset_name
         self.plate_name = plate_name
         self.cell_lines = cell_lines
@@ -261,7 +265,7 @@ class PlateData(PlateMap):
         )
 
 
-class HtsPandas(object):
+class HtsPandas:
     """
     High throughput screen dataset
 
@@ -381,9 +385,7 @@ class HtsPandas(object):
         num_cell_lines = len(self.doses.index.get_level_values('cell_line').unique())
         num_drugs = len(self.doses.index.get_level_values('drug').unique())
 
-        return 'HTS Dataset ({} drugs/combos, {} cell lines)'.format(
-            num_drugs, num_cell_lines
-        )
+        return f'HTS Dataset ({num_drugs} drugs/combos, {num_cell_lines} cell lines)'
 
     def doses_unstacked(self):
         """
@@ -520,7 +522,7 @@ def _time_parser(t):
     try:
         t = float(t)
     except ValueError:
-        raise PlateFileParseException('Error parsing time value: "{}"'.format(t))
+        raise PlateFileParseException(f'Error parsing time value: "{t}"')
     return timedelta(hours=t)
 
 
@@ -567,7 +569,11 @@ def _read_vanderbilt_hts_single_df(
             converters={
                 'time': _time_parser,
                 'well': lambda w: pm.well_name_to_id(w),
-                'expt.date': lambda d: datetime.strptime(d, '%Y-%m-%d').date(),
+                # Calendar date only (immediately reduced via .date()), so
+                # timezone-awareness does not apply here
+                'expt.date': lambda d: datetime.strptime(  # noqa: DTZ007
+                    d, '%Y-%m-%d'
+                ).date(),
             },
             sep=sep,
         )
@@ -577,15 +583,13 @@ def _read_vanderbilt_hts_single_df(
             raise PlateFileParseException(ve)
         elif errstr.startswith('could not convert string to float'):
             raise PlateFileParseException(
-                'Invalid value for drug concentration ({})'.format(errstr)
+                f'Invalid value for drug concentration ({errstr})'
             )
         elif errstr.startswith('invalid literal for int() with base 10'):
-            raise PlateFileParseException(
-                'Invalid value for cell count ({})'.format(errstr)
-            )
+            raise PlateFileParseException(f'Invalid value for cell count ({errstr})')
         elif errstr.startswith('time data') and 'does not match format' in errstr:
             raise PlateFileParseException(
-                'Date format should be YYYY-MM-DD ({})'.format(errstr)
+                f'Date format should be YYYY-MM-DD ({errstr})'
             )
         else:
             raise
@@ -611,10 +615,10 @@ def _read_vanderbilt_hts_single_df(
 
 def _select_csv_separator(file_or_buf):
     if not isinstance(file_or_buf, str):
-        raise ValueError('Need to specify file separator (\\t or ,)')
+        raise TypeError('Need to specify file separator (\\t or ,)')
     if file_or_buf.endswith('.csv'):
         return ','
-    elif file_or_buf.endswith('.tsv') or file_or_buf.endswith('.txt'):
+    elif file_or_buf.endswith(('.tsv', '.txt')):
         return '\t'
     else:
         raise ValueError(
@@ -697,34 +701,34 @@ def read_vanderbilt_hts(
 
     drug_no = 1
     drug_nums = []
-    while ('drug%d' % drug_no) in df.columns.values:
+    while f'drug{drug_no}' in df.columns.values:
         try:
-            if (df['drug%d.conc' % drug_no] < 0).any():
+            if (df[f'drug{drug_no}.conc'] < 0).any():
                 raise PlateFileParseException(
-                    'drug%d.conc contains negative value(s)' % drug_no
+                    f'drug{drug_no}.conc contains negative value(s)'
                 )
         except KeyError:
             raise PlateFileParseException(
-                'Check for "drug{}.conc" column header'.format(drug_no)
+                f'Check for "drug{drug_no}.conc" column header'
             )
 
-        null_drug_names = df['drug%d' % drug_no].isnull()
-        null_dose_positions = df['drug%d.conc' % drug_no].loc[null_drug_names]
+        null_drug_names = df[f'drug{drug_no}'].isnull()
+        null_dose_positions = df[f'drug{drug_no}.conc'].loc[null_drug_names]
         if (~null_dose_positions.isnull() & null_dose_positions != 0.0).any():
             raise PlateFileParseException(
-                'Check that blank drug{} entries have blank or zero '
-                'concentration also'.format(drug_no)
+                f'Check that blank drug{drug_no} entries have blank or zero '
+                'concentration also'
             )
 
-        if 'drug%d.units' % drug_no not in df.columns:
+        if f'drug{drug_no}.units' not in df.columns:
             raise PlateFileParseException(
-                'Check for "drug{}.units" column header'.format(drug_no)
+                f'Check for "drug{drug_no}.units" column header'
             )
 
         if null_drug_names.all() and drug_no == 2 and 'drug3' not in df.columns:
             break
 
-        for du in df['drug%d.units' % drug_no].unique():
+        for du in df[f'drug{drug_no}.units'].unique():
             if not isinstance(du, str) and np.isnan(du):
                 continue
 
@@ -769,8 +773,8 @@ def read_vanderbilt_hts(
             ind_val = dup_drugs.index.tolist()[0]
             well_name = pm.well_id_to_name(ind_val[1])
             raise PlateFileParseException(
-                '{} entries have the same drug listed in the same well, '
-                'e.g. plate "{}", well {}'.format(len(dup_drugs), ind_val[0], well_name)
+                f'{len(dup_drugs)} entries have the same drug listed in the same well, '
+                f'e.g. plate "{ind_val[0]}", well {well_name}'
             )
 
     # Check for duplicate time point definitions
@@ -781,10 +785,8 @@ def read_vanderbilt_hts(
         first_dup = dups[0]
 
         raise PlateFileParseException(
-            'There are {} duplicate time points defined, e.g. plate "{}"'
-            ', well {}, time {}'.format(
-                n_dups, first_dup[0], pm.well_id_to_name(first_dup[1]), first_dup[2]
-            )
+            f'There are {n_dups} duplicate time points defined, e.g. plate "{first_dup[0]}"'
+            f', well {pm.well_id_to_name(first_dup[1])}, time {first_dup[2]}'
         )
 
     assay_name = 'Cell count'
@@ -793,24 +795,20 @@ def read_vanderbilt_hts(
         doses_cols = ['cell.line']
 
         for n in drug_nums:
-            doses_cols.extend(['drug{}'.format(n), 'drug{}.conc'.format(n)])
-        expt_rows = np.logical_or.reduce(
-            [df['drug{}.conc'.format(n)] > 0 for n in drug_nums]
-        )
+            doses_cols.extend([f'drug{n}', f'drug{n}.conc'])
+        expt_rows = np.logical_or.reduce([df[f'drug{n}.conc'] > 0 for n in drug_nums])
 
         df_doses = df.loc[expt_rows, doses_cols]
         df_doses.reset_index(inplace=True)
         df_doses['well_num'] = df_doses['well']
         df_doses = df_doses.assign(
-            well=list(
-                [
-                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
-                    for a_, b_ in zip(df_doses['upid'], df_doses['well'])
-                ]
-            )
+            well=[
+                f'{a_}{WELL_ID_SEP}{b_}'
+                for a_, b_ in zip(df_doses['upid'], df_doses['well'])
+            ]
         )
         df_doses = df_doses.drop_duplicates(subset='well')
-        col_renames = {'drug{}.conc'.format(n): 'dose{}'.format(n) for n in drug_nums}
+        col_renames = {f'drug{n}.conc': f'dose{n}' for n in drug_nums}
         col_renames.update(
             {'cell.line': 'cell_line', 'well': 'well_id', 'upid': 'plate'}
         )
@@ -819,9 +817,9 @@ def read_vanderbilt_hts(
         if not _unstacked:
             _stack_doses(df_doses, inplace=True)
         else:
-            index_cols = ['drug{}'.format(n) for n in drug_nums]
+            index_cols = [f'drug{n}' for n in drug_nums]
             index_cols += ['cell_line']
-            index_cols.extend(['dose{}'.format(n) for n in drug_nums])
+            index_cols.extend([f'dose{n}' for n in drug_nums])
             df_doses.set_index(index_cols, inplace=True)
 
         df_doses.sort_index(inplace=True)
@@ -840,12 +838,10 @@ def read_vanderbilt_hts(
         df_controls.reset_index(inplace=True)
         df_controls['well_num'] = df_controls['well']
         df_controls = df_controls.assign(
-            well=list(
-                [
-                    '{}{}{}'.format(a_, WELL_ID_SEP, b_)
-                    for a_, b_ in zip(df_controls['upid'], df_controls['well'])
-                ]
-            )
+            well=[
+                f'{a_}{WELL_ID_SEP}{b_}'
+                for a_, b_ in zip(df_controls['upid'], df_controls['well'])
+            ]
         )
         df_controls.columns = [
             'plate',
@@ -864,9 +860,7 @@ def read_vanderbilt_hts(
     # df_vals
     df_vals = df[['time', 'cell.count']]
     df_vals = df_vals[expt_rows]
-    df_vals.index = [
-        '{}{}{}'.format(a_, WELL_ID_SEP, b_) for a_, b_ in df_vals.index.tolist()
-    ]
+    df_vals.index = [f'{a_}{WELL_ID_SEP}{b_}' for a_, b_ in df_vals.index.tolist()]
     df_vals.index.name = 'well_id'
     df_vals.columns = ['timepoint', 'value']
     df_vals['assay'] = assay_name
@@ -1055,17 +1049,17 @@ def _unstack_doses(df_doses):
         drug_cols = df_doses['drug'].apply(pd.Series)
         dose_cols = df_doses['dose'].apply(pd.Series)
         drug_cols.rename(
-            columns={n: 'drug%d' % (n + 1) for n in range(n_drugs)}, inplace=True
+            columns={n: f'drug{n + 1}' for n in range(n_drugs)}, inplace=True
         )
         dose_cols.rename(
-            columns={n: 'dose%d' % (n + 1) for n in range(n_drugs)}, inplace=True
+            columns={n: f'dose{n + 1}' for n in range(n_drugs)}, inplace=True
         )
         df_doses.drop(['drug', 'dose'], axis=1, inplace=True)
         df_doses = pd.concat([df_doses, drug_cols, dose_cols], axis=1)
     df_doses.set_index(
-        ['drug%d' % (n + 1) for n in range(n_drugs)]
+        [f'drug{n + 1}' for n in range(n_drugs)]
         + ['cell_line']
-        + ['dose%d' % (n + 1) for n in range(n_drugs)],
+        + [f'dose{n + 1}' for n in range(n_drugs)],
         inplace=True,
     )
     return df_doses

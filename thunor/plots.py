@@ -1,27 +1,26 @@
-# -*- coding: utf-8 -*-
-
-import plotly.graph_objs as go
-import numpy as np
-import seaborn as sns
-from . import config
-from .helpers import format_dose
-from .dip import SECONDS_IN_HOUR, ctrl_dip_rates, expt_dip_rates
-from .curve_fit import HillCurveNull, is_param_truncated
-import scipy.stats
 import re
-import pandas as pd
 from collections.abc import Iterable
 
+import numpy as np
+import pandas as pd
+import plotly.graph_objs as go
+import scipy.stats
+import seaborn as sns
+
+from . import config
+from .curve_fit import HillCurveNull, is_param_truncated
+from .dip import SECONDS_IN_HOUR, ctrl_dip_rates, expt_dip_rates
+from .helpers import format_dose
 
 __all__ = [
     'CannotPlotError',
-    'plot_drc',
-    'plot_drug_combination_heatmap',
-    'plot_drc_params',
-    'plot_time_course',
-    'plot_ctrl_dip_by_plate',
     'plot_ctrl_cell_counts_by_plate',
+    'plot_ctrl_dip_by_plate',
+    'plot_drc',
+    'plot_drc_params',
+    'plot_drug_combination_heatmap',
     'plot_plate_map',
+    'plot_time_course',
     'plot_two_dataset_param_scatter',
 ]
 
@@ -88,14 +87,13 @@ def _secs_to_str(seconds):
     """
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
-    return 'Time: %d:%02d:%02d' % (h, m, s)
+    return f'Time: {h:d}:{m:02d}:{s:02d}'
 
 
 def _remove_drmetric_prefix(param_id):
     """Remove DR metric prefix on parameter name, if present"""
     for prefix in ('viability__', 'dip__'):
-        if param_id.startswith(prefix):
-            param_id = param_id[len(prefix) :]
+        param_id = param_id.removeprefix(prefix)
 
     return param_id
 
@@ -122,11 +120,11 @@ def _get_param_name(param_id):
         return PARAM_NAMES[param_id]
     except KeyError:
         if IC_REGEX.match(param_id):
-            return 'IC<sub>{:d}</sub>'.format(int(param_id[2:]))
+            return f'IC<sub>{int(param_id[2:]):d}</sub>'
         elif EC_REGEX.match(param_id):
-            return 'EC<sub>{:d}</sub>'.format(int(param_id[2:]))
+            return f'EC<sub>{int(param_id[2:]):d}</sub>'
         elif E_REGEX.match(param_id):
-            return 'E<sub>{:d}</sub>'.format(int(param_id[1:]))
+            return f'E<sub>{int(param_id[1:]):d}</sub>'
         elif E_REL_REGEX.match(param_id):
             return 'E<sub>{:d}</sub> (relative)'.format(
                 int(param_id[1 : param_id.index('_')])
@@ -149,14 +147,12 @@ def _get_param_units(param_id):
 
 
 def _out_of_range_msg(param_id):
-    return '{} truncated to limit of measured concentrations'.format(
-        _get_param_name(param_id)
-    )
+    return f'{_get_param_name(param_id)} truncated to limit of measured concentrations'
 
 
 def _sns_to_rgb(palette):
     return [
-        'rgb(%d, %d, %d)' % (c[0] * 255, c[1] * 255, c[2] * 255)
+        f'rgb({int(c[0] * 255)}, {int(c[1] * 255)}, {int(c[2] * 255)})'
         if not isinstance(c, str)
         else c
         for c in palette
@@ -174,21 +170,19 @@ def _make_title(title, df):
                 else:
                     drug_name = ' &amp; '.join(drug_name)
             else:
-                raise ValueError('Unknown drug_name type: {}'.format(type(drug_name)))
-        title += ' for {}'.format(drug_name)
+                raise TypeError(f'Unknown drug_name type: {type(drug_name)}')
+        title += f' for {drug_name}'
 
     cell_line_list = df.index.get_level_values('cell_line').unique()
     if len(cell_line_list) == 1:
-        title += ' on {}'.format(cell_line_list[0])
+        title += f' on {cell_line_list[0]}'
 
     return title
 
 
 def _combine_title_subtitle(title, subtitle):
     if subtitle:
-        title += '<br> <span style="color:#999;font-size:0.9em">{}</span>'.format(
-            subtitle
-        )
+        title += f'<br> <span style="color:#999;font-size:0.9em">{subtitle}</span>'
 
     return title
 
@@ -306,7 +300,7 @@ def plot_drc(
                     y=[0],
                     legendgroup=name,
                     showlegend=True,
-                    name='<b>{}</b>'.format(name),
+                    name=f'<b>{name}</b>',
                 )
             )
     xaxis_min = np.inf
@@ -325,7 +319,7 @@ def plot_drc(
                     this_colour = colours[idx]
                     break
             if this_colour is None:
-                raise ValueError('"{}" is not in the color_groups'.format(grp))
+                raise ValueError(f'"{grp}" is not in the color_groups')
         else:
             this_colour = colours.pop()
             legend_grp = fp.label
@@ -378,7 +372,7 @@ def plot_drc(
             dose_x_range = None
             dip_rate_fit = None
             line_mode = 'none'
-            group_name_disp = '<i>{}</i>'.format(group_name_disp)
+            group_name_disp = f'<i>{group_name_disp}</i>'
             hoverinfo = 'none'
             visible = 'legendonly'
         elif isinstance(fp.fit_obj, HillCurveNull):
@@ -433,8 +427,8 @@ def plot_drc(
             repl_name = 'Replicate'
             ctrl_name = 'Control'
             if multi_dataset:
-                repl_name = '{} {}'.format(fp.Index[0], repl_name)
-                ctrl_name = '{} {}'.format(fp.Index[0], ctrl_name)
+                repl_name = f'{fp.Index[0]} {repl_name}'
+                ctrl_name = f'{fp.Index[0]} {ctrl_name}'
 
             if is_viability:
                 # viability times - convert to seconds
@@ -632,8 +626,8 @@ def plot_drug_combination_heatmap(
 
     layout = go.Layout(
         title=title,
-        xaxis={'title': '{} concentration'.format(drug2)},
-        yaxis={'title': '{} concentration'.format(drug1)},
+        xaxis={'title': f'{drug2} concentration'},
+        yaxis={'title': f'{drug1} concentration'},
         template=template,
     )
 
@@ -659,8 +653,7 @@ def _symbols_hovertext_two_dataset_scatter(
             tmp_df.columns = [fit_param, 'max_dose_measured', 'min_dose_measured']
             param_truncated = is_param_truncated(tmp_df, fit_param)
             addtxt = [
-                '<br> {} {}'.format(dataset_names[i], msg) if x else ''
-                for x in param_truncated
+                f'<br> {dataset_names[i]} {msg}' if x else '' for x in param_truncated
             ]
             hovertext = [ht + at for ht, at in zip(hovertext, addtxt)]
             symbols = [
@@ -751,11 +744,11 @@ def plot_two_dataset_param_scatter(
     except TypeError:
         pass
     if param_units:
-        axis_title = '{} ({})'.format(param_name, param_units)
+        axis_title = f'{param_name} ({param_units})'
     else:
         axis_title = param_name
 
-    axis_title = '{} {}'.format(dr_metric, axis_title)
+    axis_title = f'{dr_metric} {axis_title}'
 
     fit_param_data = df_params.loc[:, fit_param]
 
@@ -802,7 +795,7 @@ def plot_two_dataset_param_scatter(
     layout = go.Layout(title=title)
 
     try:
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+        slope, intercept, r_value, p_value, _std_err = scipy.stats.linregress(
             xdat_fit, ydat_fit
         )
     except ValueError:
@@ -820,10 +813,8 @@ def plot_two_dataset_param_scatter(
                 y=yfit,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(color='darkorange'),
-                name='{} vs {} {} Linear Fit'.format(
-                    dataset_names[0], dataset_names[1], param_name
-                ),
+                line={'color': 'darkorange'},
+                name=f'{dataset_names[0]} vs {dataset_names[1]} {param_name} Linear Fit',
                 showlegend=False,
             )
         )
@@ -835,9 +826,7 @@ def plot_two_dataset_param_scatter(
                 'yanchor': 'bottom',
                 'yref': 'paper',
                 'showarrow': False,
-                'text': 'R<sup>2</sup>: {:0.4g} p-value: {:0.4g} '.format(
-                    r_value**2, p_value
-                ),
+                'text': f'R<sup>2</sup>: {r_value**2:0.4g} p-value: {p_value:0.4g} ',
             }
         ]
 
@@ -888,18 +877,16 @@ def plot_two_dataset_param_scatter(
                 mode='markers',
                 customdata=custom_data,
                 marker={'symbol': symbols, 'color': colour_list},
-                name='{} vs {} {}'.format(
-                    dataset_names[0], dataset_names[1], param_name
-                ),
+                name=f'{dataset_names[0]} vs {dataset_names[1]} {param_name}',
             )
         )
 
     layout['xaxis'] = {
-        'title': '{} {}'.format(dataset_names[0], axis_title),
+        'title': f'{dataset_names[0]} {axis_title}',
         'type': 'log' if _param_is_log(fit_param) else None,
     }
     layout['yaxis'] = {
-        'title': '{} {}'.format(dataset_names[1], axis_title),
+        'title': f'{dataset_names[1]} {axis_title}',
         'type': 'log' if _param_is_log(fit_param) else None,
     }
     layout['hovermode'] = 'closest'
@@ -1022,25 +1009,25 @@ def plot_drc_params(
     except TypeError:
         pass
     if yaxis_units:
-        yaxis_title = '{} ({})'.format(yaxis_param_name, yaxis_units)
+        yaxis_title = f'{yaxis_param_name} ({yaxis_units})'
     else:
         yaxis_title = yaxis_param_name
     if df_params.attrs.get('drmetric') in ('dip', 'compare'):
-        yaxis_title = 'DIP {}'.format(yaxis_title)
+        yaxis_title = f'DIP {yaxis_title}'
     else:
         yaxis_title = '{:g} hr viability {}'.format(
             df_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR,
             yaxis_title,
         )
 
-    layout = dict(
-        title=title,
-        template=template,
-        yaxis={
+    layout = {
+        'title': title,
+        'template': template,
+        'yaxis': {
             'title': yaxis_title,
             'type': 'log' if _param_is_log(fit_param) else None,
         },
-    )
+    }
 
     if fit_param_compare:
         df_params.dropna(subset=[fit_param, fit_param_compare], inplace=True)
@@ -1065,11 +1052,11 @@ def plot_drc_params(
         except TypeError:
             pass
         if xaxis_units:
-            xaxis_title = '{} ({})'.format(xaxis_param_name, xaxis_units)
+            xaxis_title = f'{xaxis_param_name} ({xaxis_units})'
         else:
             xaxis_title = xaxis_param_name
         if df_params.attrs.get('drmetric') == 'dip':
-            xaxis_title = 'DIP {}'.format(xaxis_title)
+            xaxis_title = f'DIP {xaxis_title}'
         else:
             xaxis_title = '{:g} hr viability {}'.format(
                 df_params.attrs['viability_time'].total_seconds() / SECONDS_IN_HOUR,
@@ -1114,7 +1101,7 @@ def plot_drc_params(
             ydat_fit = ydat_fit[fitdat_mask].values
 
         if len(xdat_fit) > 0:
-            slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(
+            slope, intercept, r_value, p_value, _std_err = scipy.stats.linregress(
                 xdat_fit, ydat_fit
             )
 
@@ -1130,10 +1117,8 @@ def plot_drc_params(
                     y=yfit,
                     mode='lines',
                     hoverinfo='none',
-                    line=dict(color='darkorange'),
-                    name='{} vs {} Linear Fit'.format(
-                        xaxis_param_name, yaxis_param_name
-                    ),
+                    line={'color': 'darkorange'},
+                    name=f'{xaxis_param_name} vs {yaxis_param_name} Linear Fit',
                     showlegend=False,
                 )
             )
@@ -1145,9 +1130,7 @@ def plot_drc_params(
                     'yanchor': 'bottom',
                     'yref': 'paper',
                     'showarrow': False,
-                    'text': 'R<sup>2</sup>: {:0.4g} p-value: {:0.4g} '.format(
-                        r_value**2, p_value
-                    ),
+                    'text': f'R<sup>2</sup>: {r_value**2:0.4g} p-value: {p_value:0.4g} ',
                 }
             ]
 
@@ -1196,7 +1179,7 @@ def plot_drc_params(
                     mode='markers',
                     customdata=custom_data,
                     marker={'symbol': symbols, 'color': colour_list},
-                    name='{} vs {}'.format(xaxis_param_name, yaxis_param_name),
+                    name=f'{xaxis_param_name} vs {yaxis_param_name}',
                 )
             )
 
@@ -1262,7 +1245,7 @@ def plot_drc_params(
                         marker_cols.append(colours[idx])
                         break
                 else:
-                    raise ValueError('Entity not found: {}'.format(c))
+                    raise ValueError(f'Entity not found: {c}')
 
         if fit_param_sort is not None:
             na_list = df_params[fit_param_sort].isnull()
@@ -1272,8 +1255,8 @@ def plot_drc_params(
                 if na_list.iloc[idx]:
                     if text[idx]:
                         text[idx] += '<br>'
-                    text[idx] += '{} undefined, sorted by {}'.format(
-                        _get_param_name(fit_param_sort), _get_param_name(fit_param)
+                    text[idx] += (
+                        f'{_get_param_name(fit_param_sort)} undefined, sorted by {_get_param_name(fit_param)}'
                     )
 
         custom_data = [
@@ -1335,8 +1318,8 @@ def plot_drc_params(
                                 'yanchor': 'bottom',
                                 'yref': 'paper',
                                 'showarrow': False,
-                                'text': 'Two-sided Mann-Whitney U: {:.4g} '
-                                'p-value: {:.4g}'.format(mw_u, mw_p),
+                                'text': f'Two-sided Mann-Whitney U: {mw_u:.4g} '
+                                f'p-value: {mw_p:.4g}',
                             }
                         )
 
@@ -1514,9 +1497,7 @@ def plot_drc_params(
                     'yanchor': 'bottom',
                     'yref': 'paper',
                     'showarrow': False,
-                    'text': 'One-way ANOVA F: {:.4g} p-value: {:.4g}'.format(
-                        anova_f, anova_p
-                    ),
+                    'text': f'One-way ANOVA F: {anova_f:.4g} p-value: {anova_p:.4g}',
                 }
             )
 
@@ -1556,9 +1537,7 @@ def _aggregate_by_tag(
 
         # Add counts to the tag names
         if add_counts:
-            tag_name = '{} ({})'.format(
-                tag_name, len(yvals_tmp.index.get_level_values(label_type).unique())
-            )
+            tag_name = f'{tag_name} ({len(yvals_tmp.index.get_level_values(label_type).unique())})'
 
         yvals_tmp.loc[:, label_type_tag] = np.repeat(tag_name, len(yvals_tmp))
         df_list.append(yvals_tmp)
@@ -1581,7 +1560,7 @@ def _create_label_max_items(items, max_items=5):
         items = items[0:max_items]
     annotation_label = ', '.join(items)
     if n > max_items:
-        annotation_label += ' and {} more'.format(n - len(items))
+        annotation_label += f' and {n - len(items)} more'
     return annotation_label
 
 
@@ -1637,9 +1616,7 @@ def plot_time_course(
         assay = assay_name
     else:
         raise ValueError(
-            '{} is not a valid assay. Options are {}'.format(
-                assay_name, df_assays_avail
-            )
+            f'{assay_name} is not a valid assay. Options are {df_assays_avail}'
         )
 
     if df_controls is not None:
@@ -1806,7 +1783,7 @@ def plot_time_course(
 
     data = traces + traces_fits
     if log_yaxis:
-        assay_name = 'Change in log<sub>2</sub> {}'.format(assay_name)
+        assay_name = f'Change in log<sub>2</sub> {assay_name}'
     max_time = df_vals.index.get_level_values('timepoint').max()
     layout = go.Layout(
         title=title,
@@ -1999,9 +1976,9 @@ def plot_plate_map(
     """
     maintitle = 'DIP Rate Plate Map'
     if subtitle is None:
-        subtitle = 'Plate {}'.format(plate_data.plate_name)
+        subtitle = f'Plate {plate_data.plate_name}'
         if plate_data.dataset_name:
-            subtitle += ' ({})'.format(plate_data.dataset_name)
+            subtitle += f' ({plate_data.dataset_name})'
     title = _combine_title_subtitle(maintitle, subtitle)
 
     well_color_basis = np.array(getattr(plate_data, color_by), dtype=np.double)
@@ -2080,10 +2057,10 @@ def plot_plate_map(
         mode='text',
         text=col_labels,
         hoverinfo='none',
-        textfont=dict(
-            color=label_color,
+        textfont={
+            'color': label_color,
             # size=18,
-        ),
+        },
     )
 
     row_labels = go.Scatter(
@@ -2092,10 +2069,10 @@ def plot_plate_map(
         mode='text',
         text=row_labels,
         hoverinfo='none',
-        textfont=dict(
-            color=label_color,
+        textfont={
+            'color': label_color,
             # size=18,
-        ),
+        },
     )
 
     data = (well_objs, col_labels, row_labels)

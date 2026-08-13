@@ -7,8 +7,8 @@ Run with:
     python benchmarks/bench_fitting.py
 """
 
-import sys
 import importlib
+import sys
 import time
 from pathlib import Path
 
@@ -18,11 +18,12 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 
-import numpy as np  # noqa: E402
-import thunor.io  # noqa: E402
-import thunor.dip  # noqa: E402
-import thunor.viability  # noqa: E402
-import thunor.curve_fit  # noqa: E402
+import numpy as np
+
+import thunor.curve_fit
+import thunor.dip
+import thunor.io
+import thunor.viability
 
 REPEATS = 10
 

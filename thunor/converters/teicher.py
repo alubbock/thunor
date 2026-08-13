@@ -1,7 +1,9 @@
-from ..io import HtsPandas, write_hdf
-import pandas as pd
 import datetime
 import os
+
+import pandas as pd
+
+from ..io import HtsPandas, write_hdf
 
 ASSAY = 'lum:Lum'
 TIMEPOINT = datetime.timedelta(hours=96)
@@ -54,7 +56,7 @@ def import_teicher(directory):
                 'assay': ASSAY,
                 'cell_line': cell_line,
                 'plate': plate,
-                'well_id': '{}__{}'.format(plate, 0),
+                'well_id': f'{plate}__{0}',
                 'timepoint': TIMEPOINT,
                 'value': 100.0,
                 'well_num': 0,
