@@ -208,6 +208,17 @@ class TestCSVTwoDrugs(unittest.TestCase):
         assert len(csv.doses.index.get_level_values('drug')[0]) == 1
         assert len(csv.doses.index.get_level_values('dose')[0]) == 1
 
+    def test_csv_two_drugs_drug2_blank_conc_specified_among_valid_rows(self):
+        # A valid blank-drug2 control well (zero conc) alongside a row with
+        # a blank drug2 name but a genuine nonzero dose - the latter must
+        # still be caught even when mixed with valid rows
+        with pytest.raises(thunor.io.PlateFileParseException):
+            _check_csv(
+                CSV_HEADER + ',drug2,drug2.units,drug2.conc'
+                '\ncl1,0.00013,drug1,plate1,12,1234,A1,M,,M,0'
+                '\ncl1,0.00013,drug1,plate1,12,1235,A2,M,,M,0.00010'
+            )
+
 
 def test_stack_doses_mismatched_columns_raises():
     df = pd.DataFrame(

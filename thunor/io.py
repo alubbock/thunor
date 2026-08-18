@@ -714,7 +714,7 @@ def read_vanderbilt_hts(
 
         null_drug_names = df[f'drug{drug_no}'].isnull()
         null_dose_positions = df[f'drug{drug_no}.conc'].loc[null_drug_names]
-        if (~null_dose_positions.isnull() & null_dose_positions != 0.0).any():
+        if ((~null_dose_positions.isnull()) & (null_dose_positions != 0.0)).any():
             raise PlateFileParseException(
                 f'Check that blank drug{drug_no} entries have blank or zero '
                 'concentration also'
