@@ -85,7 +85,7 @@ def _secs_to_str(seconds):
     str
         Formatted string like "Time: 2:04:00"
     """
-    m, s = divmod(seconds, 60)
+    m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
     return f'Time: {h:d}:{m:02d}:{s:02d}'
 

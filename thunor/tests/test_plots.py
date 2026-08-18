@@ -9,6 +9,7 @@ import thunor.io
 import thunor.viability
 from thunor.helpers import plotly_to_dataframe
 from thunor.plots import (
+    _secs_to_str,
     plot_ctrl_dip_by_plate,
     plot_drc,
     plot_drc_params,
@@ -139,3 +140,7 @@ class TestWithDataset(unittest.TestCase):
         assert isinstance(df, pd.DataFrame)
         assert list(df.columns) == ['t 0', 't 1']
         assert list(df.index) == [0, 1]
+
+    def test_secs_to_str_float_input(self):
+        # total_seconds() on a pd.Timedelta returns a float
+        assert _secs_to_str(3723.7) == 'Time: 1:02:03'
