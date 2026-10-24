@@ -3,7 +3,7 @@ import itertools
 import pathlib
 import re
 import warnings
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
@@ -569,11 +569,7 @@ def _read_vanderbilt_hts_single_df(
             converters={
                 'time': _time_parser,
                 'well': lambda w: pm.well_name_to_id(w),
-                # Calendar date only (immediately reduced via .date()), so
-                # timezone-awareness does not apply here
-                'expt.date': lambda d: datetime.strptime(  # noqa: DTZ007
-                    d, '%Y-%m-%d'
-                ).date(),
+                'expt.date': lambda d: date.fromisoformat(d),
             },
             sep=sep,
         )
